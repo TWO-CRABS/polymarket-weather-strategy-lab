@@ -174,7 +174,7 @@ export const DEFAULT_STRATEGY = Object.freeze({
     takeProfitPct: 50,
     stopLossPct: 30,
     maxHoldSec: 3600,
-    holdToResolution: true,
+    holdToResolution: false,
     exitOnOppositeSignal: false,
   },
   risk: {
@@ -223,8 +223,24 @@ export function isPlainObject(v) {
  * @returns {object} normalized config (deep cloned)
  */
 export function normalizeStrategy(input = {}) {
-  const merged = deepMerge(DEFAULT_STRATEGY, isPlainObject(input) ? input : {});
-  merged.version = STRATEGY_VERSION;
+  const src = isPlainObject(input) ? input : {};
+  const merged = deepMerge(DEFAULT_STRATEGY, src);
+
+  // Defensive: a caller may send null/primitive group values. Never throw.
+  const groups = ["universe", "signal", "execution", "exit", "risk", "fees", "sim"];
+  for (const group of groups) {
+    if (!isPlainObject(merged[group])) merged[group] = clone(DEFAULT_STRATEGY[group]);
+  }
+
+  // version is validated (only 1 accepted) rather than silently coerced.
+  const versionRaw = src.version;
+  merged.version =
+    versionRaw === undefined || versionRaw === null
+      ? STRATEGY_VERSION
+      : Number.isFinite(Number(versionRaw))
+        ? Number(versionRaw)
+        : versionRaw;
+
   merged.name = String(merged.name || "未命名策略").slice(0, 120);
   merged.description = String(merged.description || "").slice(0, 2000);
 
@@ -233,8 +249,8 @@ export function normalizeStrategy(input = {}) {
     return Number.isFinite(n) ? n : fallback;
   };
 
-  for (const group of ["universe", "signal", "execution", "exit", "risk", "fees", "sim"]) {
-    for (const [key, value] of Object.entries(merged[group] || {})) {
+  for (const group of groups) {
+    for (const [key, value] of Object.entries(merged[group])) {
       if (Array.isArray(value)) continue;
       if (typeof DEFAULT_STRATEGY[group][key] === "number") {
         merged[group][key] = num(value, DEFAULT_STRATEGY[group][key]);
@@ -246,8 +262,8 @@ export function normalizeStrategy(input = {}) {
     ? merged.universe.cities.map((c) => String(c).trim()).filter(Boolean)
     : [];
 
-  // Run mode lives in sim.mode; the API may also echo it at the top level.
-  if (!RUN_MODES.includes(merged.sim.mode)) merged.sim.mode = "live";
+  // sim.mode is validated by validateStrategy (invalid values must be rejected,
+  // see docs/03 §1.1), so it is deliberately not coerced here.
   return merged;
 }
 
@@ -278,6 +294,9 @@ export function validateStrategy(input = {}) {
   const r = cfg.risk;
   const sim = cfg.sim;
 
+  if (cfg.version !== STRATEGY_VERSION) {
+    err(`version 仅支持 ${STRATEGY_VERSION}，当前为 ${String(cfg.version)}`);
+  }
   if (!RUN_MODES.includes(sim.mode)) err(`sim.mode 非法: ${sim.mode}`);
   if (!PRICE_FIELDS.includes(s.priceField)) err(`signal.priceField 非法: ${s.priceField}`);
   if (!DIRECTIONS.includes(s.direction)) err(`signal.direction 非法: ${s.direction}`);
@@ -355,7 +374,7 @@ export const STRATEGY_PRESETS = Object.freeze([
       universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.05, maxPrice: 0.95, minLiquidityUsd: 1000, maxSpread: 0.02, maxMarkets: 8 },
       signal: { ...clone(DEFAULT_STRATEGY.signal), windowSec: 120, moveThresholdPct: 25, minAbsMove: 0.02, confirmationTicks: 2, cooldownSec: 600, maxSignalsPerMarket: 3 },
       execution: { ...clone(DEFAULT_STRATEGY.execution), sizingMode: "fixed_stake", sizingValue: 20, maxPositionUsd: 40, maxPositions: 3 },
-      exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 40, stopLossPct: 25, maxHoldSec: 1800 },
+      exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 40, stopLossPct: 25, maxHoldSec: 1800, holdToResolution: false },
       risk: { ...clone(DEFAULT_STRATEGY.risk), bankrollUsd: 1000, maxDrawdownPct: 15 },
       sim: { ...clone(DEFAULT_STRATEGY.sim), tickIntervalMs: 1000 },
     },
@@ -370,7 +389,7 @@ export const STRATEGY_PRESETS = Object.freeze([
       universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.02, maxPrice: 0.98, minLiquidityUsd: 500, maxSpread: 0.03 },
       signal: { ...clone(DEFAULT_STRATEGY.signal), windowSec: 60, moveThresholdPct: 20, minAbsMove: 0.01, confirmationTicks: 1, cooldownSec: 300 },
       execution: { ...clone(DEFAULT_STRATEGY.execution), sizingValue: 25, maxPositionUsd: 50, maxPositions: 5 },
-      exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 50, stopLossPct: 30, maxHoldSec: 3600 },
+      exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 50, stopLossPct: 30, maxHoldSec: 3600, holdToResolution: false },
       risk: { ...clone(DEFAULT_STRATEGY.risk), bankrollUsd: 1000, maxDrawdownPct: 20 },
       sim: { ...clone(DEFAULT_STRATEGY.sim), tickIntervalMs: 1000 },
     },
@@ -462,6 +481,8 @@ export const STRATEGY_PRESETS = Object.freeze([
  * @property {number} totalCost        notional + fee (BUY) or notional - fee (SELL)
  * @property {number} cashDelta        negative for BUY, positive for SELL
  * @property {number} realizedPnl      realized P&L on SELL, 0 otherwise
+ * @property {number} [referenceMid]   optional: mid at fill time, for spread-cost attribution
+ * @property {number} [spreadCost]     optional: shares * |referenceQuote - referenceMid| (USDC)
  * @property {string|null} signalId
  * @property {string} reason           one of EXIT_REASONS or "signal"
  * @property {"filled"|"partial"|"rejected"} status

@@ -1,0 +1,52 @@
+{
+  "_comment": "Deterministic REPLAY_FIXTURE sample for backend/QA smoke tests. Use with FEED_MODE=off (zero upstream calls). Prices are synthetic; fills use a synthetic book around each mid.",
+  "asOf": 1794118800000,
+  "markets": [
+    {
+      "id": "fix-temp-up",
+      "city": "Test City",
+      "bracket": "10°C",
+      "question": "Will the highest temperature in Test City be 10°C or below on November 8?",
+      "tokens": { "yesTokenId": "fix-yes-up", "noTokenId": "fix-no-up" },
+      "tickSize": 0.001,
+      "minOrderShares": 5,
+      "endDate": "2026-11-09T06:20:00Z",
+      "liquidityUsd": 25000,
+      "spread": 0.01,
+      "negRisk": true,
+      "feeSchedule": { "rate": 0.05, "exponent": 1, "takerOnly": true }
+    },
+    {
+      "id": "fix-temp-down",
+      "city": "Test City",
+      "bracket": "20°C",
+      "question": "Will the highest temperature in Test City be 20°C or higher on November 8?",
+      "tokens": { "yesTokenId": "fix-yes-down", "noTokenId": "fix-no-down" },
+      "tickSize": 0.001,
+      "minOrderShares": 5,
+      "endDate": "2026-11-09T06:20:00Z",
+      "liquidityUsd": 20000,
+      "spread": 0.01,
+      "negRisk": true,
+      "feeSchedule": { "rate": 0.05, "exponent": 1, "takerOnly": true }
+    }
+  ],
+  "series": {
+    "fix-yes-up": [
+      { "ts": 1794118800000, "mid": 0.2 },
+      { "ts": 1794118860000, "mid": 0.24 },
+      { "ts": 1794118920000, "mid": 0.24 },
+      { "ts": 1794118980000, "mid": 0.18 },
+      { "ts": 1794119040000, "mid": 0.3 },
+      { "ts": 1794119100000, "mid": 0.3 }
+    ],
+    "fix-yes-down": [
+      { "ts": 1794118800000, "mid": 0.6 },
+      { "ts": 1794118860000, "mid": 0.45 },
+      { "ts": 1794118920000, "mid": 0.45 },
+      { "ts": 1794118980000, "mid": 0.5 },
+      { "ts": 1794119040000, "mid": 0.5 },
+      { "ts": 1794119100000, "mid": 0.5 }
+    ]
+  }
+}
