@@ -463,31 +463,44 @@ test("BUY trims by 0.01 shares so notional + fee fits available cash", () => {
   const result = simulateBuy({ book, budgetUsd: 6, cashUsd: 6.05 });
   assert.equal(result.ok, true);
   assert.ok(result.notional + result.fee <= 6.05 + 1e-9);
-  assert.ok(result.shares >= 5);
+  assert.ok(result.shares < 12);
   assert.ok(result.notional < 6);
 
-  // Cannot trim below the 5-share minimum to fit cash => insufficient_cash.
-  const tooPoor = simulateBuy({ book, budgetUsd: 6, cashUsd: 2.5 });
-  assert.equal(tooPoor.ok, false);
-  assert.equal(tooPoor.rejectReason, "insufficient_cash");
+  // Trimming may go below 5 shares: market BUYs have no share minimum, only $1 notional.
+  const lessCash = simulateBuy({ book, budgetUsd: 6, cashUsd: 2.5 });
+  assert.equal(lessCash.ok, true);
+  assert.ok(lessCash.shares < 5);
+  assert.ok(lessCash.notional >= 1 - 1e-9);
+  assert.ok(lessCash.notional + lessCash.fee <= 2.5 + 1e-9);
 });
 
-test("BUY rejects below the 5-share minimum / $1 market-buy value / without liquidity / with no cash", () => {
-  assert.equal(simulateBuy({ book: ORDER_BOOK_THIN, budgetUsd: 100 }).rejectReason, "below_min_order");
-  assert.equal(simulateBuy({ book: ORDER_BOOK_THIN, budgetUsd: 100 }).shares, 0);
+test("BUY rejects below the $1 market-buy minimum / without liquidity / with no cash", () => {
+  // Market BUY only needs $1 notional; 3 shares at 40¢ = $1.20 is a valid order.
+  const thin = simulateBuy({ book: ORDER_BOOK_THIN, budgetUsd: 100 });
+  assert.equal(thin.ok, true);
+  assert.equal(thin.shares, 3);
+  assert.equal(thin.notional, 1.2);
+  assert.equal(thin.price, 0.4);
+
   assert.equal(simulateBuy({ book: makeOrderBook({}), budgetUsd: 100 }).rejectReason, "no_liquidity");
   assert.equal(simulateBuy({ book: ORDER_BOOK_BIDS_ONLY, budgetUsd: 100 }).rejectReason, "no_liquidity");
   assert.equal(simulateBuy({ book: ORDER_BOOK_DOCS_WALK, budgetUsd: 0 }).rejectReason, "insufficient_cash");
   assert.equal(simulateBuy({ book: ORDER_BOOK_DOCS_WALK, budgetUsd: -5 }).rejectReason, "insufficient_cash");
 
-  // Market BUY $1 minimum notional (Felix/Polymarket): 5 shares at 10¢ = $0.50 => rejected.
+  // $1 notional floor: $0.55 at 10¢ (5.5 shares) is below $1 => rejected.
   const cheap = makeOrderBook({ asks: [{ price: 0.1, size: 100 }] });
   assert.equal(simulateBuy({ book: cheap, budgetUsd: 0.55 }).rejectReason, "below_min_order");
-  // 11 shares at 10¢ = $1.10 notional => accepted.
+  // $1.15 at 10¢ = 11.5 shares => accepted.
   const dollarOk = simulateBuy({ book: cheap, budgetUsd: 1.15 });
   assert.equal(dollarOk.ok, true);
   assert.ok(dollarOk.notional >= 1 - 1e-9, "notional must meet the $1 floor");
-  assert.ok(dollarOk.shares >= 5);
+
+  // No 5-share minimum for market BUY: $1.01 at 72¢ = 1.4 shares => valid (matches Polymarket UI).
+  const high = makeOrderBook({ asks: [{ price: 0.72, size: 100 }] });
+  const small = simulateBuy({ book: high, budgetUsd: 1.01 });
+  assert.equal(small.ok, true);
+  assert.ok(small.shares < 5);
+  assert.ok(small.notional >= 1 - 1e-9);
 });
 
 test("BUY fee always equals calcTakerFee(shares, vwap) — AC-03", () => {

@@ -308,7 +308,6 @@ export async function tryEntry(run, signal, market, now) {
     feeRate: feeRate(run, market),
     slippageBufferBps: run.config.execution.slippageBufferBps,
     tickSize: market.tickSize,
-    minOrderShares: market.minOrderShares,
   });
   if (!fill.ok) {
     recordRejectedEntry(run, signal, market, fill.rejectReason, now);

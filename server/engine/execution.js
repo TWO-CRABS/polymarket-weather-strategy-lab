@@ -9,8 +9,9 @@
  * `notional + fee <= cashUsd`.
  * Price protection: buyLimit = ceilToTick(min(0.999, bestAsk×(1+bps/1e4))),
  *                   sellLimit = floorToTick(max(0.001, bestBid×(1−bps/1e4))).
- * Orders below the market minimum (default 5 shares) are rejected whole.
- * Market BUYs additionally require notional >= $1 (ORDER_RULES.minOrderValueUsd).
+ * MARKET BUY minimum: $1 notional (NO share minimum — the 5-share minimum applies
+ * to limit orders; a market BUY of 1.4 shares is valid on Polymarket).
+ * MARKET SELL minimum: 5 shares (under-5-share positions cannot be sold).
  */
 import { FEES, ORDER_RULES, calcTakerFee, roundTo } from "../../shared/contract.js";
 import { toNum } from "../util.js";
@@ -63,7 +64,7 @@ function rejected(reason, extra = {}) {
 /**
  * Simulate a FAK BUY (marketable) against asks.
  * @param {{book:any, budgetUsd:number, cashUsd?:number, feeRate?:number, slippageBufferBps?:number,
- *          tickSize?:number, minOrderShares?:number, minOrderValueUsd?:number}} args
+ *          tickSize?:number, minOrderValueUsd?:number}} args
  * @returns {FillResult}
  */
 export function simulateBuy(args) {
@@ -74,8 +75,7 @@ export function simulateBuy(args) {
     feeRate = FEES.takerFeeRate,
     slippageBufferBps = 0,
     tickSize = book?.tickSize || 0.001,
-    minOrderShares = book?.minOrderSize || ORDER_RULES.minOrderShares,
-    minOrderValueUsd = ORDER_RULES.minOrderValueUsd,
+    minOrderValueUsd = ORDER_RULES.marketBuyMinUsd,
   } = args;
   if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) return rejected("insufficient_cash");
   const asks = Array.isArray(book?.asks) ? book.asks : [];
@@ -127,7 +127,7 @@ export function simulateBuy(args) {
   // Cash constraint: the exchange debits the fee from the account on top of the
   // order amount, so trim lots until notional + fee fits available cash.
   let guard = 0;
-  while (Number.isFinite(cashUsd) && notional + fee > cashUsd + 1e-9 && filled - 0.01 >= minOrderShares && guard < 100000) {
+  while (Number.isFinite(cashUsd) && notional + fee > cashUsd + 1e-9 && filled > 0.01 && guard < 100000) {
     guard += 1;
     filled = roundTo(filled - 0.01, 2);
     notional = roundTo(filled * price, 5);
@@ -144,10 +144,8 @@ export function simulateBuy(args) {
   if (Number.isFinite(cashUsd) && notional + fee > cashUsd + 1e-9) {
     return rejected("insufficient_cash", { limitPrice });
   }
-  if (filled < minOrderShares - 1e-9) return rejected("below_min_order", { limitPrice });
-  // Market BUY minimum value: the USD notional must be at least $1 (separate from
-  // the 5-share CLOB minimum). Below 20¢ the $1 floor binds; above it the share
-  // minimum dominates.
+  // Market BUY minimum value: $1 notional. There is NO market-order share minimum
+  // (5 shares is the LIMIT-order rule), so a 1.4-share $1 order is valid.
   if (notional + 1e-9 < minOrderValueUsd) return rejected("below_min_order", { limitPrice });
 
   price = roundTo(notional / filled, 6);
@@ -181,7 +179,7 @@ export function simulateSell(args) {
     feeRate = FEES.takerFeeRate,
     slippageBufferBps = 0,
     tickSize = book?.tickSize || 0.001,
-    minOrderShares = book?.minOrderSize || 5,
+    minOrderShares = book?.minOrderSize || ORDER_RULES.marketSellMinShares,
   } = args;
   if (!Number.isFinite(shares) || shares <= 0) return rejected("below_min_order");
   const bids = Array.isArray(book?.bids) ? book.bids : [];

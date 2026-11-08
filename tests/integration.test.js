@@ -160,7 +160,13 @@ test("replay fixture run: signals, trades, fees, equity, metrics, positions, SSE
       assert.ok(["filled", "partial"].includes(trade.status));
       assert.equal(trade.fee, calcTakerFee(trade.shares, trade.price), "AC-03 fee formula");
       assert.equal(trade.notional, roundTo(trade.shares * trade.price, 5));
-      assert.ok(trade.shares >= 5, "min order size 5 shares");
+      // Market BUY: only the $1 notional floor applies (no share minimum).
+      // Market SELL/exit: the 5-share CLOB minimum applies.
+      if (trade.side === "BUY") {
+        assert.ok(trade.notional >= 1 - 1e-9, "market BUY must meet the $1 notional floor");
+      } else {
+        assert.ok(trade.shares >= 5, "sell must meet the 5-share minimum");
+      }
       assert.ok(trade.bookLevels.length > 0);
       if (trade.side === "BUY") {
         assert.equal(trade.totalCost, roundTo(trade.notional + trade.fee, 5));

@@ -92,7 +92,7 @@
 - 滚动收益：`ret = (p_now / p_ref - 1) × 100`，`p_ref` = `now - windowSec` 时刻（容差内）的 `priceField` 价格；需有足够样本，否则不产生信号。
 - 触发条件：`ret >= moveThresholdPct`（up）或 `ret <= -moveThresholdPct`（down），且 `|p_now - p_ref| >= minAbsMove`，且连续 `confirmationTicks` 个 tick 满足。
 - 去重：同市场同方向 `cooldownSec` 内不重复触发；每市场最多 `maxSignalsPerMarket` 次。
-- 下单约束：所有订单 ≥ 5 股（CLOB `min_order_size`）；市价 BUY 名义金额 ≥ **$1**（`shared/contract.js` 的 `ORDER_RULES`）。`sizingValue`/`maxPositionUsd` 按**订单名义额**计，官方 taker 手续费从账户现金单独扣除（现金须 ≥ 名义额 + 手续费）。低于任一门槛记 `below_min_order` 拒单。
+- 下单约束（市价单）：**BUY 名义额 ≥ $1，无股数下限**；**SELL（退出）≥ 5 股**（交易所对 <5 股仓位不可卖出）。5 股是限价单规则，本系统不模拟限价单。`sizingValue`/`maxPositionUsd` 按**订单名义额**计，官方 taker 手续费从账户现金单独扣除（现金须 ≥ 名义额 + 手续费）。低于门槛记 `below_min_order` 拒单。
 - 校验接口返回 `{valid, errors[], warnings[], normalized}`；`warnings` 用于提示“低价区间 ±20% 被费用吞噬”等退化配置，不阻止运行。
 
 ---
@@ -117,7 +117,7 @@
 | `liquidityUsd` | number | 市场流动性 |
 | `volume24hUsd` | number | 24h 成交额 |
 | `tickSize` | number | 最小价格变动（0.001） |
-| `minOrderShares` | number | 最小下单份额（5） |
+| `minOrderShares` | number | 卖出最小份额（5；市价 BUY 无股数下限，仅 $1 名义额门槛） |
 | `endDate` | string | ISO 时间 |
 | `eventStartTime` | string | ISO 时间 |
 | `acceptingOrders` | boolean | 是否可接单 |

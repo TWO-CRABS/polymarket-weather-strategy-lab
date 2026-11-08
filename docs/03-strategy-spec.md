@@ -227,7 +227,11 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 ```
 
 - `status`：吃到的深度/预算耗尽且未被保护价截断 ⇒ `filled`；因保护价或深度不足提前停止 ⇒ `partial`（允许部分成交，剩余量撤销）。
-- **最小下单量**：两条官方约束同时生效——① `filled ≥ minOrderShares`（CLOB `/book` 的 `min_order_size`，实为 5 股，市价/限价单均适用）；② 市价 **BUY 的名义金额 ≥ $1**（`ORDER_RULES.minOrderValueUsd`，官方市价单以 USD 金额计价；Felix/Turbine 等生产集成均确认）。任一不满足 ⇒ 整单拒绝 `below_min_order`，不产生持仓。故买入最低**名义额** = `max($1, 5 × 价格)`，另需账户现金 ≥ 名义额 + 手续费；卖出仅受 5 股约束（份额计价）。
+- **最小下单量（按订单类型区分）**：本系统只下**市价单**——
+  ① 市价 **BUY：名义金额 ≥ $1**，**无股数下限**（Polymarket UI 提示「盘口买入需高于 1 美元」；1.4 股的 $1 单合法）；
+  ② 市价 **SELL（退出）：≥ `marketSellMinShares` = 5 股**（交易所对 <5 股仓位不可卖出）；
+  ③ 5 股 `min_order_size` 是**限价单**规则（本系统不模拟限价单）。
+  任一不满足 ⇒ `below_min_order`，不产生成交。买入另需账户现金 ≥ 名义额 + 手续费（手续费从现金单独扣）。
 - 卖出平仓同规则（走 bids 降序、`sellLimit`、费用从收入扣除）；部分平仓按比例结转 costBasis（§5.1）。
 
 ### 3.4 拒绝条件（必须落 `rejected` Trade，`rejectReason` ∈ contract.REJECT_REASONS）
@@ -238,7 +242,7 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 | 行情 stale | `stale_market` |
 | 点差 > maxSpread（requireSpreadOk=true） | `spread_too_wide` |
 | 目标侧盘口空 / 无档位在保护价内 / 可成交为 0 | `no_liquidity` |
-| 可成交股数 < minOrderShares（5 股）或市价 BUY 名义额 < $1 | `below_min_order` |
+| 市价 BUY 名义额 < $1（无股数下限）或市价 SELL <5 股 | `below_min_order` |
 | 预算不足 / 现金不足 | `insufficient_cash` |
 | 全局持仓数 ≥ maxPositions | `max_positions` |
 | 同市场持仓数 ≥ maxPositionsPerMarket | `max_positions_per_market` |
@@ -521,7 +525,7 @@ function markToMarket(now) {
 8. **价格字段**：`last` 在从未成交（占位 0.5/空 side）时不产生信号；单边盘口下 mid 无效。
 9. **映射**：UP 单走 YES asks、DOWN 单走 NO asks；不得用 `1-yesMid` 造 NO 成交价。
 10. **逐档 VWAP**：asks `[0.50×10, 0.52×20]`、预算 $20 ⇒ 依次吃档，VWAP/notional/fee 与手算一致；部分成交 `status=partial` 且剩余撤销。
-11. **最小单**：可成交 <5 股，或市价 BUY 名义额 <$1 ⇒ `below_min_order`，不产生持仓（两条规则同时生效）。
+11. **最小单**：市价 BUY 名义额 <$1（无股数下限）或市价 SELL <5 股 ⇒ `below_min_order`，不产生成交；限价单 5 股规则不适用。
 12. **费用**：100 股 @0.50 ⇒ `calcTakerFee=1.25000`；费用一律按成交 VWAP 用 `calcTakerFee()` 计算、`<0.00001` 记 0；BUY 现金支出=notional+fee，SELL 现金收入=notional-fee。
 13. **费用后盈亏**：示例 B `costBasis=24.99774`，bid=0.40 时 `retLiqPct≈52.6%`，`takeProfitPct=50` 触发 `take_profit`。
 14. **退出优先级**：同时满足 SL/TP/maxHold ⇒ 先 `stop_loss`；`holdToResolution=false` 时 TP/SL/maxHold/反向均生效；`true` 时只在结算 `resolution` 兑付。
