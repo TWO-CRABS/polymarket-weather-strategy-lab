@@ -170,8 +170,9 @@
 - `maxDrawdownPct = max((peak − equity)/peak) × 100`
 
 ### 3.7 RunSummary
-`{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, marketsTracked, feedStatus }`
+`{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, marketsTracked, marketIds, feedStatus }`
 `strategyId` 为已保存策略 id，使用内联 strategy 启动时为 `null`。
+`marketIds` 为本运行实际订阅的 Gamma market id 数组（用于看板只展示该运行跟踪的市场；历史旧运行可能为 `[]`）。
 `status ∈ created | starting | running | paused | stopping | stopped | ended | error`
 `feedStatus ∈ connecting | live | degraded | offline`
 

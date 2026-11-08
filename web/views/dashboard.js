@@ -283,7 +283,7 @@ export async function mount(root, ctx) {
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/trades?limit=${MAX_TRADES}`),
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/equity?limit=${MAX_EQUITY}`),
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/signals?limit=200`),
-        api.getJSON("/api/markets?limit=100"),
+        api.getJSON("/api/markets?limit=500"),
       ]);
 
       if (tradesRes.status === "fulfilled" && tradesRes.value) {
@@ -717,9 +717,24 @@ export async function mount(root, ctx) {
 
   /* -------------------- 行情网格 -------------------- */
 
+  /** 本运行实际订阅的 marke id 集合（旧运行记录可能为空）。 */
+  function runMarketIds() {
+    const ids = state.run && Array.isArray(state.run.marketIds) ? state.run.marketIds : [];
+    return new Set(ids);
+  }
+
+  /** 行情网格只展示本运行订阅的市场；旧运行无 marketIds 时回退到全部。 */
+  function visibleMarkets() {
+    const all = [...state.markets.values()];
+    const ids = runMarketIds();
+    if (!ids.size) return { markets: all, filtered: false };
+    const tracked = all.filter((market) => ids.has(market.id));
+    return tracked.length ? { markets: tracked, filtered: true } : { markets: all, filtered: false };
+  }
+
   function renderMarkets() {
     if (!el.marketGrid) return;
-    const markets = [...state.markets.values()];
+    const { markets, filtered } = visibleMarkets();
     if (!markets.length) {
       el.marketGrid.innerHTML = ui.emptyState({ icon: "◌", title: "暂无行情", message: "行情通道尚未推送温度市场；请检查服务端 feed 状态。" });
       if (el.marketFoot) el.marketFoot.innerHTML = '<span class="muted">暂无市场数据</span>';
@@ -738,10 +753,12 @@ export async function mount(root, ctx) {
       </div>`;
     }).join("");
     if (el.marketFoot) {
-      el.marketFoot.innerHTML = `<span class="muted">共 ${markets.length} 个市场 · 点击卡片选择走势图</span>`;
+      el.marketFoot.innerHTML = filtered
+        ? `<span class="muted">仅显示本运行订阅的 ${markets.length} 个市场（其余市场未订阅实时行情）· 点击卡片选择走势图</span>`
+        : `<span class="muted">共 ${markets.length} 个市场 · 点击卡片选择走势图</span>`;
     }
     const countBadge = root.querySelector("#marketCountBadge");
-    if (countBadge) countBadge.textContent = `${markets.length} 个`;
+    if (countBadge) countBadge.textContent = `${markets.length} 个${filtered ? " · 本运行" : ""}`;
     drawMarketSparklines();
   }
 
@@ -810,11 +827,12 @@ export async function mount(root, ctx) {
   /* -------------------- 选中市场 -------------------- */
 
   function selectInitialMarket() {
-    const markets = [...state.markets.values()]
+    const { markets } = visibleMarkets();
+    const open = markets
       .filter((market) => !market.closed)
       .sort((a, b) => bracketSortKey(a) - bracketSortKey(b));
-    const pool = markets.length ? markets : [...state.markets.values()];
-    if (!state.selectedMarketId || !state.markets.has(state.selectedMarketId)) {
+    const pool = open.length ? open : markets;
+    if (!state.selectedMarketId || !pool.some((market) => market.id === state.selectedMarketId)) {
       state.selectedMarketId = pool.length ? pool[0].id : null;
     }
   }
@@ -1157,13 +1175,20 @@ export async function mount(root, ctx) {
           appendLog("info", `SSE 已连接 · 服务端契约 v${data.contractVersion}`);
         }
         return;
-      case "markets":
-        applyMarkets(data.markets || []);
+      case "markets": {
+        const ids = runMarketIds();
+        const list = (data.markets || []).filter(
+          (market) => market && market.id && (!ids.size || ids.has(market.id)),
+        );
+        applyMarkets(list);
         scheduleMarketsRender();
         return;
+      }
       case "market": {
         const market = data.market;
         if (!market || !market.id) return;
+        const ids = runMarketIds();
+        if (ids.size && !ids.has(market.id)) return;
         state.markets.set(market.id, market);
         const display = yesDisplay(market);
         if (display.value !== null) {

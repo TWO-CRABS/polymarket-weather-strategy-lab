@@ -328,6 +328,7 @@ export class RunManager {
       metrics: record.metrics ?? null,
       signalsCount: record.signalsCount ?? 0,
       marketsTracked: record.marketsTracked ?? 0,
+      marketIds: Array.isArray(record.marketIds) ? record.marketIds : [],
       feedStatus: record.feedStatus ?? "offline",
       createdAt: record.createdAt,
       stopReason: record.stopReason ?? null,
