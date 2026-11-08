@@ -45,8 +45,6 @@ export const config = Object.freeze({
 
   /* ---- market discovery (Gamma) ---- */
   discoveryMs: numEnv("DISCOVERY_MS", 60_000),
-  /** hard cap of markets fed to the simulation engine per live run */
-  maxMarkets: numEnv("MAX_MARKETS", 40),
   /** markets tracked by the live feed while no run is active (for /api/markets) */
   idleFeedMarkets: numEnv("IDLE_FEED_MARKETS", 36),
 

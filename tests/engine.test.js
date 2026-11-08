@@ -44,7 +44,7 @@ import {
   simulateBuy,
   simulateSell,
 } from "../server/engine/execution.js";
-import { planFallbackOrders } from "../server/engine/runTrading.js";
+import { planFallbackOrders, preRiskChecks } from "../server/engine/runTrading.js";
 import { Portfolio } from "../server/engine/portfolio.js";
 import {
   computeMetrics,
@@ -1002,4 +1002,87 @@ test("periodic fallback ranks by probability even when the top bracket has a wid
     planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`),
     ["1:YES:26c", "3:NO:25c"],
   );
+});
+
+test("fallback candidates are not filtered by price band, liquidity or spread", () => {
+  const mk = (id, prob, { liquidityUsd = 1000, spread = 0.01 } = {}) => ({
+    id,
+    city: "Alpha",
+    bracket: id,
+    eventId: "evt-fallback",
+    impliedProbability: prob,
+    liquidityUsd,
+    spread,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+  });
+  const markets = new Map([
+    ["x1", mk("x1", 0.99, { liquidityUsd: 0, spread: 0.5 })],
+    ["x2", mk("x2", 0.5)],
+    ["x3", mk("x3", 0.01, { liquidityUsd: 0, spread: 0.4 })],
+  ]);
+  const run = {
+    marketIds: [...markets.keys()],
+    markets,
+    portfolio: { positions: new Map() },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05, minLiquidityUsd: 500 } },
+  };
+  assert.deepEqual(
+    planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`),
+    ["1:YES:x1", "3:NO:x3"],
+  );
+});
+
+test("order-time checks reject low liquidity and wide spread (price/liquidity are not universe filters)", () => {
+  const now = Date.now();
+  const market = {
+    id: "m-order",
+    city: "Alpha",
+    bracket: "1",
+    endDate: new Date(now + 4 * 3600_000).toISOString(),
+    tradingCutoff: new Date(now + 4 * 3600_000).toISOString(),
+    negRisk: false,
+    impliedProbability: 0.5,
+    liquidityUsd: 100,
+    spread: 0.01,
+    stale: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: "m-order-y", noTokenId: "m-order-n" },
+    quotes: {
+      YES: { bid: 0.49, ask: 0.51, mid: 0.5, last: null },
+      NO: { bid: 0.49, ask: 0.51, mid: 0.5, last: null },
+    },
+  };
+  const run = {
+    killSwitchTripped: false,
+    status: "running",
+    peakEquity: 100,
+    dayStartEquity: 100,
+    portfolio: { equity: () => 100, positions: new Map(), positionsForMarket: () => [] },
+    config: {
+      risk: { killSwitch: false, maxDrawdownPct: 20, dailyLossLimitUsd: 0 },
+      universe: {
+        minPrice: 0.02,
+        maxPrice: 0.98,
+        minLiquidityUsd: 500,
+        maxSpread: 0.05,
+        minTimeToResolutionSec: 300,
+        maxTimeToResolutionSec: 86_400,
+      },
+      execution: { maxPositions: 5, maxPositionsPerMarket: 1 },
+    },
+  };
+  const signal = { outcome: "YES" };
+
+  assert.equal(preRiskChecks(run, market, signal, now).reason, "liquidity_too_low");
+  market.liquidityUsd = 1000;
+  market.spread = 0.2;
+  assert.equal(preRiskChecks(run, market, signal, now).reason, "spread_too_wide");
+  market.spread = 0.01;
+  assert.equal(preRiskChecks(run, market, signal, now).ok, true);
 });

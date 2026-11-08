@@ -1,44 +1,45 @@
 /**
  * tests/selection.test.js
  *
- * universe.selectionMode 选市场方式：
- *  - per_market（默认）：按流动性取前 N 个市场，可能拆散城市事件；
- *  - per_event：按城市/日期事件整组纳入，容量不足时跳过整组，不拆事件；
- *    这样城市内概率排名（兜底的第 1/第 3 高）才是真实排名。
+ * 新选市场语义：
+ *  - live 只选当天（UTC 观察日）市场；
+ *  - 按城市事件纳入全部可交易括号，不按价格/流动性/点差过滤，不设数量上限；
+ *  - 城市多选、TTR 窗口仍生效。
  */
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import { RunManager } from "../server/engine/runManager.js";
 import { DEFAULT_STRATEGY, clone, normalizeStrategy } from "../shared/contract.js";
+import { utcDateKey } from "../server/util.js";
 
-const NOW = Date.now();
-
-function makeMarket(id, eventId, city, impliedProbability, liquidityUsd = 1000) {
-  const endDate = new Date(NOW + 2 * 3600_000).toISOString();
+function makeMarket({ id, eventId, city, bracket, dateKey, impliedProbability = 0.5, liquidityUsd = 1000, spread = 0.01, tradingCutoff = null }) {
+  const endDate = `${dateKey}T12:00:00.000Z`;
   return {
     id,
     eventId,
     conditionId: `0x${id}`,
     eventStartTime: endDate,
     endDate,
+    tradingCutoff: tradingCutoff || undefined,
     city,
     station: `${city}-ST`,
-    bracket: id,
-    question: `Will ${city} be ${id}?`,
+    bracket: bracket || id,
+    question: `Will ${city} be ${bracket || id}?`,
     tokens: { yesTokenId: `${id}-yes`, noTokenId: `${id}-no` },
     impliedProbability,
     liquidityUsd,
     volume24hUsd: liquidityUsd,
-    spread: 0.01,
+    spread,
     acceptingOrders: true,
     closed: false,
+    negRisk: true,
     tickSize: 0.001,
     minOrderShares: 5,
     feeSchedule: { rate: 0.05, exponent: 1, takerOnly: true },
     quotes: {
-      YES: { bid: impliedProbability - 0.01, ask: impliedProbability + 0.01, mid: impliedProbability, last: null },
-      NO: { bid: 1 - impliedProbability - 0.01, ask: 1 - impliedProbability + 0.01, mid: 1 - impliedProbability, last: null },
+      YES: { bid: Math.max(0, impliedProbability - 0.01), ask: impliedProbability + 0.01, mid: impliedProbability, last: null },
+      NO: { bid: Math.max(0, 1 - impliedProbability - 0.01), ask: 1 - impliedProbability + 0.01, mid: 1 - impliedProbability, last: null },
     },
   };
 }
@@ -66,11 +67,10 @@ function makeConfig(overrides = {}) {
     ...clone(DEFAULT_STRATEGY),
     universe: {
       ...clone(DEFAULT_STRATEGY.universe),
-      maxMarkets: 12,
       minPrice: 0.02,
       maxPrice: 0.98,
-      minLiquidityUsd: 0,
-      maxSpread: 0.2,
+      minLiquidityUsd: 500,
+      maxSpread: 0.03,
       minTimeToResolutionSec: 300,
       maxTimeToResolutionSec: 1_209_600,
       ...overrides,
@@ -78,53 +78,79 @@ function makeConfig(overrides = {}) {
   });
 }
 
-function buildMarkets() {
-  const alpha = [0.8, 0.5, 0.3].map((p, i) => makeMarket(`a${i}`, "evt-alpha", "Alpha", p, 1000));
-  const beta = [0.6, 0.5, 0.4].map((p, i) => makeMarket(`b${i}`, "evt-beta", "Beta", p, 500));
-  const gamma = [0.4, 0.3, 0.2].map((p, i) => makeMarket(`g${i}`, "evt-gamma", "Gamma", p, 100));
-  return [...alpha, ...beta, ...gamma];
-}
+const TODAY = utcDateKey();
+const TOMORROW = utcDateKey(Date.now() + 24 * 3600_000);
 
-test("per_event keeps each city/date event complete and skips groups that do not fit", () => {
-  const manager = makeManager(buildMarkets());
-
-  const full = manager.selectMarkets(makeConfig({ selectionMode: "per_event", maxMarkets: 9 }), "live");
-  assert.equal(full.length, 9);
-  assert.deepEqual(
-    [...new Set(full.map((market) => market.eventId))].sort(),
-    ["evt-alpha", "evt-beta", "evt-gamma"],
-  );
-  for (const eventId of ["evt-alpha", "evt-beta", "evt-gamma"]) {
-    assert.equal(full.filter((market) => market.eventId === eventId).length, 3, `${eventId} must be complete`);
+test("live selection is today-only, full-event, no quantity cap and no per-market filters", () => {
+  const markets = [];
+  // 3 events today: Alpha/Beta/Gamma; include extreme price/liq/spread brackets
+  for (const [city, eventId, probs] of [
+    ["Alpha", "evt-alpha", [0.99, 0.5, 0.0005]],
+    ["Beta", "evt-beta", [0.7, 0.2]],
+    ["Gamma", "evt-gamma", [0.6, 0.3, 0.1]],
+  ]) {
+    probs.forEach((prob, i) => {
+      markets.push(
+        makeMarket({
+          id: `${eventId}-${i}`,
+          eventId,
+          city,
+          bracket: `${i}`,
+          dateKey: TODAY,
+          impliedProbability: prob,
+          liquidityUsd: i === 0 ? 0 : 1000,
+          spread: i === 0 ? 0.2 : 0.01,
+        }),
+      );
+    });
   }
-
-  // Only one full event fits in 4 slots: pick Alpha (highest aggregate liquidity),
-  // never split Beta across the boundary.
-  const one = manager.selectMarkets(makeConfig({ selectionMode: "per_event", maxMarkets: 4 }), "live");
-  assert.equal(one.length, 3);
-  assert.ok(one.every((market) => market.eventId === "evt-alpha"));
-});
-
-test("per_event includes every open bracket of an eligible event even if it fails per-market filters", () => {
-  const markets = buildMarkets();
-  const outOfBand = markets.find((market) => market.id === "a1");
-  outOfBand.impliedProbability = 0.99; // fails universe price band (maxPrice 0.98)
+  markets.push(makeMarket({ id: "tomorrow-1", eventId: "evt-tomorrow", city: "Alpha", bracket: "T", dateKey: TOMORROW }));
 
   const manager = makeManager(markets);
-  const perEvent = manager.selectMarkets(makeConfig({ selectionMode: "per_event", maxMarkets: 9 }), "live");
-  assert.ok(perEvent.some((market) => market.id === "a1"), "per_event must keep the full event bracket set");
-  assert.equal(perEvent.filter((market) => market.eventId === "evt-alpha").length, 3);
-
-  // per_market keeps the legacy per-market filter: a1 is excluded.
-  const perMarket = manager.selectMarkets(makeConfig({ selectionMode: "per_market", maxMarkets: 9 }), "live");
-  assert.ok(!perMarket.some((market) => market.id === "a1"));
+  const picked = manager.selectMarkets(makeConfig(), "live", { dateKey: TODAY });
+  assert.equal(picked.length, 8, "all today's event brackets included, no maxMarkets cap");
+  assert.ok(!picked.some((market) => market.id === "tomorrow-1"), "tomorrow must be excluded");
+  assert.ok(picked.some((market) => market.impliedProbability > 0.98), "price band must NOT filter selection");
+  assert.ok(picked.some((market) => market.liquidityUsd === 0), "liquidity must NOT filter selection");
+  assert.ok(picked.some((market) => market.spread > 0.03), "spread must NOT filter selection");
 });
 
-test("per_market keeps the legacy top-N-by-liquidity behavior (may split events)", () => {
-  const manager = makeManager(buildMarkets());
-  const picked = manager.selectMarkets(makeConfig({ selectionMode: "per_market", maxMarkets: 4 }), "live");
-  assert.equal(picked.length, 4);
-  // Markets are sorted by liquidity/volume: a0..a2 (1000) come before b* (500).
-  const events = new Set(picked.map((market) => market.eventId));
-  assert.ok(events.has("evt-alpha"));
+test("city multi-select restricts events; empty cities = all", () => {
+  const markets = [
+    makeMarket({ id: "a1", eventId: "evt-a", city: "Alpha", bracket: "1", dateKey: TODAY }),
+    makeMarket({ id: "a2", eventId: "evt-a", city: "Alpha", bracket: "2", dateKey: TODAY }),
+    makeMarket({ id: "b1", eventId: "evt-b", city: "Beta", bracket: "1", dateKey: TODAY }),
+  ];
+  const manager = makeManager(markets);
+  const selected = manager.selectMarkets(makeConfig({ cities: ["Alpha"] }), "live", { dateKey: TODAY });
+  assert.deepEqual(selected.map((market) => market.id).sort(), ["a1", "a2"]);
+  const all = manager.selectMarkets(makeConfig({ cities: [] }), "live", { dateKey: TODAY });
+  assert.equal(all.length, 3);
+});
+
+test("TTR window still filters events by actual trading cutoff", () => {
+  const now = Date.now();
+  const near = makeMarket({
+    id: "near",
+    eventId: "evt-near",
+    city: "Alpha",
+    bracket: "1",
+    dateKey: TODAY,
+    tradingCutoff: new Date(now + 10 * 60_000).toISOString(), // 10 min
+  });
+  const far = makeMarket({
+    id: "far",
+    eventId: "evt-far",
+    city: "Beta",
+    bracket: "1",
+    dateKey: TODAY,
+    tradingCutoff: new Date(now + 4 * 3600_000).toISOString(), // 4h
+  });
+  const manager = makeManager([near, far]);
+  const picked = manager.selectMarkets(
+    makeConfig({ minTimeToResolutionSec: 3600, maxTimeToResolutionSec: 86_400 }),
+    "live",
+    { dateKey: TODAY },
+  );
+  assert.deepEqual(picked.map((market) => market.id), ["far"]);
 });

@@ -139,7 +139,7 @@ PolyMarket Wealther Strategy Verification System/
 1. `GET /events/keyset?closed=false&...` 或 `public-search?q=highest temperature` 拉取温度事件。
 2. 过滤标题匹配 `highest temperature in <City> on <Date>` 的事件；展开其 `markets[]`（每个 °C 括号一个市场）。
 3. 归一化为 `MarketSnapshot`：解析 `clobTokenIds`（JSON 字符串，[0]=YES，[1]=NO）、`outcomePrices`、`bestBid/bestAsk`、`spread`、`orderPriceMinTickSize`、`orderMinSize`、`feeSchedule`、`endDate`、`acceptingOrders` 等。
-4. 按策略 universe 过滤（城市、价格带、流动性、点差、距结算时间），取前 `maxMarkets` 个，按流动性/成交量排序。
+4. live 选市场：只取当天（UTC 观察日）市场，按城市事件纳入全部可交易括号，不设数量上限；价格/流动性/点差仅在下单时校验。
 
 ### 5.2 实时盘口
 - **主通道**：`wss://ws-subscriptions-clob.polymarket.com/ws/market`，发送 `{type:"market", assets_ids:[token...]}`；处理 `book` / `price_change` / `last_trade_price` / `tick_size_change`。

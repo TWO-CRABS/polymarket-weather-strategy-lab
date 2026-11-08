@@ -13,6 +13,18 @@ export function nowMs() {
   return Date.now();
 }
 
+/** UTC 日期键 `YYYY-MM-DD`（用于“只做当天市场”和每日滚动）。 */
+export function utcDateKey(ts = Date.now()) {
+  const n = typeof ts === "number" ? ts : Date.parse(ts);
+  return Number.isFinite(n) ? new Date(n).toISOString().slice(0, 10) : "";
+}
+
+/** 温度市场的观察日（Gamma endDate 的 UTC 日期，如 `2026-11-09`）。 */
+export function marketDateKey(market) {
+  const n = Date.parse(market?.endDate);
+  return Number.isFinite(n) ? new Date(n).toISOString().slice(0, 10) : "";
+}
+
 /** Generate a contract id such as `run_1ab2c3` (base36 suffix). */
 export function newId(prefix) {
   const value = BigInt(`0x${randomBytes(8).toString("hex")}`);

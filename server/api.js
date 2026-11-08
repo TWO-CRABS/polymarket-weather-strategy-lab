@@ -14,7 +14,7 @@ import {
   STRATEGY_PRESETS,
   validateStrategy,
 } from "../shared/contract.js";
-import { AppError, UpstreamError, nowMs, roundTo } from "./util.js";
+import { AppError, UpstreamError, nowMs, roundTo, utcDateKey } from "./util.js";
 
 const MAX_LIMIT = 500;
 
@@ -81,7 +81,8 @@ export function createApiHandler(deps) {
   const metaPayload = () => ({
     contractVersion: CONTRACT_VERSION,
     serverTime: nowMs(),
-    cities: discovery.getCities(),
+    cities: discovery.getCities(utcDateKey()),
+    universeDate: utcDateKey(),
     presets: STRATEGY_PRESETS,
     feeModel: FEES,
     limits: LIMITS,
@@ -218,7 +219,7 @@ export function createApiHandler(deps) {
       return true;
     }
 
-    const runSubMatch = /^\/api\/runs\/([^/]+)\/(trades|equity|signals|positions|stop)$/.exec(pathname);
+    const runSubMatch = /^\/api\/runs\/([^/]+)\/(trades|equity|signals|positions|markets|stop)$/.exec(pathname);
     if (runSubMatch) {
       const runId = runSubMatch[1];
       const sub = runSubMatch[2];
@@ -239,6 +240,11 @@ export function createApiHandler(deps) {
       if (sub === "equity" && method === "GET") {
         const { items, total } = await runs.getEquity(runId, { limit: parseLimit(url, 500), offset: parseOffset(url) });
         sendJson(res, 200, { points: items, total });
+        return true;
+      }
+      if (sub === "markets" && method === "GET") {
+        const markets = await runs.getRunMarkets(runId);
+        sendJson(res, 200, { markets });
         return true;
       }
       if (sub === "positions" && method === "GET") {

@@ -22,6 +22,7 @@ import { TemperatureDiscovery } from "./data/gamma.js";
 import { RunManager } from "./engine/runManager.js";
 import { createApiHandler } from "./api.js";
 import { FEES, STRATEGY_PRESETS } from "../shared/contract.js";
+import { utcDateKey } from "./util.js";
 
 const startedAt = Date.now();
 let sse = null;
@@ -153,7 +154,8 @@ async function main() {
   sse = new SseHub({
     heartbeatMs: config.sseHeartbeatMs,
     metaProvider: () => ({
-      cities: discovery.getCities(),
+      cities: discovery.getCities(utcDateKey()),
+      universeDate: utcDateKey(),
       presets: STRATEGY_PRESETS,
       feeModel: FEES,
       marketCount: discovery.getMarkets().length,

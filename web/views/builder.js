@@ -44,17 +44,15 @@ const GROUP_DEFS = [
     key: "universe",
     step: "01",
     title: "市场范围",
-    desc: "城市、价格带、流动性、点差与距结算时间过滤；不选城市 = 全部城市。",
+    desc: "只交易当天的城市事件（UTC 00:00 自动切下一天）；城市多选，不选 = 全部城市。价格/流动性/点差在下单时判断，不影响市场发现。",
     fields: [
       { path: "universe.cities", kind: "cities", label: "城市（多选，不选 = 全部城市）" },
-      { path: "universe.maxMarkets", label: "最大市场数", unit: "个", min: LIM.universe.maxMarkets[0], max: LIM.universe.maxMarkets[1], step: 1, help: "按流动性/成交额选取" },
-      { path: "universe.selectionMode", kind: "select", label: "选市场方式", options: [{ value: "per_market", label: "按单个市场（流动性优先）" }, { value: "per_event", label: "按完整城市事件（推荐兜底策略）" }], help: "per_event：事件内任一括号满足过滤，就整组纳入该城市/日期的全部可交易括号，保证城市内概率排名（第 1/第 3 高）真实；maxMarkets 按整组消耗（每组约 6–11 个）" },
-      { path: "universe.minPrice", label: "最低 YES 价格", unit: "USDC 0–1", min: LIM.universe.minPrice[0], max: LIM.universe.minPrice[1], step: 0.001, help: "0.02 = 2¢，过滤极端低价" },
-      { path: "universe.maxPrice", label: "最高 YES 价格", unit: "USDC 0–1", min: LIM.universe.maxPrice[0], max: LIM.universe.maxPrice[1], step: 0.001, help: "0.98 = 98¢" },
-      { path: "universe.minLiquidityUsd", label: "最小流动性", unit: "USD", min: LIM.universe.minLiquidityUsd[0], max: LIM.universe.minLiquidityUsd[1], step: 100 },
-      { path: "universe.maxSpread", label: "最大点差", unit: "USDC", min: LIM.universe.maxSpread[0], max: LIM.universe.maxSpread[1], step: 0.001, help: "0.03 = 3¢；市价单点差成本显著" },
-      { path: "universe.minTimeToResolutionSec", label: "最短距结算", unit: "秒", min: LIM.universe.minTimeToResolutionSec[0], max: LIM.universe.minTimeToResolutionSec[1], step: 60, help: "900 = 15 分钟" },
-      { path: "universe.maxTimeToResolutionSec", label: "最长距结算", unit: "秒", min: LIM.universe.maxTimeToResolutionSec[0], max: LIM.universe.maxTimeToResolutionSec[1], step: 600, help: "129600 = 36 小时" },
+      { path: "universe.minPrice", label: "最低 YES 价格（下单时）", unit: "USDC 0–1", min: LIM.universe.minPrice[0], max: LIM.universe.minPrice[1], step: 0.001, help: "低于该值不成交，但市场仍会被跟踪" },
+      { path: "universe.maxPrice", label: "最高 YES 价格（下单时）", unit: "USDC 0–1", min: LIM.universe.maxPrice[0], max: LIM.universe.maxPrice[1], step: 0.001, help: "高于该值不成交" },
+      { path: "universe.minLiquidityUsd", label: "最小流动性（下单时）", unit: "USD", min: LIM.universe.minLiquidityUsd[0], max: LIM.universe.minLiquidityUsd[1], step: 100, help: "低于该值不成交" },
+      { path: "universe.maxSpread", label: "最大点差（下单时）", unit: "USDC", min: LIM.universe.maxSpread[0], max: LIM.universe.maxSpread[1], step: 0.001, help: "0.03 = 3¢；超过不成交" },
+      { path: "universe.minTimeToResolutionSec", label: "最短距交易截止", unit: "秒", min: LIM.universe.minTimeToResolutionSec[0], max: LIM.universe.minTimeToResolutionSec[1], step: 60, help: "900 = 15 分钟" },
+      { path: "universe.maxTimeToResolutionSec", label: "最长距交易截止", unit: "秒", min: LIM.universe.maxTimeToResolutionSec[0], max: LIM.universe.maxTimeToResolutionSec[1], step: 600, help: "129600 = 36 小时" },
       { path: "universe.onlyAcceptingOrders", kind: "toggle", label: "仅接受可接单市场", help: "关闭后可能纳入暂停接单市场（不建议）" },
     ],
   },
@@ -147,15 +145,13 @@ const GROUP_DEFS = [
 /* ------------------------------------------------------------------ */
 
 const FIELD_TIPS = {
-  "universe.cities": "只在这些城市的最高温市场里交易；不勾选 = 全部城市。城市越少可选市场越少，可能长时间没有信号。",
-  "universe.maxMarkets": "从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡；使用 per_event（完整城市事件）时每组约 6–11 个括号，建议 60–110 以覆盖 6–10 个城市。",
-  "universe.selectionMode": "per_market：按单个市场流动性取前 N 个（原行为，城市组可能不完整）；per_event：按城市/日期事件整组选入，保留完整温度括号，组内“概率第 1/第 3 高”才有意义。若开启“每周期空仓兜底建仓”，强烈建议 per_event，否则多数城市组不足 3 个候选，第 3 高 NO 腿不会触发。",
-  "universe.minPrice": "只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。",
-  "universe.maxPrice": "只交易 YES 中间价 ≤ 该值的市场（0.98 = 98¢）。过滤接近确定的极端高价括号。",
-  "universe.minLiquidityUsd": "市场流动性低于该值不参与。数据源流动性可能偏高，建议同时用点差过滤。",
-  "universe.maxSpread": "买一卖一价差超过该值不参与且不触发信号（0.03 = 3¢）。市价单先承担点差，点差过宽会吃掉利润。",
-  "universe.minTimeToResolutionSec": "距市场结算至少还有多少秒才参与（900 = 15 分钟）。太近时价格已基本确定，交易价值低。",
-  "universe.maxTimeToResolutionSec": "距市场结算最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。",
+  "universe.cities": "只在这些城市的当天最高温市场里交易；不勾选 = 全部城市。城市列表按当天事件生成，跨天后自动更新；建议选少量城市控制负载。",
+  "universe.minPrice": "下单时：YES 中间价低于该值则拒绝成交（0.02 = 2¢），但市场仍会被跟踪、参与概率排名。",
+  "universe.maxPrice": "下单时：YES 中间价高于该值则拒绝成交（0.98 = 98¢），避免买接近确定的极端高价。",
+  "universe.minLiquidityUsd": "下单时：市场流动性低于该值则拒绝成交。不会再把它从关注/排名中剔除。",
+  "universe.maxSpread": "下单时：买一卖一价差超过该值则拒绝成交（0.03 = 3¢）；同时正常信号会跳过点差过宽的 tick。",
+  "universe.minTimeToResolutionSec": "距交易截止至少还有多少秒才纳入当天事件（900 = 15 分钟）。太近时价格已基本确定，交易价值低。",
+  "universe.maxTimeToResolutionSec": "距交易截止最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。",
   "universe.onlyAcceptingOrders": "只交易当前可接单的市场；关闭后可能选到暂停/已关闭的市场，不建议关闭。",
   "signal.priceField": "用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。",
   "signal.windowSec": "回看多少秒内的涨跌幅。60 秒就是需求里的『1 分钟』。",
@@ -627,6 +623,11 @@ export async function mount(root, ctx) {
     const cities = metaCities(ctx.store);
     const selected = Array.isArray(state.cfg.universe.cities) ? state.cfg.universe.cities : [];
     const selectedSet = new Set(selected);
+    // 保留已保存策略里选中、但当天没有市场的城市，避免打开配置时选择丢失
+    const known = new Set(cities.map((city) => city.name));
+    for (const name of selected) {
+      if (!known.has(name)) cities.push({ name, station: "" });
+    }
     if (cities.length) {
       return `<div class="field" data-cities-wrap>
         <span class="field-label" id="lb-cities">${ui.escapeHtml(field.label)}${fieldTipDot("universe.cities")}</span>
@@ -637,6 +638,10 @@ export async function mount(root, ctx) {
             <span class="city-name">${ui.escapeHtml(city.name)}</span>
             ${city.station ? `<span class="city-meta">${ui.escapeHtml(city.station)}</span>` : ""}
           </label>`).join("")}
+        </div>
+        <div class="city-actions">
+          <button type="button" class="btn btn-ghost btn-xs" data-cities-all>全选</button>
+          <button type="button" class="btn btn-ghost btn-xs" data-cities-clear>清空</button>
         </div>
         <span class="field-help" id="citiesHelp">${citiesHelpText(selected)}</span>
       </div>`;
@@ -1159,6 +1164,21 @@ export async function mount(root, ctx) {
   function onClick(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
+    if (target.closest("[data-cities-all]") || target.closest("[data-cities-clear]")) {
+      const all = Boolean(target.closest("[data-cities-all]"));
+      const inputs = [...root.querySelectorAll("input[data-city]")];
+      state.cfg.universe.cities = all ? inputs.map((input) => input.dataset.city) : [];
+      for (const input of inputs) {
+        input.checked = all;
+        input.closest(".city-option")?.classList.toggle("is-on", all);
+      }
+      const help = root.querySelector("#citiesHelp");
+      if (help) help.textContent = citiesHelpText(state.cfg.universe.cities);
+      state.presetId = "";
+      updatePresetChip();
+      scheduleValidate();
+      return;
+    }
     if (target.closest("#btnApplyPreset")) {
       const select = root.querySelector("#presetSelect");
       const presetId = select ? select.value : "";

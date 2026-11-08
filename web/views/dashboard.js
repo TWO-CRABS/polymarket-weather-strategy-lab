@@ -374,7 +374,7 @@ export async function mount(root, ctx) {
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/trades?limit=${MAX_TRADES}`),
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/equity?limit=${MAX_EQUITY}`),
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/signals?limit=200`),
-        api.getJSON("/api/markets?limit=500"),
+        api.getJSON(`/api/runs/${encodeURIComponent(state.runId)}/markets`),
       ]);
 
       if (tradesRes.status === "fulfilled" && tradesRes.value) {
@@ -400,11 +400,11 @@ export async function mount(root, ctx) {
 
   function applyMarkets(markets) {
     if (!Array.isArray(markets)) return;
-    const map = new Map();
+    // 滚动换天后仍保留旧市场快照：持仓/成交/历史链接还需要旧市场元数据；
+    // 行情网格只按 run.marketIds（当天活跃集合）过滤展示。
     for (const market of markets) {
-      if (market && market.id) map.set(market.id, market);
+      if (market && market.id) state.markets.set(market.id, market);
     }
-    state.markets = map;
     for (const market of markets) {
       if (!market || !market.id) continue;
       const display = yesDisplay(market);
@@ -728,14 +728,16 @@ export async function mount(root, ctx) {
     const end = num(run.endedAt) || Date.now();
     const elapsed = Math.max(0, end - started);
     const marketsTracked = num(run.marketsTracked) || num(state.feed.marketsTracked) || state.markets.size;
+    const todayLabel = run.mode === "live" && run.universeDate ? `今日 ${run.universeDate} 市场` : null;
     el.sub.textContent = [
       run.strategyName || "未命名策略",
       modeLabel(run.mode),
       `已运行 ${ui.fmtDuration(elapsed)}`,
       `行情 ${ui.feedStatusLabel(state.feed.status)}`,
-      `${marketsTracked} 个市场`,
+      todayLabel || `${marketsTracked} 个市场`,
+      run.mode === "live" ? "每日 00:00 UTC 自动切换" : null,
       `契约 v${CONTRACT_VERSION}`,
-    ].join(" · ");
+    ].filter(Boolean).join(" · ");
   }
 
   function setErrorBox(error) {
@@ -870,7 +872,7 @@ export async function mount(root, ctx) {
       const sumCls = group.sumOk ? "muted" : "down";
       return `<div class="market-group" role="group" aria-label="${ui.escapeHtml(group.city)} 温度市场">
         <div class="market-group-head">
-          <span class="market-group-city">${ui.escapeHtml(group.city)}${group.date ? ` · ${ui.escapeHtml(group.date)}` : ""}</span>
+          <span class="market-group-city">${ui.escapeHtml(group.city)} · 今日</span>
           <span class="market-group-sum">${group.markets.length} 个括号 · 概率和 <b class="${sumCls}" title="${group.sumOk ? "概率和接近 100%" : "概率和偏离 100%（可能含价差/未定价括号）"}">${sumPct.toFixed(1)}%</b></span>
         </div>
         <div class="market-group-grid">${group.markets.map(renderMarketCard).join("")}</div>
@@ -910,7 +912,7 @@ export async function mount(root, ctx) {
 
     return `<button type="button" class="mkt ${selected ? "is-selected" : ""}" data-market-id="${ui.escapeHtml(market.id)}" style="--mkt-tint:${tint}" title="${ui.escapeHtml(`${market.question || marketName(market)}${marketDate ? `（交易日 ${marketDate}，交易截止 ${tradingEndHint(market)}，预计结算 ${settlementHint(market)}）` : ""}`)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${ui.escapeHtml(marketName(market))}，YES ${priceText(display.value)}，隐含概率 ${prob === null ? "未知" : ui.fmtProb(prob)}">
       <div class="mkt-top">
-        <span class="mkt-city"><i aria-hidden="true"></i>${ui.escapeHtml(cityLabel(market))}${marketDate ? `<span class="mkt-date">${ui.escapeHtml(marketDate)}</span>` : ""}</span>
+        <span class="mkt-city"><i aria-hidden="true"></i>${ui.escapeHtml(cityLabel(market))}</span>
         <canvas class="mkt-spark" data-spark-id="${ui.escapeHtml(market.id)}" width="62" height="20" aria-hidden="true"></canvas>
       </div>
       <div class="mkt-bracket">${ui.escapeHtml(bracketLabel(market))}</div>

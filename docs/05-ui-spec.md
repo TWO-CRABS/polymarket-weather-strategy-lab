@@ -123,7 +123,7 @@
 ┌ 策略构建 ────────────────────────────────────────────── 预设 · 均衡  保存草稿  ▶ 启动模拟 ┐
 │ ┌ 01 市场范围 ──────────────────────────────── 5 城 · 11 市场 ┐ ┌ 校验摘要 ──────────────┐ │
 │ │ [城市 chips: 纽约/London/首尔/重庆/香港]                    │ │ ✓ 市场范围有效           │ │
-│ │ maxMarkets  最小流动性  最大价差  价格带 min/max            │ │ ! 阈值不足以覆盖摩擦     │ │
+│ │ 最小流动性  最大价差  价格带 min/max            │ │ ! 阈值不足以覆盖摩擦     │ │
 │ │ 到期 min/max h   [仅可交易市场 ●]                           │ │ ✓ 方向映射已校验         │ │
 │ ├ 02 信号规则 ────────── ▲ 动量入场 ──────────────────────────┤ │ ── 单笔成本估算 ──      │ │
 │ │ priceField  windowSec  minAbsMove  confirmationTicks        │ │ 名义 $25.00             │ │
@@ -139,7 +139,7 @@
 ```
 | 面板 | 必填控件（identifier 对齐 contract） |
 |---|---|
-| 01 universe | cities、maxMarkets、minLiquidityUsd、maxSpread、minPrice、maxPrice、minTimeToResolutionSec / maxTimeToResolutionSec（UI 用小时）、onlyAcceptingOrders |
+| 01 universe | cities、minLiquidityUsd、maxSpread、minPrice、maxPrice（仅下单时校验）、minTimeToResolutionSec / maxTimeToResolutionSec（UI 用小时）、onlyAcceptingOrders |
 | 02 signal | priceField、windowSec、moveThresholdPct（滑块 5–50%）、minAbsMove（¢）、direction、confirmationTicks、cooldownSec、maxSignalsPerMarket、requireSpreadOk |
 | 03 execution | orderType=market（只读）、sizingMode、sizingValue（滑块 / 百分比模式切换）、maxPositionUsd、maxPositions、maxPositionsPerMarket、fillModel=book_walk（只读）、slippageBufferBps |
 | 04 exit | takeProfitPct、stopLossPct、maxHoldSec、holdToResolution、exitOnOppositeSignal |
@@ -309,7 +309,7 @@
 ### 10.1 UI ↔ `shared/contract.js` 字段映射
 | UI 区域 | contract 字段/实体 |
 |---|---|
-| 构建器 01 | `universe.cities / maxMarkets / minPrice / maxPrice / minLiquidityUsd / maxSpread / minTimeToResolutionSec / maxTimeToResolutionSec / onlyAcceptingOrders` |
+| 构建器 01 | `universe.cities / minPrice / maxPrice / minLiquidityUsd / maxSpread / minTimeToResolutionSec / maxTimeToResolutionSec / onlyAcceptingOrders`（只做当天，UTC 00:00 自动滚动） |
 | 构建器 02 | `signal.priceField / windowSec / moveThresholdPct / minAbsMove / direction / confirmationTicks / cooldownSec / maxSignalsPerMarket / requireSpreadOk` |
 | 构建器 03 | `execution.orderType / sizingMode / sizingValue / maxPositionUsd / maxPositions / maxPositionsPerMarket / fillModel / slippageBufferBps`；`MarketSnapshot.tickSize / minOrderShares`（只读展示） |
 | 构建器 04 | `exit.takeProfitPct / stopLossPct / maxHoldSec / holdToResolution / exitOnOppositeSignal` |

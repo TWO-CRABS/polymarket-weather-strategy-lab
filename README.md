@@ -93,7 +93,7 @@ node server/index.js
 
 | 组 | 关键参数 |
 |---|---|
-| 市场域 `universe` | `cities[]`、`maxMarkets`、`minPrice`/`maxPrice`、`minLiquidityUsd`、`maxSpread`、`minTimeToResolutionSec`/`maxTimeToResolutionSec` |
+| 市场域 `universe` | `cities[]`、`minPrice`/`maxPrice`、`minLiquidityUsd`、`maxSpread`（下单时校验）、`minTimeToResolutionSec`/`maxTimeToResolutionSec`；只做当天市场，UTC 00:00 自动滚动 |
 | 信号 `signal` | `priceField`(mid/last/best_bid/best_ask)、`windowSec`、`moveThresholdPct`、`minAbsMove`、`direction`(up/down/both)、`confirmationTicks`、`cooldownSec`、`maxSignalsPerMarket` |
 | 执行 `execution` | `sizingMode`(fixed_stake/pct_equity)、`sizingValue`、`maxPositionUsd`、`maxPositions`、`maxPositionsPerMarket`、`slippageBufferBps` |
 | 退出 `exit` | `takeProfitPct`、`stopLossPct`、`maxHoldSec`、`holdToResolution`、`exitOnOppositeSignal` |

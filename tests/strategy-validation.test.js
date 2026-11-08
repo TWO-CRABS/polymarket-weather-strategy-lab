@@ -81,6 +81,15 @@ test("normalizeStrategy fills defaults and coerces numeric strings", () => {
   assert.equal(normalized.version, 1);
 });
 
+test("removed universe fields are dropped for backward compatibility", () => {
+  const normalized = normalizeStrategy({
+    universe: { cities: ["London"], maxMarkets: 8, selectionMode: "per_event" },
+  });
+  assert.equal(normalized.universe.cities.length, 1);
+  assert.ok(!("maxMarkets" in normalized.universe), "maxMarkets must be ignored/removed");
+  assert.ok(!("selectionMode" in normalized.universe), "selectionMode must be ignored/removed");
+});
+
 test("normalizeStrategy trims city list and keeps it an array", () => {
   const normalized = normalizeStrategy({
     universe: { cities: [" New York ", "London", "", "  "] },
@@ -134,8 +143,6 @@ test("out-of-range signal limits produce errors (docs/03 §1.1)", () => {
 });
 
 test("out-of-range universe limits produce errors", () => {
-  expectInvalid(patchUniverse({ maxMarkets: 0 }), "universe.maxMarkets");
-  expectInvalid(patchUniverse({ selectionMode: "per_city" }), "universe.selectionMode");
   expectInvalid(patchUniverse({ minPrice: 0.0001 }), "universe.minPrice");
   expectInvalid(patchUniverse({ minPrice: 0.6 }), "universe.minPrice");
   expectInvalid(patchUniverse({ maxPrice: 0.4 }), "universe.maxPrice");
@@ -219,7 +226,6 @@ test("degenerate-config warnings are non-blocking (docs/04 §5.10, AC-11)", () =
     [patchExit({ stopLossPct: 90 }), "止损"],
     [patchRisk({ maxDrawdownPct: 3, killSwitch: true }), "熔断"],
     [patchExecution({ sizingMode: "pct_equity", sizingValue: 60 }), "50%"],
-    [patchExecution({ fallbackBuyEachWindow: true }), "per_event"],
   ];
   for (const [patch, fragment] of cases) {
     const result = validateStrategy(patch);
@@ -255,7 +261,6 @@ test("all bounds are inclusive at the LIMITS edges", () => {
   const minConfig = {
     universe: {
       ...clone(DEFAULT_STRATEGY.universe),
-      maxMarkets: LIMITS.universe.maxMarkets[0],
       minPrice: LIMITS.universe.minPrice[0],
       maxPrice: LIMITS.universe.maxPrice[0],
       minLiquidityUsd: LIMITS.universe.minLiquidityUsd[0],
@@ -309,7 +314,6 @@ test("all bounds are inclusive at the LIMITS edges", () => {
   const maxConfig = {
     universe: {
       ...clone(DEFAULT_STRATEGY.universe),
-      maxMarkets: LIMITS.universe.maxMarkets[1],
       minPrice: LIMITS.universe.minPrice[1],
       maxPrice: LIMITS.universe.maxPrice[1],
       minLiquidityUsd: LIMITS.universe.minLiquidityUsd[1],
@@ -380,7 +384,6 @@ test("STRATEGY_PRESETS are all valid and match docs/03 §9 parameter table", () 
   assert.equal(conservative.universe.maxPrice, 0.95);
   assert.equal(conservative.universe.maxSpread, 0.02);
   assert.equal(conservative.universe.minLiquidityUsd, 1_000);
-  assert.equal(conservative.universe.maxMarkets, 8);
   assert.equal(conservative.execution.sizingValue, 20);
   assert.equal(conservative.execution.maxPositionUsd, 40);
   assert.equal(conservative.execution.maxPositions, 3);

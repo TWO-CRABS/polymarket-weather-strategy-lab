@@ -324,13 +324,15 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-19 | **停止/重启后恢复结算**：live 运行被手动停止或服务重启后，只要 journal 中仍有未平仓持仓，系统从 journal 回放重建持仓并继续轮询官方裁决；兑付后补记 `reason=resolution` Trade 并更新现金/权益/指标，`pendingSettlements → 0`、`settledPositions` 递增（`tests/settlementRecovery.test.js`） |
 | AC-20 | 看板/历史对存在待结算或已结算的运行显示「待结算 N / 已结算 N」标识；停止后详情页仍能看到未结算持仓（从 journal 重建） |
 | AC-21 | 每周期兜底按**城市/日期事件组独立**：每个空仓城市组各自买「组内概率第 1 高 YES + 第 3 高 NO」，某城市已有持仓只跳过该城市、不阻止其他城市建仓；城市组按组内最高概率降序消费资金/仓位（`tests/engine.test.js`） |
-| AC-22 | `universe.selectionMode` 支持 `per_market`（默认，按流动性取前 N 个）与 `per_event`（事件内任一括号满足过滤即整组选入**全部可交易括号**，容量不够时跳过整组、不拆事件）；后者保证城市内概率排名与第 3 高 NO 是真实排名（`tests/selection.test.js`） |
+| AC-22 | live 只选当天（UTC 观察日）市场；按城市事件纳入全部可交易括号，不设 `maxMarkets`，选市场阶段不按价格/流动性/点差过滤（`tests/selection.test.js`） |
 | AC-23 | 实时看板的「成交明细」「当前持仓」市场列链接到官方事件页 `https://polymarket.com/zh/event/<eventSlug>`（`eventSlug` 来自市场快照）；无 slug 时退化为纯文本 |
 | AC-24 | 成交明细支持「分组」（不分组/城市/市场/方向/YES-NO/原因）与「筛选」（按分组值过滤）；分组行显示每组笔数，badge 显示 `过滤后/总数` |
 | AC-25 | 温度市场实际**交易截止 = 观察日 24:00 UTC**（快照 `tradingCutoff`，次日 00:00Z）；看板显示「交易截止 11/09 24:00 UTC」「预计结算 11/10 00:00 UTC 后（首份 METAR）」；TTR/入场风控/结算轮询均使用该截止（`tests/market-time.test.js`） |
 | AC-26 | 成交明细、当前持仓的市场列与信号流卡片均显示**交易日 MM/DD**（区分同一城市不同日期）；选中市场标题、成交/持仓市场链接、信号城市名称均跳转官方事件页 |
 | AC-27 | 点击成交行 / 持仓行 / 信号卡会切换「选中市场」，同步更新走势图与市场详情，并在三处高亮同一市场（行/卡片 `is-selected`，支持 Enter/Space 键盘） |
 | AC-28 | 每周期兜底的排名**只按城市组内 YES 隐含概率**（不因点差过滤改变名次，兜底执行不受 maxSpread 拦截；正常信号入场仍保留点差过滤）；实测深圳 26°C 57% 点差 6¢ 时仍应为第 1 高、25°C 为第 3 高 |
+| AC-29 | 最低/最高 YES、最小流动性、最大点差仅在下单时校验（新增 `liquidity_too_low` 拒绝原因）；被拒绝不改变市场发现与排名（`tests/engine.test.js`） |
+| AC-30 | 每日 UTC 00:00 自动滚动：活跃 marketIds 切换到新一天、旧市场关闭、旧仓位保留并继续结算、权益/成交连续，同一 run 不重启（`tests/rolling.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

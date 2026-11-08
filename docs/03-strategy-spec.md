@@ -32,14 +32,12 @@
   "name": "均衡 · ±20%/1min 动量",        // 1..120 字符
   "description": "",                     // 0..2000 字符
   "universe": {
-    "cities": [],                        // [] = 全部城市；否则城市名/slug 精确匹配
-    "maxMarkets": 12,                    // 1..200，容量上限
-    "selectionMode": "per_market",       // per_market（按流动性取前 N 个）| per_event（整组选入事件全部括号）
-    "minPrice": 0.02,                    // 0.001..0.5，YES mid 下限（兼作信号/入场价格护栏）
-    "maxPrice": 0.98,                    // 0.5..0.999，YES mid 上限
-    "minLiquidityUsd": 500,              // 0..1e6；双边前 10 档 Σ(price×size)
-    "maxSpread": 0.03,                   // 0.001..0.2；bestAskYES - bestBidYES
-    "minTimeToResolutionSec": 900,       // 300..604800；= endDate - now 的下限
+    "cities": [],                        // [] = 当天全部城市；否则城市名精确匹配（多选）
+    "minPrice": 0.02,                    // 0.001..0.5，下单时：YES mid 下限
+    "maxPrice": 0.98,                    // 0.5..0.999，下单时：YES mid 上限
+    "minLiquidityUsd": 500,              // 0..1e6，下单时：流动性下限
+    "maxSpread": 0.03,                   // 0.001..0.2，下单时：点差上限
+    "minTimeToResolutionSec": 900,       // 300..604800；距实际交易截止（次日 00:00 UTC）下限
     "maxTimeToResolutionSec": 129600,    // 3600..1209600；上限
     "onlyAcceptingOrders": true          // true 时要求 active && !closed && acceptingOrders
   },
@@ -110,7 +108,7 @@
 |---|---|---|---|
 | `universe.bracket price band` | `universe.minPrice/maxPrice` | `signal.confirmation_ticks / cooldown_sec` | `confirmationTicks / cooldownSec` |
 | `universe.min/max_time-to-resolution` | `minTimeToResolutionSec / maxTimeToResolutionSec` | `signal.max_signals_per_market / require_spread_ok` | `maxSignalsPerMarket / requireSpreadOk` |
-| `universe.min_liquidity / max_spread / max_markets` | `minLiquidityUsd / maxSpread / maxMarkets` | `signal.min_price / max_price` | `universe.minPrice / maxPrice` |
+| `universe.min_liquidity / max_spread` | `minLiquidityUsd / maxSpread` | `signal.min_price / max_price` | `universe.minPrice / maxPrice` |
 | `signal.price_field / window_sec / move_threshold_pct / min_abs_move` | `priceField / windowSec / moveThresholdPct / minAbsMove` | `exit.take_profit_pct / stop_loss_pct / max_hold_sec` | `takeProfitPct / stopLossPct / maxHoldSec` |
 | `execution.order_type / sizing mode+value / fill_model` | `orderType / sizingMode+sizingValue / fillModel` | `exit.hold_to_resolution / exit_on_opposite_signal` | `holdToResolution / exitOnOppositeSignal` |
 | `execution.max_position_usd / max_positions / max_positions_per_market / slippage buffer` | `maxPositionUsd / maxPositions / maxPositionsPerMarket / slippageBufferBps` | `risk.bankroll_usd / max_drawdown_pct / daily_loss_limit_usd / kill_switch` | `bankrollUsd / maxDrawdownPct / dailyLossLimitUsd / killSwitch` |
@@ -242,7 +240,8 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 |---|---|
 | 市场 closed / 非 acceptingOrders / enableOrderBook=false | `market_not_accepting_orders` |
 | 行情 stale | `stale_market` |
-| 点差 > maxSpread（requireSpreadOk=true） | `spread_too_wide` |
+| 点差 > maxSpread（下单时校验；正常信号 requireSpreadOk 时也会跳过） | `spread_too_wide` |
+| 流动性 < minLiquidityUsd（下单时校验） | `liquidity_too_low` |
 | 目标侧盘口空 / 无档位在保护价内 / 可成交为 0 | `no_liquidity` |
 | 市价 BUY 名义额 < $1（无股数下限）或市价 SELL <5 股 | `below_min_order` |
 | 预算不足 / 现金不足 | `insufficient_cash` |
@@ -258,15 +257,22 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 - **分组**：温度市场按 **城市 + 日期（negRisk 事件组）** 独立处理——快照有 `eventId` 用 `eventId`，否则用 `city + endDate` 分组。
 - **触发时机**：从运行第一个 tick 起，每满一个观察窗口（`signal.windowSec`）检查一次（`_fallbackNextAt` 按行情时间推进；live=时钟、replay=历史数据时间）。
 - **触发条件（每组独立）**：该城市/日期组**当前没有持仓**（买过又全部卖掉也算空仓）；**其他城市有持仓不影响本城市**，已持仓的组本周期跳过。
-- **动作**：对本组可交易候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice`）按 **YES 隐含概率降序**：
+- **动作**：对本组可交易候选（过滤仅：closed / 非 acceptingOrders / 无 YES 卖价）按 **YES 隐含概率降序**：
   - **第 1 高** → `BUY YES`
   - **第 3 高** → `BUY NO`（组内候选不足 3 个时只做第 1 笔）
-  - **排名不按点差过滤**：否则点差稍宽的 Top1 会被挤出，导致“第 1/第 3 高”名不副实（实测深圳 26°C 57% 因 6¢ 点差被过滤，排名错成 27/25/28）。兜底执行同样不受 `universe.maxSpread` 拦截，但正常信号入场仍保留点差过滤；实际成本按卖一价与真实点差计入。
+  - **排名不按价格带/流动性/点差过滤**：这些只在下单时检查；被拒的腿记录 rejected，本轮不顺延替换（保持真实排名语义）。
 - **资金/仓位**：城市组按“组内最高概率”降序依次尝试；`maxPositions` 或现金不足时停止本次循环，剩余城市在后续周期继续（不会因为某个城市持仓而阻止其他城市建仓）。
-- **执行约束**：与正常入场一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；**仅豁免 `maxSpread` 拦截**（避免排名被点差扭曲），其余风控照常。
+- **执行约束**：与正常入场一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；**价格带、最小流动性、最大点差均在下单时校验**，任一不满足即拒绝该腿。
 - **记录**：成交的 `Trade.reason = "fallback_entry"`（前端显示「兜底建仓」），不产生 Signal（`signalsCount` 不变）。
-- **推荐配置**：使用 `universe.selectionMode="per_event"`。per_event 只要求事件内**至少一个**括号满足价格带/点差/流动性过滤，随后纳入该事件的**全部可交易括号**（不再逐个过滤），因此城市内“第 1/第 3 高”是真实概率排名，不会因个别括号点差宽而被挤掉。注意：`maxMarkets` 按整组消耗（每组约 6–11 个括号），覆盖城市数会少于 per_market；需要更多城市时提高 maxMarkets（上限 200）。`minPrice/maxPrice` 仍决定哪些括号可作为兜底候选。
+- **选市场语义**：live 只取当天（UTC 观察日）市场；按城市事件纳入**全部可交易括号**，不设数量上限，不按价格/流动性/点差做市场过滤。
 - **关闭**（默认 `false`）时行为与旧版完全一致。
+
+### 3.6 只做当天市场与 UTC 00:00 自动滚动
+
+- live run 的 universe 只包含**当前 UTC 观察日**的市场（market.endDate 的 UTC 日期）；每天 **00:00 UTC**（前一日交易截止时刻）自动切到新一天。
+- 滚动时同一 run 继续：旧市场标记交易关闭、保留在内存中等待官方裁决；已有持仓继续按 settlement polling 结算；权益/成交/指标连续累计，不新建 run。
+- 新一天暂无市场时保持 running 并每 30s/每次 discovery 刷新重试，不崩溃、不重复滚动。
+- 构建器不复选日期；城市列表也按当天事件生成。
 
 ## 4. 退出规则
 
@@ -299,7 +305,7 @@ holdSec     = (now - entryTs)/1000
 - **当前实现（live）**：每 20 秒通过 Gamma `/markets/<id>` 轮询；当 `closed=true` 且 `outcomePrices` 明确为 `["1","0"]` / `["0","1"]`（或极罕见 50/50）时兑付；未裁决则标记 `resolution_pending=true` 并继续轮询。CLOB WS `market_resolved` 事件目前未接入（可作为增强）。
 - 二元市场赢家 1.0 USD/股、输家 0（极罕见 50/50 按 0.50 兑付）；`cash += payout`，**结算不收费**，`realizedPnl = payout - costBasis`，Trade 记 `reason=resolution`，随后删除持仓。
 - negRisk 温度组应恰有一个 YES；若出现 0/多个 winner（异常或未定），持仓按最后 mid 保留并标记 `resolution_pending=true`，继续轮询，不虚构成交。
-- **运行生命周期**：只要还有未结算持仓，run 保持 running 持续轮询；全部平仓且所有市场 `closed` 或超过 `endDate + 6h` 才自动 `ended`。
+- **运行生命周期**：只要还有未结算持仓，run 保持 running 持续轮询；全部平仓且所有市场 `closed` 或超过 `tradingCutoff + 6h` 才自动 `ended`。每日 UTC 00:00 滚动到新一天市场，不新建 run。
 - **停止/重启后的结算恢复**：live 运行被手动停止，或服务重启把运行标记为 stopped 后，只要 journal 里仍有未平仓持仓，系统会从 `data/runs/<id>.jsonl` 回放成交重建持仓，并继续每 20s 轮询官方裁决；兑付后自动补记 `reason=resolution` Trade、更新现金/权益/指标与 `pendingSettlements/settledPositions`，看板与历史会显示「待结算 N」→「已结算 N」。
 - **回放**：不做结算（无 live resolutionProvider），历史数据结束即 `ended`，持仓按最后 mid 估值，报告标注 `openPositionsAtEnd`。
 
@@ -467,7 +473,7 @@ function markToMarket(now) {
 |---|---|---|---|
 | windowSec / moveThresholdPct / minAbsMove / confirmationTicks | 120 / 25 / 0.02 / 2 | 60 / 20 / 0.01 / 1 | 30 / 12 / 0.005 / 1 |
 | cooldownSec / maxSignalsPerMarket | 600 / 3 | 300 / 5 | 120 / 8 |
-| universe 价格带 / maxSpread / minLiquidityUsd / maxMarkets | 0.05–0.95 / 0.02 / 1000 / 8 | 0.02–0.98 / 0.03 / 500 / 12 | 0.01–0.99 / 0.05 / 200 / 20 |
+| universe 价格带 / maxSpread / minLiquidityUsd（均下单时校验） | 0.05–0.95 / 0.02 / 1000 | 0.02–0.98 / 0.03 / 500 | 0.01–0.99 / 0.05 / 200 |
 | sizing / maxPositionUsd / maxPositions / maxPositionsPerMarket | fixed 20 / 40 / 3 / 1 | fixed 25 / 50 / 5 / 1 | fixed 50 / 100 / 8 / 1 |
 | TP / SL / maxHoldSec / holdToResolution / exitOnOppositeSignal | 40 / 25 / 1800 / false / false | 50 / 30 / 3600 / false / false | 80 / 50 / 900 / false / false |
 | bankroll / maxDrawdown / dailyLoss / tickIntervalMs / speed | 1000 / 15 / 100 / 1000 / 10 | 1000 / 20 / 100 / 1000 / 10 | 2000 / 35 / 200 / 500 / 10 |
@@ -482,7 +488,7 @@ function markToMarket(now) {
   "id": "conservative", "label": "保守 · 高概率区间",
   "config": {
     "version": 1, "name": "保守 · 高概率区间", "description": "只看 5¢-95¢ 高流动性区间，2 次确认 + 长冷却，弱化噪声信号。",
-    "universe": { "cities": [], "maxMarkets": 8, "minPrice": 0.05, "maxPrice": 0.95, "minLiquidityUsd": 1000, "maxSpread": 0.02, "minTimeToResolutionSec": 900, "maxTimeToResolutionSec": 129600, "onlyAcceptingOrders": true },
+    "universe": { "cities": [], "minPrice": 0.05, "maxPrice": 0.95, "minLiquidityUsd": 1000, "maxSpread": 0.02, "minTimeToResolutionSec": 900, "maxTimeToResolutionSec": 129600, "onlyAcceptingOrders": true },
     "signal": { "priceField": "mid", "windowSec": 120, "moveThresholdPct": 25, "minAbsMove": 0.02, "direction": "both", "confirmationTicks": 2, "cooldownSec": 600, "maxSignalsPerMarket": 3, "requireSpreadOk": true },
     "execution": { "orderType": "market", "sizingMode": "fixed_stake", "sizingValue": 20, "maxPositionUsd": 40, "maxPositions": 3, "maxPositionsPerMarket": 1, "fillModel": "book_walk", "slippageBufferBps": 0 },
     "exit": { "takeProfitPct": 40, "stopLossPct": 25, "maxHoldSec": 1800, "holdToResolution": false, "exitOnOppositeSignal": false },
@@ -500,7 +506,7 @@ function markToMarket(now) {
   "id": "balanced", "label": "均衡 · ±20%/1min 动量",
   "config": {
     "version": 1, "name": "均衡 · ±20%/1min 动量", "description": "需求原文策略的稳健实现：1 分钟 ±20% 且最小绝对变动 1¢，单笔 $25、最多 5 个仓位。",
-    "universe": { "cities": [], "maxMarkets": 12, "minPrice": 0.02, "maxPrice": 0.98, "minLiquidityUsd": 500, "maxSpread": 0.03, "minTimeToResolutionSec": 900, "maxTimeToResolutionSec": 129600, "onlyAcceptingOrders": true },
+    "universe": { "cities": [], "minPrice": 0.02, "maxPrice": 0.98, "minLiquidityUsd": 500, "maxSpread": 0.03, "minTimeToResolutionSec": 900, "maxTimeToResolutionSec": 129600, "onlyAcceptingOrders": true },
     "signal": { "priceField": "mid", "windowSec": 60, "moveThresholdPct": 20, "minAbsMove": 0.01, "direction": "both", "confirmationTicks": 1, "cooldownSec": 300, "maxSignalsPerMarket": 5, "requireSpreadOk": true },
     "execution": { "orderType": "market", "sizingMode": "fixed_stake", "sizingValue": 25, "maxPositionUsd": 50, "maxPositions": 5, "maxPositionsPerMarket": 1, "fillModel": "book_walk", "slippageBufferBps": 0 },
     "exit": { "takeProfitPct": 50, "stopLossPct": 30, "maxHoldSec": 3600, "holdToResolution": false, "exitOnOppositeSignal": false },
@@ -518,7 +524,7 @@ function markToMarket(now) {
   "id": "aggressive", "label": "激进 · 30s 高频动量",
   "config": {
     "version": 1, "name": "激进 · 30s 高频动量", "description": "30 秒窗口、12% 阈值、快速冷却，追求交易频次；费用拖累和回撤显著放大。",
-    "universe": { "cities": [], "maxMarkets": 20, "minPrice": 0.01, "maxPrice": 0.99, "minLiquidityUsd": 200, "maxSpread": 0.05, "minTimeToResolutionSec": 900, "maxTimeToResolutionSec": 129600, "onlyAcceptingOrders": true },
+    "universe": { "cities": [], "minPrice": 0.01, "maxPrice": 0.99, "minLiquidityUsd": 200, "maxSpread": 0.05, "minTimeToResolutionSec": 900, "maxTimeToResolutionSec": 129600, "onlyAcceptingOrders": true },
     "signal": { "priceField": "mid", "windowSec": 30, "moveThresholdPct": 12, "minAbsMove": 0.005, "direction": "both", "confirmationTicks": 1, "cooldownSec": 120, "maxSignalsPerMarket": 8, "requireSpreadOk": true },
     "execution": { "orderType": "market", "sizingMode": "fixed_stake", "sizingValue": 50, "maxPositionUsd": 100, "maxPositions": 8, "maxPositionsPerMarket": 1, "fillModel": "book_walk", "slippageBufferBps": 0 },
     "exit": { "takeProfitPct": 80, "stopLossPct": 50, "maxHoldSec": 900, "holdToResolution": false, "exitOnOppositeSignal": false },

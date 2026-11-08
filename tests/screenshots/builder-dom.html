@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">22:05:24</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">23:03:46</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -129,48 +129,38 @@
     </section><section class="panel" aria-labelledby="h-universe">
       <header class="panel-head">
         <span class="panel-step">01</span>
-        <div class="panel-title"><h2 id="h-universe">市场范围</h2><p>城市、价格带、流动性、点差与距结算时间过滤；不选城市 = 全部城市。</p></div>
-        <span class="badge badge-ghost">10 项参数</span>
+        <div class="panel-title"><h2 id="h-universe">市场范围</h2><p>只交易当天的城市事件（UTC 00:00 自动切下一天）；城市多选，不选 = 全部城市。价格/流动性/点差在下单时判断，不影响市场发现。</p></div>
+        <span class="badge badge-ghost">8 项参数</span>
       </header>
       <div class="panel-body"><div class="field" data-cities-wrap="">
-      <label class="field-label" for="f-universe-cities-csv">城市（多选，不选 = 全部城市）<button type="button" class="help-dot" data-tip="只在这些城市的最高温市场里交易；不勾选 = 全部城市。城市越少可选市场越少，可能长时间没有信号。" aria-label="说明：只在这些城市的最高温市场里交易；不勾选 = 全部城市。城市越少可选市场越少，可能长时间没有信号。">?</button></label>
+      <label class="field-label" for="f-universe-cities-csv">城市（多选，不选 = 全部城市）<button type="button" class="help-dot" data-tip="只在这些城市的当天最高温市场里交易；不勾选 = 全部城市。城市列表按当天事件生成，跨天后自动更新；建议选少量城市控制负载。" aria-label="说明：只在这些城市的当天最高温市场里交易；不勾选 = 全部城市。城市列表按当天事件生成，跨天后自动更新；建议选少量城市控制负载。">?</button></label>
       <input class="input" id="f-universe-cities-csv" type="text" data-path="universe.cities" data-kind="cities-csv" value="" placeholder="留空 = 全部城市；多个城市用英文逗号分隔">
       <span class="field-help" id="citiesHelp">城市元数据暂不可用；可手动输入城市名，例如 New York, London。</span>
     </div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-universe-maxMarkets">最大市场数 <span class="hint">个</span><button type="button" class="help-dot" data-tip="从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡；使用 per_event（完整城市事件）时每组约 6–11 个括号，建议 60–110 以覆盖 6–10 个城市。" aria-label="说明：从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡；使用 per_event（完整城市事件）时每组约 6–11 个括号，建议 60–110 以覆盖 6–10 个城市。">?</button></label>
-      <input class="input num" type="number" id="f-universe-maxMarkets" data-path="universe.maxMarkets" data-kind="number" data-min="1" data-max="200" data-step="1" min="1" max="200" step="1" value="12" inputmode="decimal">
-      <span class="field-help">按流动性/成交额选取</span>
-    </div><div class="field">
-        <label class="field-label" for="f-universe-selectionMode">选市场方式<button type="button" class="help-dot" data-tip="per_market：按单个市场流动性取前 N 个（原行为，城市组可能不完整）；per_event：按城市/日期事件整组选入，保留完整温度括号，组内“概率第 1/第 3 高”才有意义。若开启“每周期空仓兜底建仓”，强烈建议 per_event，否则多数城市组不足 3 个候选，第 3 高 NO 腿不会触发。" aria-label="说明：per_market：按单个市场流动性取前 N 个（原行为，城市组可能不完整）；per_event：按城市/日期事件整组选入，保留完整温度括号，组内“概率第 1/第 3 高”才有意义。若开启“每周期空仓兜底建仓”，强烈建议 per_event，否则多数城市组不足 3 个候选，第 3 高 NO 腿不会触发。">?</button></label>
-        <select class="input" id="f-universe-selectionMode" data-path="universe.selectionMode" data-kind="select">
-          <option value="per_market" selected="">按单个市场（流动性优先）</option><option value="per_event">按完整城市事件（推荐兜底策略）</option>
-        </select>
-        <span class="field-help">per_event：事件内任一括号满足过滤，就整组纳入该城市/日期的全部可交易括号，保证城市内概率排名（第 1/第 3 高）真实；maxMarkets 按整组消耗（每组约 6–11 个）</span>
-      </div><div class="field">
-      <label class="field-label" for="f-universe-minPrice">最低 YES 价格 <span class="hint">USDC 0–1</span><button type="button" class="help-dot" data-tip="只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。" aria-label="说明：只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。">?</button></label>
+      <label class="field-label" for="f-universe-minPrice">最低 YES 价格（下单时） <span class="hint">USDC 0–1</span><button type="button" class="help-dot" data-tip="下单时：YES 中间价低于该值则拒绝成交（0.02 = 2¢），但市场仍会被跟踪、参与概率排名。" aria-label="说明：下单时：YES 中间价低于该值则拒绝成交（0.02 = 2¢），但市场仍会被跟踪、参与概率排名。">?</button></label>
       <input class="input num" type="number" id="f-universe-minPrice" data-path="universe.minPrice" data-kind="number" data-min="0.001" data-max="0.5" data-step="0.001" min="0.001" max="0.5" step="0.001" value="0.02" inputmode="decimal">
-      <span class="field-help">0.02 = 2¢，过滤极端低价</span>
+      <span class="field-help">低于该值不成交，但市场仍会被跟踪</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-maxPrice">最高 YES 价格 <span class="hint">USDC 0–1</span><button type="button" class="help-dot" data-tip="只交易 YES 中间价 ≤ 该值的市场（0.98 = 98¢）。过滤接近确定的极端高价括号。" aria-label="说明：只交易 YES 中间价 ≤ 该值的市场（0.98 = 98¢）。过滤接近确定的极端高价括号。">?</button></label>
+      <label class="field-label" for="f-universe-maxPrice">最高 YES 价格（下单时） <span class="hint">USDC 0–1</span><button type="button" class="help-dot" data-tip="下单时：YES 中间价高于该值则拒绝成交（0.98 = 98¢），避免买接近确定的极端高价。" aria-label="说明：下单时：YES 中间价高于该值则拒绝成交（0.98 = 98¢），避免买接近确定的极端高价。">?</button></label>
       <input class="input num" type="number" id="f-universe-maxPrice" data-path="universe.maxPrice" data-kind="number" data-min="0.5" data-max="0.999" data-step="0.001" min="0.5" max="0.999" step="0.001" value="0.98" inputmode="decimal">
-      <span class="field-help">0.98 = 98¢</span>
-    </div></div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-universe-minLiquidityUsd">最小流动性 <span class="hint">USD</span><button type="button" class="help-dot" data-tip="市场流动性低于该值不参与。数据源流动性可能偏高，建议同时用点差过滤。" aria-label="说明：市场流动性低于该值不参与。数据源流动性可能偏高，建议同时用点差过滤。">?</button></label>
+      <span class="field-help">高于该值不成交</span>
+    </div><div class="field">
+      <label class="field-label" for="f-universe-minLiquidityUsd">最小流动性（下单时） <span class="hint">USD</span><button type="button" class="help-dot" data-tip="下单时：市场流动性低于该值则拒绝成交。不会再把它从关注/排名中剔除。" aria-label="说明：下单时：市场流动性低于该值则拒绝成交。不会再把它从关注/排名中剔除。">?</button></label>
       <input class="input num" type="number" id="f-universe-minLiquidityUsd" data-path="universe.minLiquidityUsd" data-kind="number" data-min="0" data-max="1000000" data-step="100" min="0" max="1000000" step="100" value="500" inputmode="decimal">
-      <span class="field-help">范围 0 – 1000000</span>
+      <span class="field-help">低于该值不成交</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-maxSpread">最大点差 <span class="hint">USDC</span><button type="button" class="help-dot" data-tip="买一卖一价差超过该值不参与且不触发信号（0.03 = 3¢）。市价单先承担点差，点差过宽会吃掉利润。" aria-label="说明：买一卖一价差超过该值不参与且不触发信号（0.03 = 3¢）。市价单先承担点差，点差过宽会吃掉利润。">?</button></label>
+      <label class="field-label" for="f-universe-maxSpread">最大点差（下单时） <span class="hint">USDC</span><button type="button" class="help-dot" data-tip="下单时：买一卖一价差超过该值则拒绝成交（0.03 = 3¢）；同时正常信号会跳过点差过宽的 tick。" aria-label="说明：下单时：买一卖一价差超过该值则拒绝成交（0.03 = 3¢）；同时正常信号会跳过点差过宽的 tick。">?</button></label>
       <input class="input num" type="number" id="f-universe-maxSpread" data-path="universe.maxSpread" data-kind="number" data-min="0.001" data-max="0.2" data-step="0.001" min="0.001" max="0.2" step="0.001" value="0.03" inputmode="decimal">
-      <span class="field-help">0.03 = 3¢；市价单点差成本显著</span>
-    </div><div class="field">
-      <label class="field-label" for="f-universe-minTimeToResolutionSec">最短距结算 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距市场结算至少还有多少秒才参与（900 = 15 分钟）。太近时价格已基本确定，交易价值低。" aria-label="说明：距市场结算至少还有多少秒才参与（900 = 15 分钟）。太近时价格已基本确定，交易价值低。">?</button></label>
+      <span class="field-help">0.03 = 3¢；超过不成交</span>
+    </div></div><div class="field-row field-row-4"><div class="field">
+      <label class="field-label" for="f-universe-minTimeToResolutionSec">最短距交易截止 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距交易截止至少还有多少秒才纳入当天事件（900 = 15 分钟）。太近时价格已基本确定，交易价值低。" aria-label="说明：距交易截止至少还有多少秒才纳入当天事件（900 = 15 分钟）。太近时价格已基本确定，交易价值低。">?</button></label>
       <input class="input num" type="number" id="f-universe-minTimeToResolutionSec" data-path="universe.minTimeToResolutionSec" data-kind="number" data-min="300" data-max="604800" data-step="60" min="300" max="604800" step="60" value="900" inputmode="decimal">
       <span class="field-help">900 = 15 分钟</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-maxTimeToResolutionSec">最长距结算 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距市场结算最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。" aria-label="说明：距市场结算最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。">?</button></label>
+      <label class="field-label" for="f-universe-maxTimeToResolutionSec">最长距交易截止 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距交易截止最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。" aria-label="说明：距交易截止最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。">?</button></label>
       <input class="input num" type="number" id="f-universe-maxTimeToResolutionSec" data-path="universe.maxTimeToResolutionSec" data-kind="number" data-min="3600" data-max="1209600" data-step="600" min="3600" max="1209600" step="600" value="129600" inputmode="decimal">
       <span class="field-help">129600 = 36 小时</span>
-    </div></div><div class="field-row field-row-4"><div class="field switch-field">
+    </div><div class="field switch-field">
         <label class="switch-row" for="f-universe-onlyAcceptingOrders">
           <span class="field-label">仅接受可接单市场</span>
           <span class="switch"><input type="checkbox" id="f-universe-onlyAcceptingOrders" data-path="universe.onlyAcceptingOrders" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>

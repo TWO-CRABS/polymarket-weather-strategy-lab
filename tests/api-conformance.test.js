@@ -289,7 +289,7 @@ test("replay run lifecycle: create -> running/ended -> trades/equity/signals/pos
   for (const key of [
     "id", "strategyId", "strategyName", "mode", "status", "startedAt", "endedAt",
     "initialCapital", "equity", "cash", "positionsValue", "metrics", "signalsCount",
-    "marketsTracked", "pendingSettlements", "settledPositions", "feedStatus",
+    "marketsTracked", "universeDate", "pendingSettlements", "settledPositions", "feedStatus",
   ]) {
     assert.ok(key in summary, `RunSummary.${key} missing`);
   }
@@ -367,6 +367,12 @@ test("replay run lifecycle: create -> running/ended -> trades/equity/signals/pos
     assert.ok(key in positions.json, `positions.${key} missing`);
   }
   assert.ok(Array.isArray(positions.json.positions));
+
+  // active run markets endpoint (dashboard loads the complete today universe)
+  const runMarkets = await server.http.get(`/api/runs/${encodeURIComponent(summary.id)}/markets`);
+  assert.equal(runMarkets.status, 200);
+  assert.ok(Array.isArray(runMarkets.json.markets));
+  assert.equal(runMarkets.json.markets.length, summary.marketsTracked);
   for (const position of positions.json.positions) {
     for (const key of [
       "marketId", "tokenId", "outcome", "shares", "avgPrice", "costBasis", "midPrice",

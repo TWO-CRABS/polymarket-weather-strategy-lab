@@ -11,7 +11,7 @@
  *   - idempotent stop, delete, boot recovery (store keeps terminal records)
  */
 import { RUN_MODES, STRATEGY_VERSION, deepMerge, clone, roundTo, validateStrategy, normalizeStrategy } from "../../shared/contract.js";
-import { AppError, nowMs, newId } from "../util.js";
+import { AppError, nowMs, newId, utcDateKey, marketDateKey } from "../util.js";
 import { Run } from "./run.js";
 import { ReplaySource, loadFixtureMarkets } from "../data/replay.js";
 import { compareMarketsForSelection, effectiveTradingEndMs } from "../data/gamma.js";
@@ -37,6 +37,14 @@ export class RunManager {
     /** @type {Map<string, any>} 已停止/重启后仍需等待官方裁决的 run settler */
     this._settlers = new Map();
     this._settlementTimer = null;
+    this._rollTimer = setInterval(() => {
+      try {
+        this.rollDailyUniverses();
+      } catch (err) {
+        this.log("warn", `daily roll failed: ${err.message}`);
+      }
+    }, 30_000);
+    if (typeof this._rollTimer.unref === "function") this._rollTimer.unref();
     this.discovery.onRefresh((payload) => this._onDiscoveryRefresh(payload));
   }
 
@@ -114,101 +122,54 @@ export class RunManager {
   }
 
   /**
-   * Select markets for a run (docs/03 §1.2).
-   * @param {any} config validated StrategyConfig
+   * 选市场（live）：只取当天（UTC 观察日）市场，按完整城市事件纳入全部可交易括号，
+   * 不限制数量、不按价格/流动性/点差过滤（这些仅在下单时检查）。
+   * @param {any} config
    * @param {"live"|"replay"} mode
+   * @param {{dateKey?:string}} [options]
    * @returns {any[]}
    */
-  selectMarkets(config, mode) {
+  selectMarkets(config, mode, options = {}) {
     const u = config.universe;
     // Deterministic fixture replay: the fixture file IS the universe.
     if (mode === "replay" && this.config.replayFixture) {
       try {
         const fixtureMarkets = loadFixtureMarkets(this.config.replayFixture);
-        if (fixtureMarkets.length > 0) {
-          return fixtureMarkets.slice(0, Math.max(1, u.maxMarkets)).map((market) => clone(market));
-        }
+        if (fixtureMarkets.length > 0) return fixtureMarkets.map((market) => clone(market));
       } catch (err) {
         throw new AppError(400, "INVALID_BODY", `REPLAY_FIXTURE 读取失败: ${err.message}`);
       }
     }
     const now = nowMs();
+    const dateKey = options.dateKey ?? (mode === "live" ? utcDateKey(now) : null);
     const cities = (u.cities || []).map((c) => String(c));
+    const allCandidates = this.discovery.getCandidateMarkets();
     const withinTime = (market) => {
       const cutoffMs = effectiveTradingEndMs(market);
       if (!Number.isFinite(cutoffMs)) return false;
       const ttrSec = (cutoffMs - now) / 1000;
       return ttrSec >= u.minTimeToResolutionSec && ttrSec <= u.maxTimeToResolutionSec;
     };
-    const allCandidates = this.discovery.getCandidateMarkets();
-    // 完整事件宇宙：只做“能不能交易”的硬过滤（closed/tokens/接单/城市/时间窗口），
-    // 不做价格带/流动性/点差过滤——per_event 需要完整括号来保证概率排名正确。
-    const openUniverse = allCandidates.filter((market) => {
+    const markets = allCandidates.filter((market) => {
       if (!market || market.closed) return false;
       if (!market.tokens?.yesTokenId || !market.tokens?.noTokenId) return false;
       if (u.onlyAcceptingOrders && !market.acceptingOrders) return false;
       if (!this._cityMatches(market, cities)) return false;
+      if (dateKey && marketDateKey(market) !== dateKey) return false;
       return withinTime(market);
     });
-    // 策略可交易过滤（价格带/流动性/点差）：用于判断“事件是否值得关注”。
-    const base = openUniverse.filter((market) => {
-      const mid = market.impliedProbability;
-      if (!(mid >= u.minPrice && mid <= u.maxPrice)) return false;
-      if (market.liquidityUsd < u.minLiquidityUsd) return false;
-      if (market.spread > u.maxSpread) return false;
-      return true;
-    });
-    let candidates = base;
-    if (candidates.length === 0 && mode === "replay") {
+    if (markets.length === 0 && mode === "replay") {
       // Replay can use markets that recently closed/expired: historical prices
       // still exist, so the demo/repro path stays available overnight.
-      candidates = allCandidates.filter((market) => {
-        const endMs = Date.parse(market.endDate);
-        return Number.isFinite(endMs) ? endMs > now - 3 * 86400_000 : false;
-      });
+      return allCandidates
+        .filter((market) => {
+          const endMs = Date.parse(market.endDate);
+          return Number.isFinite(endMs) ? endMs > now - 3 * 86400_000 : false;
+        })
+        .sort(compareMarketsForSelection)
+        .map((market) => clone(market));
     }
-    candidates.sort(compareMarketsForSelection);
-    if (u.selectionMode === "per_event") {
-      const eligibleKeys = new Set(base.map((market) => this._eventKeyForMarket(market)));
-      const picked = this._selectFullEvents(eligibleKeys, openUniverse, Math.max(1, u.maxMarkets));
-      if (picked.length > 0) return picked.map((market) => clone(market));
-    }
-    return candidates.slice(0, Math.max(1, u.maxMarkets)).map((market) => clone(market));
-  }
-
-  _eventKeyForMarket(market) {
-    return market.eventId
-      ? `event:${market.eventId}`
-      : `place:${market.city || "未知"}|${String(market.endDate || "").slice(0, 10)}`;
-  }
-
-  /**
-   * per_event：对每个“至少有一个括号满足策略过滤”的城市/日期事件，
-   * 纳入该事件的全部可交易括号（不再逐括号过滤价格带/点差/流动性），
-   * 保证兜底排名（第 1/第 3 高）是该城市真实排名。
-   * 事件按组内总流动性降序；容量不够时整组跳过。
-   */
-  _selectFullEvents(eligibleKeys, openUniverse, cap) {
-    if (eligibleKeys.size === 0) return [];
-    const groups = new Map();
-    for (const market of openUniverse) {
-      const key = this._eventKeyForMarket(market);
-      if (!eligibleKeys.has(key)) continue;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(market);
-    }
-    const liquidityOf = (group) => group.reduce((sum, market) => sum + (Number(market.liquidityUsd) || 0), 0);
-    const sorted = [...groups.values()].sort(
-      (a, b) =>
-        liquidityOf(b) - liquidityOf(a) ||
-        (Number(b[0]?.impliedProbability) || 0) - (Number(a[0]?.impliedProbability) || 0),
-    );
-    const picked = [];
-    for (const group of sorted) {
-      if (picked.length + group.length > cap) continue; // 不拆分事件，装不下就跳过
-      picked.push(...group);
-    }
-    return picked;
+    return markets.sort(compareMarketsForSelection).map((market) => clone(market));
   }
 
   /* -------------------------------- create ------------------------------- */
@@ -262,7 +223,8 @@ export class RunManager {
     config.sim.mode = requestedMode;
     strategyName = strategyName ?? config.name;
 
-    const markets = this.selectMarkets(config, requestedMode);
+    const universeDate = requestedMode === "live" ? utcDateKey() : null;
+    const markets = this.selectMarkets(config, requestedMode, { dateKey: universeDate });
     if (markets.length === 0) {
       throw new AppError(
         409,
@@ -288,6 +250,7 @@ export class RunManager {
       metrics: null,
       signalsCount: 0,
       marketsTracked: markets.length,
+      universeDate,
       feedStatus: requestedMode === "live" ? "connecting" : "live",
       stopReason: null,
       note: "",
@@ -302,6 +265,7 @@ export class RunManager {
       store: this.store,
       log: this.log,
     });
+    run.universeDate = universeDate;
 
     if (requestedMode === "live") {
       const source = this._createLiveSource(run);
@@ -380,6 +344,7 @@ export class RunManager {
       signalsCount: record.signalsCount ?? 0,
       marketsTracked: record.marketsTracked ?? 0,
       marketIds: Array.isArray(record.marketIds) ? record.marketIds : [],
+      universeDate: record.universeDate ?? null,
       pendingSettlements: Number(record.pendingSettlements) || 0,
       settledPositions: Number(record.settledPositions) || 0,
       settlementRecovered: Boolean(record.settlementRecovered),
@@ -464,6 +429,19 @@ export class RunManager {
       exposureUsd: 0,
       tickIntervalMs: record.config?.sim?.tickIntervalMs ?? 1000,
     });
+  }
+
+  /** 当前活跃（当天）市场快照；供看板一次性加载完整 universe。 */
+  async getRunMarkets(id) {
+    const run = this.active.get(id);
+    if (run) {
+      return run.marketIds
+        .map((marketId) => run.markets.get(marketId) || this.discovery.getMarket(marketId))
+        .filter(Boolean);
+    }
+    const record = this.store.getRunRecord(id);
+    if (!record) throw new AppError(404, "RUN_NOT_FOUND", `运行不存在: ${id}`);
+    return (record.marketIds || []).map((marketId) => this.discovery.getMarket(marketId)).filter(Boolean);
   }
 
   async getTrades(id, opts = {}) {
@@ -689,6 +667,33 @@ export class RunManager {
 
   /* --------------------------- feed orchestration ------------------------ */
 
+  /**
+   * 每日滚动：live run 在 UTC 日期变化时，将活跃市场切到新一天（完整城市事件），
+   * 同一 run 继续跑；旧市场标记交易关闭并保留供官方结算。
+   */
+  rollDailyUniverses(now = nowMs()) {
+    const dateKey = utcDateKey(now);
+    let changed = false;
+    for (const run of this.active.values()) {
+      if (run.mode !== "live" || run.status !== "running") continue;
+      if (run.universeDate === dateKey) continue;
+      const markets = this.selectMarkets(run.config, "live", { dateKey });
+      if (markets.length === 0) {
+        if (run._rollWarnedDate !== dateKey) {
+          run._rollWarnedDate = dateKey;
+          this.log("warn", `daily roll: run ${run.id} has no markets for ${dateKey}, will retry`);
+          run.sse.log("warn", `新一天（${dateKey}）暂无可用市场，继续等待并重试订阅`, run.id);
+        }
+        continue;
+      }
+      run.rollUniverse(markets, dateKey, now);
+      changed = true;
+      this.log("info", `daily roll: run ${run.id} -> ${dateKey} (${markets.length} markets)`);
+    }
+    if (changed) this.applyFeedTracking();
+    return changed;
+  }
+
   _onDiscoveryRefresh(payload) {
     const updated = new Map((payload?.markets ?? []).map((market) => [market.id, market]));
     for (const run of this.active.values()) {
@@ -705,6 +710,7 @@ export class RunManager {
         }
       }
     }
+    this.rollDailyUniverses();
     this.applyFeedTracking();
   }
 
@@ -732,6 +738,8 @@ export class RunManager {
   /* ------------------------------- shutdown ------------------------------ */
 
   async shutdown() {
+    if (this._rollTimer) clearInterval(this._rollTimer);
+    if (this._settlementTimer) clearInterval(this._settlementTimer);
     const runs = [...this.active.values()];
     this.active.clear();
     await Promise.allSettled(runs.map((run) => run.stop("server_shutdown")));

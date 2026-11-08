@@ -64,8 +64,10 @@ export class Run {
     this.signalStates = new Map();
     /** @type {Map<string, any>} */
     this.markets = new Map();
-    /** @type {string[]} */
+    /** @type {string[]} 当天活跃市场 id（旧市场保留在 markets 供结算） */
     this.marketIds = [];
+    /** @type {string|null} 当前活跃市场所属 UTC 观察日（YYYY-MM-DD） */
+    this.universeDate = cfg.record.universeDate ?? null;
     /** @type {any[]} */
     this.signals = [];
     /** @type {any[]} */
@@ -116,6 +118,38 @@ export class Run {
     for (const marketId of this.marketIds) {
       if (!this.signalStates.has(marketId)) this.signalStates.set(marketId, createSignalState());
     }
+  }
+
+  /**
+   * 每日滚动：把活跃市场切到新一天；旧市场标记交易关闭并保留在 markets 里，
+   * 已有仓位继续等待官方结算。权益/成交/指标不重置。
+   */
+  rollUniverse(markets, dateKey, now = nowMs()) {
+    for (const marketId of this.marketIds) {
+      const market = this.markets.get(marketId);
+      if (market) market.closed = true;
+    }
+    const next = (Array.isArray(markets) ? markets : []).filter((market) => market && market.id);
+    this.marketIds = [];
+    for (const market of next) {
+      this.markets.set(market.id, market);
+      this.marketIds.push(market.id);
+      if (!this.signalStates.has(market.id)) this.signalStates.set(market.id, createSignalState());
+    }
+    this.universeDate = dateKey;
+    this._lastBookHash.clear();
+    this._fallbackNextAt = null;
+    this._rejectedExitKeys.clear();
+    this.broadcastMarkets();
+    this.broadcastRun();
+    this.sampleEquity(now);
+    this.store.upsertRunRecord(this.record()).catch(() => {});
+    this.sse.log(
+      "info",
+      `已切换到 ${dateKey} 市场（${this.marketIds.length} 个）；旧仓位保留，按官方裁决结算`,
+      this.id,
+    );
+    return this.marketIds.length;
   }
 
   /* ------------------------------- lifecycle ----------------------------- */
@@ -517,7 +551,8 @@ export class Run {
       positionsValue: summary.positionsValue,
       metrics: summary.metrics,
       signalsCount: this.signals.length,
-      marketsTracked: this.markets.size,
+      marketsTracked: this.marketIds.length,
+      universeDate: this.universeDate,
       marketIds: [...this.marketIds],
       pendingSettlements: summary.pendingSettlements ?? 0,
       settledPositions: summary.settledPositions ?? 0,
@@ -563,7 +598,8 @@ export class Run {
       ...this._settlementCounts(),
       metrics,
       signalsCount: this.signals.length,
-      marketsTracked: this.markets.size,
+      marketsTracked: this.marketIds.length,
+      universeDate: this.universeDate,
       marketIds: [...this.marketIds],
       feedStatus: this.source?.status ? this.source.status().status : "connecting",
       createdAt: this.createdAt,

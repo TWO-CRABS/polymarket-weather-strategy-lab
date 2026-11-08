@@ -92,8 +92,6 @@ export const RUN_MODES = Object.freeze(["live", "replay"]);
 export const PRICE_FIELDS = Object.freeze(["mid", "last", "best_bid", "best_ask"]);
 export const DIRECTIONS = Object.freeze(["up", "down", "both"]);
 export const SIZING_MODES = Object.freeze(["fixed_stake", "pct_equity"]);
-/** 选市场方式：按单个市场（流动性优先）或按完整城市/日期事件（保留全部温度括号）。 */
-export const SELECTION_MODES = Object.freeze(["per_market", "per_event"]);
 export const FILL_MODELS = Object.freeze(["book_walk"]);
 export const OUTCOMES = Object.freeze(["YES", "NO"]);
 export const TRADE_SIDES = Object.freeze(["BUY", "SELL"]);
@@ -105,7 +103,7 @@ export const EXIT_REASONS = Object.freeze([
   "resolution", "manual", "risk_kill_switch",
 ]);
 export const REJECT_REASONS = Object.freeze([
-  "no_liquidity", "spread_too_wide", "below_min_order", "insufficient_cash",
+  "no_liquidity", "spread_too_wide", "liquidity_too_low", "below_min_order", "insufficient_cash",
   "max_positions", "max_positions_per_market", "market_not_accepting_orders",
   "stale_market", "risk_blocked", "unknown",
 ]);
@@ -113,7 +111,6 @@ export const REJECT_REASONS = Object.freeze([
 /** Hard limits used by both server validation and frontend sliders. */
 export const LIMITS = Object.freeze({
   universe: {
-    maxMarkets: [1, 200],
     minPrice: [0.001, 0.5],
     maxPrice: [0.5, 0.999],
     minLiquidityUsd: [0, 1_000_000],
@@ -163,9 +160,6 @@ export const DEFAULT_STRATEGY = Object.freeze({
   description: "",
   universe: {
     cities: [],
-    maxMarkets: 12,
-    /** per_market：按流动性取前 N 个市场（默认）；per_event：按城市/日期事件整组选入（保留完整温度括号）。 */
-    selectionMode: "per_market",
     minPrice: 0.02,
     maxPrice: 0.98,
     minLiquidityUsd: 500,
@@ -278,6 +272,11 @@ export function normalizeStrategy(input = {}) {
 
   for (const group of groups) {
     for (const [key, value] of Object.entries(merged[group])) {
+      // 删除已废弃/未知字段（例如旧版 maxMarkets / selectionMode），保证配置只含当前 schema。
+      if (!(key in DEFAULT_STRATEGY[group])) {
+        delete merged[group][key];
+        continue;
+      }
       if (Array.isArray(value)) continue;
       if (typeof DEFAULT_STRATEGY[group][key] === "number") {
         merged[group][key] = num(value, DEFAULT_STRATEGY[group][key]);
@@ -333,8 +332,6 @@ export function validateStrategy(input = {}) {
   if (!PRICE_FIELDS.includes(s.priceField)) err(`signal.priceField 非法: ${s.priceField}`);
   if (!DIRECTIONS.includes(s.direction)) err(`signal.direction 非法: ${s.direction}`);
   if (!SIZING_MODES.includes(e.sizingMode)) err(`execution.sizingMode 非法: ${e.sizingMode}`);
-  if (!SELECTION_MODES.includes(u.selectionMode)) err(`universe.selectionMode 非法: ${u.selectionMode}`);
-  if (!Number.isFinite(u.maxMarkets) || u.maxMarkets < 1) err("universe.maxMarkets 必须 >= 1");
 
   inRange(u.minPrice, LIMITS.universe.minPrice, "universe.minPrice");
   inRange(u.maxPrice, LIMITS.universe.maxPrice, "universe.maxPrice");
@@ -385,11 +382,6 @@ export function validateStrategy(input = {}) {
   if (e.sizingMode === "pct_equity" && e.sizingValue > 50) warn("单笔使用超过 50% 权益，回撤风险极高");
   if (e.sizingMode === "fixed_stake" && e.sizingValue > r.bankrollUsd) err("单笔固定金额不能大于初始资金");
   if (r.killSwitch && r.maxDrawdownPct < 5) warn("最大回撤熔断阈值过低（< 5%），策略可能刚开始就被停机");
-  if (e.fallbackBuyEachWindow && u.selectionMode !== "per_event") {
-    warn(
-      "兜底建仓按城市独立：当前为 per_market 选市场，城市组可能不足 3 个候选，第 3 高 NO 腿不会触发；建议 universe.selectionMode=per_event（按完整城市事件选市场）",
-    );
-  }
   if (sim.mode === "replay" && sim.replayLookbackMin < s.windowSec / 60) {
     err("回放窗口必须大于信号窗口，否则无法计算滚动收益");
   }
@@ -409,7 +401,7 @@ export const STRATEGY_PRESETS = Object.freeze([
     config: {
       ...clone(DEFAULT_STRATEGY),
       name: "保守 · 高概率区间",
-      universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.05, maxPrice: 0.95, minLiquidityUsd: 1000, maxSpread: 0.02, maxMarkets: 8 },
+      universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.05, maxPrice: 0.95, minLiquidityUsd: 1000, maxSpread: 0.02 },
       signal: { ...clone(DEFAULT_STRATEGY.signal), windowSec: 120, moveThresholdPct: 25, minAbsMove: 0.02, confirmationTicks: 2, cooldownSec: 600, maxSignalsPerMarket: 3 },
       execution: { ...clone(DEFAULT_STRATEGY.execution), sizingMode: "fixed_stake", sizingValue: 20, maxPositionUsd: 40, maxPositions: 3 },
       exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 40, stopLossPct: 25, maxHoldSec: 1800, holdToResolution: false },
@@ -439,7 +431,7 @@ export const STRATEGY_PRESETS = Object.freeze([
     config: {
       ...clone(DEFAULT_STRATEGY),
       name: "激进 · 30s 高频动量",
-      universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.01, maxPrice: 0.99, minLiquidityUsd: 200, maxSpread: 0.05, maxMarkets: 20 },
+      universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.01, maxPrice: 0.99, minLiquidityUsd: 200, maxSpread: 0.05 },
       signal: { ...clone(DEFAULT_STRATEGY.signal), windowSec: 30, moveThresholdPct: 12, minAbsMove: 0.005, confirmationTicks: 1, cooldownSec: 120, maxSignalsPerMarket: 8 },
       execution: { ...clone(DEFAULT_STRATEGY.execution), sizingMode: "fixed_stake", sizingValue: 50, maxPositionUsd: 100, maxPositions: 8 },
       exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 80, stopLossPct: 50, maxHoldSec: 900, holdToResolution: false },
@@ -636,6 +628,7 @@ export const EXIT_REASON_LABELS = Object.freeze({
 export const REJECT_REASON_LABELS = Object.freeze({
   no_liquidity: "盘口无流动性",
   spread_too_wide: "点差过宽",
+  liquidity_too_low: "流动性不足",
   below_min_order: "低于最小下单量",
   insufficient_cash: "现金不足",
   max_positions: "达到最大持仓数",
