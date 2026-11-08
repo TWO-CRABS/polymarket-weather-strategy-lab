@@ -319,6 +319,8 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-14 | 报告与 UI 页脚均含免责声明（§8）；界面无“保证盈利/稳赚”类文案 |
 | AC-15 | 指标边界：无亏损时 `profitFactor=null`（显示“—”）、样本 < 30 时 `sharpe=null`、无持仓时 `unrealizedPnl=0`，不得输出 `Infinity`/`NaN` |
 | AC-16 | 同一 replay 配置连续跑两次（固定 fixture 与时钟）得到相同成交序列与指标（除时间戳） |
+| AC-17 | live 运行中，市场 `endDate` 已过且官方裁决返回 resolved 时，**仍持有的仓位自动按 1/0（罕见 0.5）兑付**：`cash += payout`、持仓删除、Trade `reason=resolution` 且 `fee=0`，`realizedPnl/closedTrades/winRate/totalReturnPct` 等指标同步正确；全部平仓且市场 closed 后运行自动 `ended`（`tests/settlement.test.js`） |
+| AC-18 | 市场 closed 但裁决未出时持仓保留并标记 `resolution_pending=true`，继续每 20s 轮询、不虚构成交；回放模式不做结算（结束时持仓按最后 mid 估值并标注 `openPositionsAtEnd`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |
