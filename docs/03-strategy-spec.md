@@ -295,6 +295,7 @@ holdSec     = (now - entryTs)/1000
 - 二元市场赢家 1.0 USD/股、输家 0（极罕见 50/50 按 0.50 兑付）；`cash += payout`，**结算不收费**，`realizedPnl = payout - costBasis`，Trade 记 `reason=resolution`，随后删除持仓。
 - negRisk 温度组应恰有一个 YES；若出现 0/多个 winner（异常或未定），持仓按最后 mid 保留并标记 `resolution_pending=true`，继续轮询，不虚构成交。
 - **运行生命周期**：只要还有未结算持仓，run 保持 running 持续轮询；全部平仓且所有市场 `closed` 或超过 `endDate + 6h` 才自动 `ended`。
+- **停止/重启后的结算恢复**：live 运行被手动停止，或服务重启把运行标记为 stopped 后，只要 journal 里仍有未平仓持仓，系统会从 `data/runs/<id>.jsonl` 回放成交重建持仓，并继续每 20s 轮询官方裁决；兑付后自动补记 `reason=resolution` Trade、更新现金/权益/指标与 `pendingSettlements/settledPositions`，看板与历史会显示「待结算 N」→「已结算 N」。
 - **回放**：不做结算（无 live resolutionProvider），历史数据结束即 `ended`，持仓按最后 mid 估值，报告标注 `openPositionsAtEnd`。
 
 ## 5. 仓位与组合账本（mark-to-market）

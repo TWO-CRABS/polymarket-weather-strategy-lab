@@ -10,11 +10,12 @@
  *   - expose run views / journal slices to the REST layer
  *   - idempotent stop, delete, boot recovery (store keeps terminal records)
  */
-import { RUN_MODES, STRATEGY_VERSION, deepMerge, clone, validateStrategy, normalizeStrategy } from "../../shared/contract.js";
+import { RUN_MODES, STRATEGY_VERSION, deepMerge, clone, roundTo, validateStrategy, normalizeStrategy } from "../../shared/contract.js";
 import { AppError, nowMs, newId } from "../util.js";
 import { Run } from "./run.js";
 import { ReplaySource, loadFixtureMarkets } from "../data/replay.js";
 import { compareMarketsForSelection } from "../data/gamma.js";
+import { createSettler, marketsFromTrades, rehydratePortfolio, settlePendingPositions } from "./settlementRecovery.js";
 
 const RUNS_LIST_LIMIT = 50;
 
@@ -33,6 +34,9 @@ export class RunManager {
     this.log = deps.log ?? (() => {});
     /** @type {Map<string, Run>} */
     this.active = new Map();
+    /** @type {Map<string, any>} 已停止/重启后仍需等待官方裁决的 run settler */
+    this._settlers = new Map();
+    this._settlementTimer = null;
     this.discovery.onRefresh((payload) => this._onDiscoveryRefresh(payload));
   }
 
@@ -329,6 +333,9 @@ export class RunManager {
       signalsCount: record.signalsCount ?? 0,
       marketsTracked: record.marketsTracked ?? 0,
       marketIds: Array.isArray(record.marketIds) ? record.marketIds : [],
+      pendingSettlements: Number(record.pendingSettlements) || 0,
+      settledPositions: Number(record.settledPositions) || 0,
+      settlementRecovered: Boolean(record.settlementRecovered),
       feedStatus: record.feedStatus ?? "offline",
       createdAt: record.createdAt,
       stopReason: record.stopReason ?? null,
@@ -354,13 +361,22 @@ export class RunManager {
     const record = this.store.getRunRecord(id);
     if (!record) throw new AppError(404, "RUN_NOT_FOUND", `运行不存在: ${id}`);
     const metrics = record.metrics ?? (await this._metricsFromJournal(id, record));
+    const positions = await this._positionsFromJournal(id, record);
     return {
       run: this._viewFromRecord(record),
       config: record.config ?? {},
       metrics,
-      positions: [],
+      positions,
       costBreakdown: { feesPaid: metrics.feesPaid ?? 0, spreadCost: 0, depthSlippageCost: 0, totalFriction: metrics.feesPaid ?? 0 },
     };
+  }
+
+  /** 停止/重启后的运行：从 journal 重建未平仓持仓（供详情页与待结算展示）。 */
+  async _positionsFromJournal(id, record) {
+    const trades = await this.store.readRecords(id, { type: "trade", limit: Number.MAX_SAFE_INTEGER });
+    if (trades.items.length === 0) return [];
+    const portfolio = rehydratePortfolio(record.initialCapital ?? 0, trades.items);
+    return portfolio.snapshots();
   }
 
   async _metricsFromJournal(id, record) {
@@ -429,6 +445,146 @@ export class RunManager {
 
   /* -------------------------------- control ------------------------------ */
 
+  /* ----------------------- settlement recovery (post-stop) ---------------- */
+
+  /**
+   * 启动时调用：为所有 stopped/ended 但仍有未结算持仓的 live 运行恢复结算轮询。
+   * @returns {Promise<number>} 恢复的 run 数量
+   */
+  async recoverSettlements() {
+    let recovered = 0;
+    for (const record of this.store.listRunRecords()) {
+      if (this.active.has(record.id) || this._settlers.has(record.id)) continue;
+      if (record.mode !== "live") continue;
+      try {
+        const journal = await this.store.readRecords(record.id, { type: "trade", limit: Number.MAX_SAFE_INTEGER });
+        const trades = journal.items || [];
+        if (trades.length === 0) continue;
+        const portfolio = rehydratePortfolio(record.initialCapital ?? 0, trades);
+        if (portfolio.positions.size === 0) continue;
+        const markets = marketsFromTrades(trades);
+        const settledMarketIds = trades
+          .filter((trade) => trade.reason === "resolution" && trade.status !== "rejected")
+          .map((trade) => trade.marketId);
+        this._settlers.set(
+          record.id,
+          createSettler({
+            id: record.id,
+            status: record.status,
+            markets,
+            portfolio,
+            store: this.store,
+            sse: this.sse,
+            log: (level, message) => this.log(level, `[settlement ${record.id}] ${message}`),
+            resolutionProvider: (marketId) => this.discovery.getResolution(marketId),
+            settledMarketIds,
+          }),
+        );
+        await this._persistSettler(record.id);
+        recovered += 1;
+        this.log(
+          "info",
+          `结算恢复：${record.id}（${record.strategyName || "未命名策略"}）仍有 ${portfolio.positions.size} 个持仓等待官方裁决，继续轮询`,
+        );
+      } catch (err) {
+        this.log("warn", `结算恢复失败 ${record.id}: ${err.message}`);
+      }
+    }
+    if (recovered > 0) this._ensureSettlementTimer();
+    return recovered;
+  }
+
+  /** 手动停止的 live 运行若仍有持仓，继续在后台等待官方结算。 */
+  _trackRunSettlement(run) {
+    if (!run || run.mode !== "live" || run.portfolio.positions.size === 0) return false;
+    if (this._settlers.has(run.id)) return true;
+    this._settlers.set(
+      run.id,
+      createSettler({
+        id: run.id,
+        status: run.status,
+        markets: new Map(run.markets),
+        portfolio: run.portfolio,
+        store: this.store,
+        sse: this.sse,
+        log: (level, message) => this.log(level, `[settlement ${run.id}] ${message}`),
+        resolutionProvider: (marketId) => this.discovery.getResolution(marketId),
+        settledMarketIds: run.trades
+          .filter((trade) => trade.reason === "resolution" && trade.status !== "rejected")
+          .map((trade) => trade.marketId),
+      }),
+    );
+    this._ensureSettlementTimer();
+    this.log("info", `运行 ${run.id} 已停止，但仍有 ${run.portfolio.positions.size} 个持仓；继续等待官方裁决结算`);
+    return true;
+  }
+
+  _ensureSettlementTimer() {
+    if (this._settlementTimer || this._settlers.size === 0) return;
+    this._settlementTimer = setInterval(() => {
+      this._settlementTick().catch((err) => this.log("warn", `settlement tick failed: ${err.message}`));
+    }, 20_000);
+    if (typeof this._settlementTimer.unref === "function") this._settlementTimer.unref();
+  }
+
+  async _settlementTick() {
+    if (this._settlers.size === 0) return;
+    const now = nowMs();
+    for (const [runId, settler] of [...this._settlers]) {
+      try {
+        const before = settler.portfolio.positions.size;
+        await settlePendingPositions(settler, now);
+        const after = settler.portfolio.positions.size;
+        if (after < before) {
+          await this.store.appendRecord(runId, "equity", {
+            ts: now,
+            equity: roundTo(settler.portfolio.equity(), 5),
+            cash: roundTo(settler.portfolio.cash, 5),
+            positionsValue: roundTo(settler.portfolio.positionsValue(), 5),
+          });
+        }
+        await this._persistSettler(runId);
+        if (after === 0) {
+          this._settlers.delete(runId);
+          this.log("info", `结算完成：${runId} 的全部持仓已按官方裁决兑付`);
+          this.sse.log("info", `运行 ${runId} 的待结算持仓已全部按官方裁决兑付`, runId);
+        }
+      } catch (err) {
+        this.log("warn", `结算轮询失败 ${runId}: ${err.message}`);
+      }
+    }
+    if (this._settlers.size === 0 && this._settlementTimer) {
+      clearInterval(this._settlementTimer);
+      this._settlementTimer = null;
+    }
+  }
+
+  /** 把 settler 的现金/持仓/指标写回 run record（终态运行也会持续更新到结算完毕）。 */
+  async _persistSettler(runId) {
+    const settler = this._settlers.get(runId);
+    const record = this.store.getRunRecord(runId);
+    if (!settler || !record) return;
+    const journal = await this.store.readRecords(runId, { type: "trade", limit: Number.MAX_SAFE_INTEGER });
+    const resolutionTrades = (journal.items || []).filter(
+      (trade) => trade.reason === "resolution" && trade.status !== "rejected",
+    );
+    const metrics = await this._metricsFromJournal(runId, record);
+    record.cash = roundTo(settler.portfolio.cash, 5);
+    record.positionsValue = roundTo(settler.portfolio.positionsValue(), 5);
+    record.equity = roundTo(settler.portfolio.equity(), 5);
+    record.metrics = metrics;
+    record.pendingSettlements = settler.portfolio.positions.size;
+    record.settledPositions = resolutionTrades.length;
+    record.settlementRecovered = true;
+    if (resolutionTrades.length > 0) {
+      record.note = `官方裁决已补记 ${resolutionTrades.length} 笔兑付${
+        record.pendingSettlements > 0 ? `，仍有 ${record.pendingSettlements} 个持仓待结算` : ""
+      }`;
+    }
+    await this.store.upsertRunRecord(record);
+    await this.store.saveNow();
+  }
+
   async stopRun(id) {
     const run = this.active.get(id);
     if (run) {
@@ -438,6 +594,7 @@ export class RunManager {
       const view = await run.stop("manual");
       this.active.delete(id);
       this.applyFeedTracking();
+      this._trackRunSettlement(run);
       return view;
     }
     const record = this.store.getRunRecord(id);
@@ -450,6 +607,7 @@ export class RunManager {
     if (run) {
       await run.stop("manual");
       this.active.delete(id);
+      this._settlers.delete(id);
     } else if (!this.store.getRunRecord(id)) {
       throw new AppError(404, "RUN_NOT_FOUND", `运行不存在: ${id}`);
     }

@@ -172,9 +172,10 @@
 - `maxDrawdownPct = max((peak − equity)/peak) × 100`
 
 ### 3.7 RunSummary
-`{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, marketsTracked, marketIds, feedStatus }`
+`{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, marketsTracked, marketIds, pendingSettlements, settledPositions, feedStatus }`
 `strategyId` 为已保存策略 id，使用内联 strategy 启动时为 `null`。
 `marketIds` 为本运行实际订阅的 Gamma market id 数组（用于看板只展示该运行跟踪的市场；历史旧运行可能为 `[]`）。
+`pendingSettlements` 为“市场已停止交易/已关闭、但官方裁决尚未出的持仓数”；`settledPositions` 为官方裁决已兑付的笔数。两者用于看板/历史的「待结算 / 已结算」标识；停止或服务重启后，live 运行若仍有持仓会继续轮询官方裁决并自动补记（replay 不结算）。
 `status ∈ created | starting | running | paused | stopping | stopped | ended | error`
 `feedStatus ∈ connecting | live | degraded | offline`
 

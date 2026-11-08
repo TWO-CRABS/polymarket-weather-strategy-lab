@@ -321,6 +321,8 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-16 | 同一 replay 配置连续跑两次（固定 fixture 与时钟）得到相同成交序列与指标（除时间戳） |
 | AC-17 | live 运行中，市场 `endDate` 已过且官方裁决返回 resolved 时，**仍持有的仓位自动按 1/0（罕见 0.5）兑付**：`cash += payout`、持仓删除、Trade `reason=resolution` 且 `fee=0`，`realizedPnl/closedTrades/winRate/totalReturnPct` 等指标同步正确；全部平仓且市场 closed 后运行自动 `ended`（`tests/settlement.test.js`） |
 | AC-18 | 市场 closed 但裁决未出时持仓保留并标记 `resolution_pending=true`，继续每 20s 轮询、不虚构成交；回放模式不做结算（结束时持仓按最后 mid 估值并标注 `openPositionsAtEnd`） |
+| AC-19 | **停止/重启后恢复结算**：live 运行被手动停止或服务重启后，只要 journal 中仍有未平仓持仓，系统从 journal 回放重建持仓并继续轮询官方裁决；兑付后补记 `reason=resolution` Trade 并更新现金/权益/指标，`pendingSettlements → 0`、`settledPositions` 递增（`tests/settlementRecovery.test.js`） |
+| AC-20 | 看板/历史对存在待结算或已结算的运行显示「待结算 N / 已结算 N」标识；停止后详情页仍能看到未结算持仓（从 journal 重建） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

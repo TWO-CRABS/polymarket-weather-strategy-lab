@@ -518,11 +518,30 @@ export class Run {
       signalsCount: this.signals.length,
       marketsTracked: this.markets.size,
       marketIds: [...this.marketIds],
+      pendingSettlements: summary.pendingSettlements ?? 0,
+      settledPositions: summary.settledPositions ?? 0,
       feedStatus: summary.feedStatus,
       stopReason: this.stopReason,
       note: this.note,
       config: this.config,
     };
+  }
+
+  /** 待结算持仓数（市场已关闭/已过交易截止但尚未裁决）与已结算笔数。 */
+  _settlementCounts() {
+    const now = nowMs();
+    let pending = 0;
+    for (const position of this.portfolio.positions.values()) {
+      const market = this.markets.get(position.marketId);
+      if (!market) continue;
+      const endMs = Date.parse(market.endDate);
+      if (market.closed || market.resolutionPending) pending += 1;
+      else if (Number.isFinite(endMs) && endMs <= now) pending += 1;
+    }
+    const settledPositions = this.trades.filter(
+      (trade) => trade.reason === "resolution" && trade.status !== "rejected",
+    ).length;
+    return { pendingSettlements: pending, settledPositions };
   }
 
   view() {
@@ -540,6 +559,7 @@ export class Run {
       equity: roundTo(equity, 5),
       cash: roundTo(this.portfolio.cash, 5),
       positionsValue: roundTo(this.portfolio.positionsValue(), 5),
+      ...this._settlementCounts(),
       metrics,
       signalsCount: this.signals.length,
       marketsTracked: this.markets.size,

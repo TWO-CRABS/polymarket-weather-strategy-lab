@@ -209,6 +209,7 @@ export async function mount(root, ctx) {
     runSwitcher: root.querySelector("#runSwitcher"),
     sub: root.querySelector("#dashSub"),
     statusPill: root.querySelector("#dashStatusPill"),
+    settleBadge: root.querySelector("#dashSettleBadge"),
     connBanner: root.querySelector("#connBanner"),
     connBannerText: root.querySelector("#connBannerText"),
     errorBox: root.querySelector("#dashError"),
@@ -400,6 +401,7 @@ export async function mount(root, ctx) {
               <select class="input" id="runSwitcher" aria-label="切换运行"></select>
             </label>
             <span id="dashStatusPill"></span>
+            <span id="dashSettleBadge" class="badge badge-amber" hidden></span>
             <div class="segmented segmented-sm" role="group" aria-label="权益曲线时间范围">
               ${EQUITY_RANGES.map((range) => `<button type="button" class="seg ${range.seconds === 0 ? "is-active" : ""}" data-range="${range.seconds}">${range.label}</button>`).join("")}
             </div>
@@ -597,6 +599,7 @@ export async function mount(root, ctx) {
     const run = state.run || {};
     if (el.runTag) el.runTag.textContent = run.id || state.runId;
     if (el.statusPill) el.statusPill.innerHTML = ui.runStatusPill(run.status || "running");
+    renderSettlementBadge(run);
     updateSubtitle();
     const active = ACTIVE_STATUSES.has(run.status);
     if (el.stopBtn) {
@@ -604,6 +607,23 @@ export async function mount(root, ctx) {
       el.stopBtn.title = active ? "停止当前模拟运行（快捷键 Alt+S）" : "当前运行已停止/结束";
     }
     setErrorBox(null);
+  }
+
+  function renderSettlementBadge(run) {
+    if (!el.settleBadge) return;
+    const pending = num(run.pendingSettlements) || 0;
+    const settled = num(run.settledPositions) || 0;
+    if (pending <= 0 && settled <= 0) {
+      el.settleBadge.hidden = true;
+      el.settleBadge.textContent = "";
+      return;
+    }
+    el.settleBadge.hidden = false;
+    el.settleBadge.className = `badge ${pending > 0 ? "badge-amber" : "badge-ghost"}`;
+    el.settleBadge.textContent = pending > 0 ? `待结算 ${pending}` : `已结算 ${settled}`;
+    el.settleBadge.title = pending > 0
+      ? "市场已停止交易，等待官方裁决后自动兑付（运行停止或服务重启后也会继续结算）"
+      : "官方裁决已兑付，结算不收费";
   }
 
   function updateSubtitle() {

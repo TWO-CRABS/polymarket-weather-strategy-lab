@@ -189,6 +189,13 @@ async function main() {
     discovery.start();
     runs.applyFeedTracking();
     feed.start();
+    // 重启恢复：已停止/已结束但仍有持仓的 live 运行继续等待官方裁决并补记兑付
+    runs
+      .recoverSettlements()
+      .then((count) => {
+        if (count > 0) log("info", `结算恢复：${count} 个运行仍在等待官方裁决`);
+      })
+      .catch((err) => log("warn", `结算恢复失败: ${err.message}`));
   } else {
     log("info", "FEED_MODE=off: upstream network disabled (deterministic offline mode)");
   }

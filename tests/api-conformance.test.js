@@ -289,7 +289,7 @@ test("replay run lifecycle: create -> running/ended -> trades/equity/signals/pos
   for (const key of [
     "id", "strategyId", "strategyName", "mode", "status", "startedAt", "endedAt",
     "initialCapital", "equity", "cash", "positionsValue", "metrics", "signalsCount",
-    "marketsTracked", "feedStatus",
+    "marketsTracked", "pendingSettlements", "settledPositions", "feedStatus",
   ]) {
     assert.ok(key in summary, `RunSummary.${key} missing`);
   }

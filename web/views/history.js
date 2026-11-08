@@ -320,13 +320,20 @@ export async function mount(root, ctx) {
       const selected = state.selected.has(run.id);
       const marked = state.toDelete.has(run.id);
       const active = ["running", "starting", "paused", "stopping"].includes(run.status);
+      const pendingSettlements = num(run.pendingSettlements) || 0;
+      const settledPositions = num(run.settledPositions) || 0;
+      const settleBadge = pendingSettlements > 0
+        ? `<span class="badge badge-amber" title="市场已停止交易，等待官方裁决后自动兑付（停止/重启后也会继续结算）">待结算 ${pendingSettlements}</span>`
+        : settledPositions > 0
+          ? `<span class="badge badge-ghost" title="官方裁决已兑付（结算不收费）">已结算 ${settledPositions}</span>`
+          : "";
       const started = num(run.startedAt);
       return `<tr data-run-id="${ui.escapeHtml(run.id)}" class="${selected ? "is-selected" : ""}${marked ? " is-marked" : ""}" tabindex="0" aria-label="运行 ${ui.escapeHtml(run.id)}，${ui.escapeHtml(run.strategyName || "")}">
         <td class="check-col"><input type="checkbox" class="batch-toggle" data-batch-id="${ui.escapeHtml(run.id)}" ${marked ? "checked" : ""} aria-label="选择运行 ${ui.escapeHtml(run.id)} 批量删除"></td>
         <td class="check-col"><input type="checkbox" class="compare-toggle" data-compare-id="${ui.escapeHtml(run.id)}" ${selected ? "checked" : ""} aria-label="选择运行 ${ui.escapeHtml(run.id)} 参与对比"></td>
         <td><span class="mkt-name"><b>${ui.escapeHtml(run.strategyName || "未命名策略")}</b><span>${ui.escapeHtml(run.id)}</span></span></td>
         <td>${ui.modeBadge(run.mode)}</td>
-        <td>${ui.runStatusBadge(run.status)}</td>
+        <td>${ui.runStatusBadge(run.status)} ${settleBadge}</td>
         <td class="num-col cell-dim">${ui.escapeHtml(ui.fmtDateTime(started))}</td>
         <td class="num-col">${ui.escapeHtml(ui.fmtMoney(num(run.equity)))}</td>
         <td class="num-col">${num(metrics.totalReturnPct) === null ? "—" : ui.pnlSpan(metrics.totalReturnPct, { digits: 2 })}</td>
