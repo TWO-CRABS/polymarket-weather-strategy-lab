@@ -1,0 +1,17 @@
+{
+  "name": "polymarket-weather-strategy-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Polymarket 城市最高温度市场策略验证系统 — 实时模拟交易 / Paper Trading",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "test": "node --test tests/",
+    "verify": "node scripts/verify.js"
+  }
+}

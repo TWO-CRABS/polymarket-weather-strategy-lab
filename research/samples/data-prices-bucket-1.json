@@ -1,0 +1,1 @@
+{"error":"bucket_seconds must be between 60 and 86400","code":"invalid_request","parameter":"bucket_seconds","retryable":false,"trace_id":"6954ced8e0a84202bf5668cb74684c5f"}
