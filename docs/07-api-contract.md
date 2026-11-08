@@ -92,7 +92,7 @@
 - 滚动收益：`ret = (p_now / p_ref - 1) × 100`，`p_ref` = `now - windowSec` 时刻（容差内）的 `priceField` 价格；需有足够样本，否则不产生信号。
 - 触发条件：`ret >= moveThresholdPct`（up）或 `ret <= -moveThresholdPct`（down），且 `|p_now - p_ref| >= minAbsMove`，且连续 `confirmationTicks` 个 tick 满足。
 - 去重：同市场同方向 `cooldownSec` 内不重复触发；每市场最多 `maxSignalsPerMarket` 次。
-- 下单约束：所有订单 ≥ 5 股（CLOB `min_order_size`）；市价 BUY 名义金额 ≥ **$1**（`shared/contract.js` 的 `ORDER_RULES`）。有效最低买入预算 ≈ `max($1, 5×价格) + 手续费`，低于任一门槛记 `below_min_order` 拒单。
+- 下单约束：所有订单 ≥ 5 股（CLOB `min_order_size`）；市价 BUY 名义金额 ≥ **$1**（`shared/contract.js` 的 `ORDER_RULES`）。`sizingValue`/`maxPositionUsd` 按**订单名义额**计，官方 taker 手续费从账户现金单独扣除（现金须 ≥ 名义额 + 手续费）。低于任一门槛记 `below_min_order` 拒单。
 - 校验接口返回 `{valid, errors[], warnings[], normalized}`；`warnings` 用于提示“低价区间 ±20% 被费用吞噬”等退化配置，不阻止运行。
 
 ---

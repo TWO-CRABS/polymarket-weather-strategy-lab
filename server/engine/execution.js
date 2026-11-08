@@ -2,9 +2,11 @@
  * server/engine/execution.js — FAK marketable-order simulation (docs/03 §3).
  *
  * BUY  walks asks from low to high, SELL walks bids from high to low.
- * The buy budget is fee-aware: each level consumes
- * `qty × price × (1 + rate × (1 − price))` from the budget so
- * `notional + fee <= budget` holds at all times.
+ * `budgetUsd` is the ORDER NOTIONAL budget (the USD value of shares), matching the
+ * product's "固定名义金额". The official taker fee is charged separately from the
+ * account cash (Polymarket debits the fee from the balance on top of the order
+ * amount), so the caller passes `cashUsd` and the fill is trimmed so that
+ * `notional + fee <= cashUsd`.
  * Price protection: buyLimit = ceilToTick(min(0.999, bestAsk×(1+bps/1e4))),
  *                   sellLimit = floorToTick(max(0.001, bestBid×(1−bps/1e4))).
  * Orders below the market minimum (default 5 shares) are rejected whole.
@@ -60,7 +62,7 @@ function rejected(reason, extra = {}) {
 
 /**
  * Simulate a FAK BUY (marketable) against asks.
- * @param {{book:any, budgetUsd:number, feeRate?:number, slippageBufferBps?:number,
+ * @param {{book:any, budgetUsd:number, cashUsd?:number, feeRate?:number, slippageBufferBps?:number,
  *          tickSize?:number, minOrderShares?:number, minOrderValueUsd?:number}} args
  * @returns {FillResult}
  */
@@ -68,6 +70,7 @@ export function simulateBuy(args) {
   const {
     book,
     budgetUsd,
+    cashUsd = Infinity,
     feeRate = FEES.takerFeeRate,
     slippageBufferBps = 0,
     tickSize = book?.tickSize || 0.001,
@@ -95,12 +98,12 @@ export function simulateBuy(args) {
       processedAllLevels = false;
       break;
     }
-    const unitCost = level.price * (1 + feeRate * (1 - level.price));
-    if (!(unitCost > 0)) {
+    if (!(level.price > 0)) {
       processedAllLevels = false;
       break;
     }
-    const affordable = floorShares(remaining / unitCost);
+    // Notional budget: qty × price is what the order spends; the fee is separate.
+    const affordable = floorShares(remaining / level.price);
     const qty = floorShares(Math.min(level.size, affordable));
     if (qty <= 0) {
       processedAllLevels = false; // budget cannot afford the cheapest level
@@ -114,16 +117,17 @@ export function simulateBuy(args) {
   // depth exhausted while budget remained => partial fill (docs/03 §3.3).
   // If the leftover budget cannot even buy the 0.01-share minimum lot, the
   // budget is effectively exhausted, so the order counts as filled.
-  const minLotCost = 0.01 * asks[0].price * (1 + feeRate);
+  const minLotCost = 0.01 * asks[0].price;
   const bookExhausted = processedAllLevels && !stoppedByLimit && remaining > minLotCost + 1e-9;
 
   if (filled <= 0) return rejected("no_liquidity", { limitPrice });
 
   let price = roundTo(notional / filled, 6);
   let fee = calcTakerFee(filled, price, feeRate);
-  // trim 0.01-share lots until notional+fee fits the budget
+  // Cash constraint: the exchange debits the fee from the account on top of the
+  // order amount, so trim lots until notional + fee fits available cash.
   let guard = 0;
-  while (notional + fee > budgetUsd + 1e-9 && filled - 0.01 >= minOrderShares && guard < 100000) {
+  while (Number.isFinite(cashUsd) && notional + fee > cashUsd + 1e-9 && filled - 0.01 >= minOrderShares && guard < 100000) {
     guard += 1;
     filled = roundTo(filled - 0.01, 2);
     notional = roundTo(filled * price, 5);
@@ -137,7 +141,9 @@ export function simulateBuy(args) {
       if (bookLevels[i].size <= 0) bookLevels.splice(i, 1);
     }
   }
-  if (notional + fee > budgetUsd + 1e-9) return rejected("insufficient_cash", { limitPrice });
+  if (Number.isFinite(cashUsd) && notional + fee > cashUsd + 1e-9) {
+    return rejected("insufficient_cash", { limitPrice });
+  }
   if (filled < minOrderShares - 1e-9) return rejected("below_min_order", { limitPrice });
   // Market BUY minimum value: the USD notional must be at least $1 (separate from
   // the 5-share CLOB minimum). Below 20¢ the $1 floor binds; above it the share

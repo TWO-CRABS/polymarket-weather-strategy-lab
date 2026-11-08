@@ -446,16 +446,30 @@ test("price protection at bps=0 caps the fill at the best ask (docs/03 §3.1)", 
   assert.deepEqual(protectedFill.bookLevels, [{ price: 0.3, size: 100 }]);
 });
 
-test("BUY budget exhaustion yields a partial fill and fee fits the budget", () => {
+test("BUY spends the notional budget fully; the fee is charged on top of it", () => {
   const book = makeOrderBook({ asks: [{ price: 0.5, size: 100 }] });
   const result = simulateBuy({ book, budgetUsd: 6 });
   assert.equal(result.ok, true);
-  assert.equal(result.shares, 11.7);
+  assert.equal(result.shares, 12);
   assert.equal(result.price, 0.5);
-  assert.equal(result.notional, 5.85);
-  assert.equal(result.fee, 0.14625);
-  approx(result.notional + result.fee, result.totalCost, 1e-9);
-  assert.ok(result.notional + result.fee <= 6 + 1e-9);
+  assert.equal(result.notional, 6);
+  assert.equal(result.fee, 0.15);
+  assert.equal(result.totalCost, 6.15);
+  assert.equal(result.status, "filled");
+});
+
+test("BUY trims by 0.01 shares so notional + fee fits available cash", () => {
+  const book = makeOrderBook({ asks: [{ price: 0.5, size: 100 }] });
+  const result = simulateBuy({ book, budgetUsd: 6, cashUsd: 6.05 });
+  assert.equal(result.ok, true);
+  assert.ok(result.notional + result.fee <= 6.05 + 1e-9);
+  assert.ok(result.shares >= 5);
+  assert.ok(result.notional < 6);
+
+  // Cannot trim below the 5-share minimum to fit cash => insufficient_cash.
+  const tooPoor = simulateBuy({ book, budgetUsd: 6, cashUsd: 2.5 });
+  assert.equal(tooPoor.ok, false);
+  assert.equal(tooPoor.rejectReason, "insufficient_cash");
 });
 
 test("BUY rejects below the 5-share minimum / $1 market-buy value / without liquidity / with no cash", () => {

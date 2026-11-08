@@ -82,7 +82,7 @@ const GROUP_DEFS = [
     fields: [
       { path: "execution.orderType", kind: "readonly", label: "订单类型", valueLabel: "市价单 · IOC（模拟撮合）" },
       { path: "execution.sizingMode", kind: "select", label: "仓位模式", options: SIZING_MODES.map((v) => ({ value: v, label: SIZING_LABELS[v] || v })) },
-      { path: "execution.sizingValue", label: "单笔仓位", unit: "USD / %", min: LIM.execution.sizingValue[0], max: LIM.execution.sizingValue[1], step: 1, slider: true, out: (v) => `${v}`, help: "fixed_stake 单位为 USD；pct_equity 单位为权益百分比" },
+      { path: "execution.sizingValue", label: "单笔仓位", unit: "USD / %", min: LIM.execution.sizingValue[0], max: LIM.execution.sizingValue[1], step: 1, slider: true, out: (v) => `${v}`, help: "fixed_stake 为订单名义额（USD）；pct_equity 为权益百分比；手续费另从现金扣除" },
       { path: "execution.maxPositionUsd", label: "单笔名义上限", unit: "USD", min: LIM.execution.maxPositionUsd[0], max: LIM.execution.maxPositionUsd[1], step: 1 },
       { path: "execution.maxPositions", label: "最大并发持仓", unit: "个", min: LIM.execution.maxPositions[0], max: LIM.execution.maxPositions[1], step: 1 },
       { path: "execution.maxPositionsPerMarket", label: "单市场持仓上限", unit: "个", min: LIM.execution.maxPositionsPerMarket[0], max: LIM.execution.maxPositionsPerMarket[1], step: 1 },

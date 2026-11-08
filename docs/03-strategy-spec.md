@@ -181,10 +181,10 @@ t=0s `mid=0.200`，t=60s `mid=0.240` ⇒ `retPct=(0.240/0.200-1)×100=+20.00`、
 若 t=60s `mid=0.160` ⇒ `retPct=-20.00`、`absMove=-0.040` ⇒ **DOWN → 买 NO**。
 若 `mid=0.239` ⇒ `19.5%<20%` ⇒ 无信号（不得四舍五入）。若 `p_ref=0.002→p_now=0.003`（+50%）⇒ 被 `p_ref≥0.01` 硬地板拒绝。
 
-**示例 B（费用与净收益）**：信号后 YES 盘口 `ask=0.245`（单档 500 股），`sizingValue=25`。
-`unitCost=0.245×(1+0.05×0.755)=0.25424875`；`shares=floor(25/0.25424875,2)=98.32`；`notional=24.0884`；
-`fee=calcTakerFee(98.32,0.245)=round5(0.90934)=0.90934`；`costBasis=24.99774`（`cashDelta=-24.99774`）。
-止盈：YES bestBid=0.40 时 `exitFee=round5(98.32×0.05×0.40×0.60)=1.17984`，`netProceeds=39.328-1.17984=38.14816`，费用后净收益率 `=52.6% ≥ 50%` ⇒ 触发 `take_profit`（注意不是裸价 0.245→0.40 的 63%）。
+**示例 B（费用与净收益）**：信号后 YES 盘口 `ask=0.245`（单档 500 股），`sizingValue=25`（**名义额**预算）。
+`shares=floor(25/0.245,2)=102.04`；`notional=round(102.04×0.245,5)=24.9998`；
+`fee=calcTakerFee(102.04,0.245)=round5(0.94374)=0.94374`；**账户现金扣除** `costBasis=24.9998+0.94374=25.94354`（`cashDelta=-25.94354`，即账户需 ≥ $25.94354；手续费不占名义额预算）。
+止盈：YES bestBid=0.40 时 `exitFee=round5(102.04×0.05×0.40×0.60)=1.22448`，`netProceeds=40.816-1.22448=39.59152`，费用后净收益率 `=52.6% ≥ 50%` ⇒ 触发 `take_profit`（注意不是裸价 0.245→0.40 的 63%）。
 
 ## 3. 执行模型（market order / book walk）
 
@@ -199,7 +199,7 @@ t=0s `mid=0.200`，t=60s `mid=0.240` ⇒ `retPct=(0.240/0.200-1)×100=+20.00`、
 > 注（实现口径）：当 `slippageBufferBps=0`（契约默认）时 `buyLimit == bestAsk`，市价单实际只吃最优档并可能部分成交；只有 `slippageBufferBps>0` 才会逐档吃更深流动性。§10.10 的逐档成交示例默认 `bps>0`。此约定以 §3.1 为准。
 6. 模拟不改变外部盘口（无 self-impact）；同一 tick 已消费档位不重复使用，下一 tick 以新快照为准。
 
-### 3.2 预算（fee-aware sizing）
+### 3.2 预算（notional sizing）
 
 ```
 equity     = cash + Σ(shares×mid)
@@ -209,7 +209,8 @@ budgetUsd  = min(targetUsd, cash, maxPositionUsd - marketCost)
 ```
 
 - 无杠杆、无挂单冻结（FAK 即时成交）；`pct_equity` 以当前权益为基数，随盈亏浮动。
-- 预算包含手续费：逐档累加 `qty×price + fee`，总支出不得超过 `budgetUsd`；若连最小单都买不起 ⇒ `insufficient_cash`。
+- 预算为**订单名义额**（`sizingValue` = fixed_stake 的 USD 名义金额 / pct_equity 的权益百分比对应的名义额），与产品面板「固定名义金额」一致；逐档按 `qty×price` 消耗名义额预算。
+- **手续费从账户现金单独扣除**（Polymarket 在订单金额之外从余额扣费）：总现金支出 = `notional + fee`，必须 ≤ 可用现金；现金不足时按 0.01 股步长缩减成交，仍不足 ⇒ `insufficient_cash`。`maxPositionUsd` 约束单币种/单市场累计成本上限。
 
 ### 3.3 逐档撮合、VWAP、部分成交
 
@@ -226,7 +227,7 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 ```
 
 - `status`：吃到的深度/预算耗尽且未被保护价截断 ⇒ `filled`；因保护价或深度不足提前停止 ⇒ `partial`（允许部分成交，剩余量撤销）。
-- **最小下单量**：两条官方约束同时生效——① `filled ≥ minOrderShares`（CLOB `/book` 的 `min_order_size`，实为 5 股，市价/限价单均适用）；② 市价 **BUY 的名义金额 ≥ $1**（`ORDER_RULES.minOrderValueUsd`，官方市价单以 USD 金额计价；Felix/Turbine 等生产集成均确认）。任一不满足 ⇒ 整单拒绝 `below_min_order`，不产生持仓。故买入最低预算 ≈ `max($1, 5 × 价格) + 手续费`；卖出仅受 5 股约束（份额计价）。
+- **最小下单量**：两条官方约束同时生效——① `filled ≥ minOrderShares`（CLOB `/book` 的 `min_order_size`，实为 5 股，市价/限价单均适用）；② 市价 **BUY 的名义金额 ≥ $1**（`ORDER_RULES.minOrderValueUsd`，官方市价单以 USD 金额计价；Felix/Turbine 等生产集成均确认）。任一不满足 ⇒ 整单拒绝 `below_min_order`，不产生持仓。故买入最低**名义额** = `max($1, 5 × 价格)`，另需账户现金 ≥ 名义额 + 手续费；卖出仅受 5 股约束（份额计价）。
 - 卖出平仓同规则（走 bids 降序、`sellLimit`、费用从收入扣除）；部分平仓按比例结转 costBasis（§5.1）。
 
 ### 3.4 拒绝条件（必须落 `rejected` Trade，`rejectReason` ∈ contract.REJECT_REASONS）

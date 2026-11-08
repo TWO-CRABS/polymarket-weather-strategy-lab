@@ -189,7 +189,7 @@ test("replay fixture run: signals, trades, fees, equity, metrics, positions, SSE
     assert.equal(takeProfit.reason, "take_profit");
     assert.equal(takeProfit.outcome, "YES");
     assert.ok(takeProfit.realizedPnl > 0, "take-profit round must realise a gain");
-    approxEqual(takeProfit.realizedPnl, 13.69834, 1e-4, "take_profit realizedPnl");
+    approxEqual(takeProfit.realizedPnl, 14.13377, 1e-4, "take_profit realizedPnl");
 
     /* ---------------------------- signals --------------------------- */
     const signalsRes = await server.http.get(`/api/runs/${runId}/signals`);
@@ -267,9 +267,9 @@ test("replay fixture run: signals, trades, fees, equity, metrics, positions, SSE
     );
     const open = posBody.positions[0];
     assert.equal(open.outcome, "NO");
-    assert.equal(open.shares, 54.66);
+    assert.equal(open.shares, 56.17);
     assert.equal(open.avgPrice, 0.457349);
-    assert.equal(open.costBasis, 24.99868);
+    assert.equal(open.costBasis, 25.68928);
     assert.equal(open.impliedProbability, 0.56);
     assert.equal(open.estExitFee, calcTakerFee(open.shares, open.midPrice));
     approxEqual(posBody.positionsValue, open.marketValue, 1e-6, "positionsValue");

@@ -271,7 +271,8 @@ export function preRiskChecks(run, market, signal, now) {
   return { ok: true };
 }
 
-/** Fee-aware budget (docs/03 §3.2). */
+/** Notional budget (docs/03 §3.2): `sizingValue`/`pct_equity` target the ORDER
+ *  NOTIONAL; the official taker fee is debited from cash separately. */
 export function computeBudget(run, market) {
   const equity = run.portfolio.equity();
   const execution = run.config.execution;
@@ -303,6 +304,7 @@ export async function tryEntry(run, signal, market, now) {
   const fill = simulateBuy({
     book,
     budgetUsd,
+    cashUsd: run.portfolio.cash,
     feeRate: feeRate(run, market),
     slippageBufferBps: run.config.execution.slippageBufferBps,
     tickSize: market.tickSize,
