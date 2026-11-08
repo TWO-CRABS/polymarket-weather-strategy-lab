@@ -258,11 +258,12 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 - **分组**：温度市场按 **城市 + 日期（negRisk 事件组）** 独立处理——快照有 `eventId` 用 `eventId`，否则用 `city + endDate` 分组。
 - **触发时机**：从运行第一个 tick 起，每满一个观察窗口（`signal.windowSec`）检查一次（`_fallbackNextAt` 按行情时间推进；live=时钟、replay=历史数据时间）。
 - **触发条件（每组独立）**：该城市/日期组**当前没有持仓**（买过又全部卖掉也算空仓）；**其他城市有持仓不影响本城市**，已持仓的组本周期跳过。
-- **动作**：对本组可交易候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice` / 点差 > `universe.maxSpread`）按 **YES 隐含概率降序**：
+- **动作**：对本组可交易候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice`）按 **YES 隐含概率降序**：
   - **第 1 高** → `BUY YES`
   - **第 3 高** → `BUY NO`（组内候选不足 3 个时只做第 1 笔）
+  - **排名不按点差过滤**：否则点差稍宽的 Top1 会被挤出，导致“第 1/第 3 高”名不副实（实测深圳 26°C 57% 因 6¢ 点差被过滤，排名错成 27/25/28）。兜底执行同样不受 `universe.maxSpread` 拦截，但正常信号入场仍保留点差过滤；实际成本按卖一价与真实点差计入。
 - **资金/仓位**：城市组按“组内最高概率”降序依次尝试；`maxPositions` 或现金不足时停止本次循环，剩余城市在后续周期继续（不会因为某个城市持仓而阻止其他城市建仓）。
-- **执行约束**：与正常入场一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；不绕过风控。被拒会记录 `status=rejected` 的 Trade。
+- **执行约束**：与正常入场一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；**仅豁免 `maxSpread` 拦截**（避免排名被点差扭曲），其余风控照常。
 - **记录**：成交的 `Trade.reason = "fallback_entry"`（前端显示「兜底建仓」），不产生 Signal（`signalsCount` 不变）。
 - **推荐配置**：若希望每个城市都能算真实第 3 高，使用 `universe.selectionMode="per_event"`，并放宽价格带/点差/流动性（示例：`minPrice=0.02, maxPrice=0.98, maxSpread=0.05, minLiquidityUsd=200, maxMarkets=120..200`）。否则严格过滤会把每个城市 11 个括号筛到 1–3 个，第 3 高 NO 腿基本不触发（实测：严格过滤 40 组仅 9 组≥3 个候选；放宽后 48 组中 45 组≥3 个）。
 - **关闭**（默认 `false`）时行为与旧版完全一致。

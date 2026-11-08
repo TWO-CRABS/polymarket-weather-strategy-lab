@@ -231,7 +231,7 @@ export function feeRate(run, market) {
 }
 
 /** Fixed risk pre-check order (docs/03 §6). */
-export function preRiskChecks(run, market, signal, now) {
+export function preRiskChecks(run, market, signal, now, opts = {}) {
   if (run.killSwitchTripped || run.status !== "running") return { ok: false, reason: "risk_blocked" };
   const equity = run.portfolio.equity();
   if (run.config.risk.killSwitch && equity < run.peakEquity) {
@@ -243,7 +243,7 @@ export function preRiskChecks(run, market, signal, now) {
   }
   if (!market.acceptingOrders) return { ok: false, reason: "market_not_accepting_orders" };
   if (market.stale) return { ok: false, reason: "stale_market" };
-  if (Number.isFinite(market.spread) && market.spread > run.config.universe.maxSpread) {
+  if (!opts.ignoreSpread && Number.isFinite(market.spread) && market.spread > run.config.universe.maxSpread) {
     return { ok: false, reason: "spread_too_wide" };
   }
   const ttrSec = (effectiveTradingEndMs(market) - now) / 1000;
@@ -297,7 +297,7 @@ export async function tryEntry(run, signal, market, now, opts = {}) {
     // no pyramiding by default; do not spam rejected trades for this silent guard
     return { ok: false, reason: "max_positions_per_market", silent: true };
   }
-  const risk = preRiskChecks(run, market, signal, now);
+  const risk = preRiskChecks(run, market, signal, now, opts);
   if (!risk.ok) return reject(risk.reason);
   const budgetUsd = computeBudget(run, market);
   if (!(budgetUsd > 0)) return reject("insufficient_cash");
@@ -384,7 +384,6 @@ export function collectFallbackCandidates(run) {
     if (!yes || !(yes.ask > 0)) continue;
     if (!Number.isFinite(prob)) continue;
     if (prob < universe.minPrice || prob > universe.maxPrice) continue;
-    if (Number.isFinite(market.spread) && market.spread > universe.maxSpread) continue;
     candidates.push({ market, prob });
   }
   candidates.sort((a, b) => b.prob - a.prob);
@@ -483,7 +482,7 @@ export async function maybePeriodicFallback(run, now) {
       priceField: "mid",
       reason: "fallback_entry",
     };
-    const result = await tryEntry(run, signal, market, now, { reason: "fallback_entry" });
+    const result = await tryEntry(run, signal, market, now, { reason: "fallback_entry", ignoreSpread: true });
     results.push({ ...result, outcome, rank, marketId: market.id, eventKey: leg.eventKey });
     if (result.ok) {
       run.sse.log(

@@ -966,3 +966,40 @@ test("periodic fallback plan is independent per city/date event group", () => {
     ["1:YES:b1", "3:NO:b3"],
   );
 });
+
+test("periodic fallback ranks by probability even when the top bracket has a wide spread", () => {
+  // Real case: Shenzhen 26°C (57%) had a 6¢ spread > maxSpread 5¢; filtering it out
+  // shifted rank-1 to 27°C and rank-3 to 28°C. Fallback ranking must stay
+  // probability-based; the execution path may still report spread cost.
+  const mk = (id, prob, spread) => ({
+    id,
+    city: "Shenzhen",
+    bracket: id,
+    eventId: "evt-sz",
+    impliedProbability: prob,
+    spread,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+  });
+  const markets = new Map([
+    ["26c", mk("26c", 0.575, 0.06)],
+    ["27c", mk("27c", 0.215, 0.03)],
+    ["25c", mk("25c", 0.16, 0.04)],
+    ["28c", mk("28c", 0.0375, 0.023)],
+  ]);
+  const run = {
+    marketIds: [...markets.keys()],
+    markets,
+    portfolio: { positions: new Map() },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+  };
+  assert.deepEqual(
+    planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`),
+    ["1:YES:26c", "3:NO:25c"],
+  );
+});
