@@ -135,6 +135,8 @@ if fee < 0.00001: fee = 0                      # 极小单在极端价位可免�
 ### 5.5 Maker 返佣说明
 Maker 返佣 = 25% × 该笔 taker 费，由挂单方获得，资金来自多收的 taker 费。我们的模拟单永远是 taker：**返佣收入 = 0，且不得从 `feesPaid` 中扣减 25%**。若 roadmap 引入限价 maker 单，必须显式切换 `liquidityRole: maker` 并单独计量返佣收入，不得混入现有含费 P&L。
 
+**Taker Rebate Program（2026-05-28 上线）**：官方按 30 天加权成交量分 7 档（Bronze 3% / Silver 8% / Gold 18% / Platinum 32% / Diamond 44% / Obsidian 50%），返佣按日以 pUSD 发放；Weather 类别权重 1.7，只有实际支付 taker 费的成交才计入加权量。当前模拟器**默认按“无返佣账户”（0%）**计费，未扣除返佣；如需模拟高等级账户，应新增独立的 `fees.takerRebateRate`（0–50%）并单独展示“预估返佣”，避免把它与 maker 返佣混为一谈。
+
 ### 5.6 点差成本（spreadCost，归因项）
 以决策时盘口为基准，衡量“立即成交”相对于公平价的损失：
 ```

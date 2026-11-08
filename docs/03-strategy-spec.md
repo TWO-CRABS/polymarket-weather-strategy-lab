@@ -290,10 +290,12 @@ holdSec     = (now - entryTs)/1000
 
 ### 4.3 结算（`resolution`）
 
-- 数据源优先级：CLOB WS `market_resolved`（`winningAssetId/winningOutcome`）→ Gamma `closed && outcomePrices`（如 `["1","0"]`）→ 轮询 Gamma，最多 24h。
+- **结算时点**：`endDate`（温度市场通常为观察日次日 12:00 UTC = 北京时间 20:00）只是**停止交易**时间，**不是**结算时间，也不会在当日 24:00 按现价强制兑付。真正的 settlement 以官方裁决为准（METAR 数据 → Gamma `closed` + `outcomePrices`）。
+- **当前实现（live）**：每 20 秒通过 Gamma `/markets/<id>` 轮询；当 `closed=true` 且 `outcomePrices` 明确为 `["1","0"]` / `["0","1"]`（或极罕见 50/50）时兑付；未裁决则标记 `resolution_pending=true` 并继续轮询。CLOB WS `market_resolved` 事件目前未接入（可作为增强）。
 - 二元市场赢家 1.0 USD/股、输家 0（极罕见 50/50 按 0.50 兑付）；`cash += payout`，**结算不收费**，`realizedPnl = payout - costBasis`，Trade 记 `reason=resolution`，随后删除持仓。
 - negRisk 温度组应恰有一个 YES；若出现 0/多个 winner（异常或未定），持仓按最后 mid 保留并标记 `resolution_pending=true`，继续轮询，不虚构成交。
-- 回放数据结束但市场未结算：持仓按最后 mid 估值，`run.status=ended`，报告标注 `openPositionsAtEnd`。
+- **运行生命周期**：只要还有未结算持仓，run 保持 running 持续轮询；全部平仓且所有市场 `closed` 或超过 `endDate + 6h` 才自动 `ended`。
+- **回放**：不做结算（无 live resolutionProvider），历史数据结束即 `ended`，持仓按最后 mid 估值，报告标注 `openPositionsAtEnd`。
 
 ## 5. 仓位与组合账本（mark-to-market）
 
