@@ -269,6 +269,7 @@ export async function mount(root, ctx) {
     saveBusy: false,
     previewOpen: false,
     destroyed: false,
+    savedStrategies: [],
   };
   const timers = { validate: 0 };
   let validateController = null;
@@ -390,6 +391,7 @@ export async function mount(root, ctx) {
 
   // 3) 首帧渲染表单
   renderForm();
+  loadSavedStrategyOptions();
 
   /* -------------------- 渲染 -------------------- */
 
@@ -496,6 +498,14 @@ export async function mount(root, ctx) {
           </select>
           <button class="btn btn-ghost" type="button" id="btnApplyPreset">载入选中预设</button>
           <span class="field-help" id="presetHint">预设只覆盖参数，不自动保存；载入后仍可自由修改。</span>
+        </div>
+        <div class="preset-select-row" style="margin-top: var(--sp-2)">
+          <label class="field-label" for="savedStrategySelect" style="flex: none">载入已保存策略</label>
+          <select class="input" id="savedStrategySelect" aria-describedby="savedStrategyHint">
+            ${savedStrategyOptionsHtml()}
+          </select>
+          <button class="btn btn-ghost" type="button" id="btnLoadSavedStrategy">载入策略</button>
+          <span class="field-help" id="savedStrategyHint">从策略库载入；载入后可修改并保存。</span>
         </div>
       </div>
     </section>`;
@@ -894,6 +904,70 @@ export async function mount(root, ctx) {
 
   /* -------------------- 交互 -------------------- */
 
+  /* -------------------- 已保存策略载入 -------------------- */
+
+  function savedStrategyOptionsHtml() {
+    const options = ['<option value="">— 选择已保存策略 —</option>'];
+    for (const strategy of state.savedStrategies || []) {
+      const label = `${strategy.name || "未命名策略"} · ${strategy.id}`;
+      const selected = strategy.id === state.editingStrategyId ? "selected" : "";
+      options.push(`<option value="${escapeAttr(strategy.id)}" ${selected}>${escapeAttr(label)}</option>`);
+    }
+    return options.join("");
+  }
+
+  async function loadSavedStrategyOptions() {
+    try {
+      const data = await api.getJSON("/api/strategies");
+      state.savedStrategies = Array.isArray(data && data.strategies) ? data.strategies : [];
+    } catch {
+      state.savedStrategies = [];
+    }
+    const select = root.querySelector("#savedStrategySelect");
+    if (select) {
+      select.innerHTML = savedStrategyOptionsHtml();
+      select.disabled = state.savedStrategies.length === 0;
+    }
+  }
+
+  function applySavedStrategy(strategy) {
+    state.cfg = normalizeStrategy(strategy.config || strategy);
+    state.cfg.name = strategy.name || state.cfg.name;
+    state.editingStrategyId = strategy.id;
+    state.presetId = "";
+    state.mode = state.cfg.sim.mode === "replay" ? "replay" : "live";
+    state.cfg.sim.mode = state.mode;
+    renderForm();
+    scheduleValidate(0);
+    if (location.hash) {
+      history.replaceState(null, "", `#/builder?strategy=${encodeURIComponent(strategy.id)}`);
+    }
+    ui.toast(`已载入策略：${strategy.name || strategy.id}`, { type: "info", timeout: 2400 });
+  }
+
+  async function loadSelectedSavedStrategy() {
+    const select = root.querySelector("#savedStrategySelect");
+    const id = select ? select.value : "";
+    if (!id) {
+      ui.toast("请先在“载入已保存策略”下拉框选择一个策略", { type: "info", timeout: 2400 });
+      return;
+    }
+    const cached = (ctx.store.strategies || []).find((item) => item.id === id);
+    if (cached && cached.config) {
+      applySavedStrategy(cached);
+      return;
+    }
+    try {
+      const data = await api.getJSON(`/api/strategies/${encodeURIComponent(id)}`);
+      if (!data || !data.strategy) throw new Error("策略不存在");
+      applySavedStrategy(data.strategy);
+    } catch (error) {
+      const detail = api.describeError(error);
+      ui.toast("载入策略失败", { type: "error", detail: detail.title });
+      await loadSavedStrategyOptions();
+    }
+  }
+
   function applyPreset(presetId) {
     const preset = presets.find((item) => item.id === presetId);
     if (!preset) return;
@@ -978,6 +1052,7 @@ export async function mount(root, ctx) {
       if (strategy && strategy.id) state.editingStrategyId = strategy.id;
       await ctx.refreshStrategies(false);
       updatePresetChip();
+      await loadSavedStrategyOptions();
       ui.toast("策略已保存", { type: "success", detail: payload.name, timeout: 2600 });
     } catch (error) {
       const { title, detail } = api.describeError(error);
@@ -1085,6 +1160,10 @@ export async function mount(root, ctx) {
       const presetId = select ? select.value : "";
       if (presetId) applyPreset(presetId);
       else ui.toast("请先在“载入预设”下拉框选择一个预设", { type: "info", timeout: 2400 });
+      return;
+    }
+    if (target.closest("#btnLoadSavedStrategy")) {
+      loadSelectedSavedStrategy();
       return;
     }
     if (target.closest("#btnReset")) {

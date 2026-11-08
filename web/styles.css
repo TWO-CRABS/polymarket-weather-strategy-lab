@@ -1634,3 +1634,8 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 @media (max-width: 900px) {
   .run-switch { display: none; }
 }
+
+/* ---------- B18. 策略库卡片可点击载入 ---------- */
+.strategy-card.is-clickable { cursor: pointer; }
+.strategy-card.is-clickable:hover { border-color: var(--cyan); }
+.strategy-card.is-clickable:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }

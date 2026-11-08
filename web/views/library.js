@@ -65,6 +65,7 @@ export async function mount(root, ctx) {
 
   root.innerHTML = renderShell();
   root.addEventListener("click", onClick);
+  root.addEventListener("keydown", onKeydown);
 
   await loadStrategies();
 
@@ -77,6 +78,7 @@ export async function mount(root, ctx) {
     destroy() {
       state.destroyed = true;
       root.removeEventListener("click", onClick);
+      root.removeEventListener("keydown", onKeydown);
     },
   };
   return instance;
@@ -172,7 +174,7 @@ export async function mount(root, ctx) {
     grid.innerHTML = state.strategies.map((strategy) => {
       const config = strategy.config || {};
       const busy = state.busyId === strategy.id;
-      return `<article class="strategy-card" data-strategy-id="${ui.escapeHtml(strategy.id)}">
+      return `<article class="strategy-card is-clickable" data-strategy-id="${ui.escapeHtml(strategy.id)}" tabindex="0" role="link" aria-label="载入策略 ${ui.escapeHtml(strategy.name || strategy.id)} 到构建器">
         <div class="strategy-top">
           <div>
             <div class="strategy-title">${ui.escapeHtml(strategy.name || "未命名策略")}</div>
@@ -184,7 +186,7 @@ export async function mount(root, ctx) {
         <div class="strategy-tags">${configChips(config)}</div>
         <div class="strategy-stats">${statCells(config)}</div>
         <div class="strategy-actions">
-          <button type="button" class="btn btn-primary btn-sm" data-edit-id="${ui.escapeHtml(strategy.id)}" ${busy ? "disabled" : ""}>编辑</button>
+          <button type="button" class="btn btn-primary btn-sm" data-edit-id="${ui.escapeHtml(strategy.id)}" title="载入到策略构建器" ${busy ? "disabled" : ""}>编辑</button>
           <button type="button" class="btn btn-ghost btn-sm" data-copy-id="${ui.escapeHtml(strategy.id)}" ${busy ? "disabled" : ""}>复制</button>
           <button type="button" class="btn btn-danger-ghost btn-sm" data-delete-id="${ui.escapeHtml(strategy.id)}" ${busy ? "disabled" : ""}>删除</button>
         </div>
@@ -339,6 +341,25 @@ export async function mount(root, ctx) {
     if (deleteBtn) {
       const strategy = state.strategies.find((item) => item.id === deleteBtn.dataset.deleteId);
       if (strategy) deleteStrategy(strategy);
+      return;
     }
+
+    // 点击策略卡片任意空白处也可载入构建器（按钮/输入除外）
+    if (!target.closest("button, input, a")) {
+      const card = target.closest("[data-strategy-id]");
+      if (card) {
+        ctx.navigate(`/builder?strategy=${encodeURIComponent(card.dataset.strategyId)}`);
+      }
+    }
+  }
+
+  function onKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const card = target.closest("[data-strategy-id]");
+    if (!card || target.closest("button, input, a")) return;
+    event.preventDefault();
+    ctx.navigate(`/builder?strategy=${encodeURIComponent(card.dataset.strategyId)}`);
   }
 }

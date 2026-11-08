@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">17:39:51</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">17:45:45</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -118,6 +118,12 @@
           </select>
           <button class="btn btn-ghost" type="button" id="btnApplyPreset">载入选中预设</button>
           <span class="field-help" id="presetHint">预设只覆盖参数，不自动保存；载入后仍可自由修改。</span>
+        </div>
+        <div class="preset-select-row" style="margin-top: var(--sp-2)">
+          <label class="field-label" for="savedStrategySelect" style="flex: none">载入已保存策略</label>
+          <select class="input" id="savedStrategySelect" aria-describedby="savedStrategyHint" disabled=""><option value="">— 选择已保存策略 —</option></select>
+          <button class="btn btn-ghost" type="button" id="btnLoadSavedStrategy">载入策略</button>
+          <span class="field-help" id="savedStrategyHint">从策略库载入；载入后可修改并保存。</span>
         </div>
       </div>
     </section><section class="panel" aria-labelledby="h-universe">
