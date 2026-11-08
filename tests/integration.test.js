@@ -334,6 +334,44 @@ test("replay fixture run: signals, trades, fees, equity, metrics, positions, SSE
   }
 });
 
+test("first-window fallback buy: no trade in first window -> buys highest-probability YES once", async () => {
+  const strategy = fixtureStrategy({
+    overrides: {
+      name: "fallback fixture",
+      // make normal signals impossible so only the fallback can trade
+      signal: { moveThresholdPct: 500, minAbsMove: 0.5 },
+      execution: { firstWindowFallbackBuy: true, sizingValue: 25 },
+    },
+  });
+  const create = await server.http.post("/api/runs", {
+    mode: "replay",
+    strategy,
+    replay: { speed: 100 },
+  });
+  assert.equal(create.status, 201);
+  const runId = create.json.run.id;
+  const detail = await waitForRunStatus(runId, ["ended", "stopped", "error"]);
+  assert.equal(detail.run.status, "ended");
+  assert.equal(detail.run.signalsCount, 0, "normal signals must be suppressed by the 500% threshold");
+
+  const tradesRes = await server.http.get(`/api/runs/${runId}/trades`);
+  const trades = tradesRes.json.trades;
+  assert.ok(trades.length >= 1, "fallback should place a trade");
+  const fallback = trades.find((trade) => trade.reason === "fallback_entry");
+  assert.ok(fallback, `expected a fallback_entry trade, got: ${trades.map((t) => t.reason).join(",")}`);
+  assert.equal(fallback.side, "BUY");
+  assert.equal(fallback.outcome, "YES");
+  assert.ok(fallback.shares > 0);
+  assert.equal(fallback.fee, calcTakerFee(fallback.shares, fallback.price));
+  assert.equal(fallback.notional, roundTo(fallback.shares * fallback.price, 5));
+
+  // Eligible candidate with the highest YES mid at that moment: fixture market B (higher prob).
+  assert.equal(fallback.marketId, "fix-nyc-12c");
+
+  // Only one fallback entry in the whole run.
+  assert.equal(trades.filter((trade) => trade.reason === "fallback_entry").length, 1);
+});
+
 test("GET /api/runs lists the finished replay run", async () => {
   const res = await server.http.get("/api/runs");
   assert.equal(res.status, 200);

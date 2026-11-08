@@ -61,7 +61,8 @@
     "maxPositions": 5,                   // 1..100，全局未平仓持仓数上限（按 token 计）
     "maxPositionsPerMarket": 1,          // 1..10，同一括号市场并发持仓上限
     "fillModel": "book_walk",            // 仅 book_walk：逐档吃对手盘
-    "slippageBufferBps": 0               // 0..1000，价格保护 buffer（100=1%）
+    "slippageBufferBps": 0,              // 0..1000，价格保护 buffer（100=1%）
+    "firstWindowFallbackBuy": false      // 全局兜底：首窗无成交时买入最高概率 YES（只执行一次）
   },
   "exit": {
     "takeProfitPct": 50,                 // 1..1000，费用后净收益率阈值
@@ -250,6 +251,15 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 | 解析异常等 | `unknown` |
 
 > 被拒订单：不成交、不改账本，仅记录 Trade（`status=rejected`）与日志，供前端解释“为什么没成交”。
+
+### 3.5 首窗无成交兜底买入（全局开关 `execution.firstWindowFallbackBuy`）
+
+- **触发时机**：运行第一个 tick 记录 `dueAt = now + signal.windowSec × 1000`；当 `now ≥ dueAt` 且**整个运行尚无任何成交**（`filledTradeCount=0`，被拒单不算）时触发。
+- **动作**：从本运行订阅的市场中，挑选**可交易且 YES 隐含概率最高**的候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice` / 点差 > `universe.maxSpread`），按概率降序最多尝试 5 个，执行一次 **BUY YES**。
+- **执行约束**：与正常入场完全一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；不绕过风控。
+- **只执行一次**：成功或全部候选被拒后 `_fallbackAttempted=true`，后续不再重复；成交的 `Trade.reason = "fallback_entry"`（前端显示「首窗兜底买入」），不产生 Signal 记录（`signalsCount` 不变）。
+- **时间基准**：`now` 为行情时间（live=当前时钟，replay=历史数据时间），因此回放模式下同样按数据窗口计算，不受回放倍速影响。
+- **关闭**（默认 `false`）时行为与旧版完全一致。
 
 ## 4. 退出规则
 

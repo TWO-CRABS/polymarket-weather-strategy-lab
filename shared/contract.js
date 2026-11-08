@@ -190,6 +190,8 @@ export const DEFAULT_STRATEGY = Object.freeze({
     maxPositionsPerMarket: 1,
     fillModel: "book_walk",
     slippageBufferBps: 0,
+    /** 全局兜底：启动后等满一个观察窗口仍无任何成交时，自动买入概率最高的 YES（只执行一次）。 */
+    firstWindowFallbackBuy: false,
   },
   exit: {
     takeProfitPct: 50,
@@ -282,6 +284,11 @@ export function normalizeStrategy(input = {}) {
   merged.universe.cities = Array.isArray(merged.universe.cities)
     ? merged.universe.cities.map((c) => String(c).trim()).filter(Boolean)
     : [];
+
+  // 布尔开关：兼容从 JSON 表单传入的 "true"/"false"
+  if (typeof merged.execution.firstWindowFallbackBuy !== "boolean") {
+    merged.execution.firstWindowFallbackBuy = Boolean(merged.execution.firstWindowFallbackBuy);
+  }
 
   // sim.mode is validated by validateStrategy (invalid values must be rejected,
   // see docs/03 §1.1), so it is deliberately not coerced here.
@@ -505,7 +512,7 @@ export const STRATEGY_PRESETS = Object.freeze([
  * @property {number} [referenceMid]   optional: mid at fill time, for spread-cost attribution
  * @property {number} [spreadCost]     optional: shares * |referenceQuote - referenceMid| (USDC)
  * @property {string|null} signalId
- * @property {string} reason           one of EXIT_REASONS or "signal"
+ * @property {string} reason           one of EXIT_REASONS, "signal" or "fallback_entry"
  * @property {"filled"|"partial"|"rejected"} status
  * @property {string|null} rejectReason
  * @property {Array<{price:number,size:number}>} bookLevels consumed
@@ -611,6 +618,7 @@ export const EXIT_REASON_LABELS = Object.freeze({
   resolution: "市场结算",
   manual: "手动平仓",
   risk_kill_switch: "风控熔断",
+  fallback_entry: "首窗兜底买入", // 入场原因：启动后首窗无成交，买入最高概率 YES
   rejected: "订单被拒",
 });
 

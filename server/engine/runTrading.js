@@ -110,6 +110,8 @@ export async function processMarkets(run, now) {
     await evaluateExits(run, market, now, signal);
     if (signal) await tryEntry(run, signal, market, now);
   }
+  // 全局兜底：首窗到期仍无成交时，买入概率最高的 YES（只执行一次）
+  await maybeFirstWindowFallback(run, now);
 }
 
 /** Exit plan: settlement handled earlier; then SL > TP > maxHold > opposite. */
@@ -284,23 +286,22 @@ export function computeBudget(run, market) {
   return Math.min(targetUsd, run.portfolio.cash, execution.maxPositionUsd - marketCost);
 }
 
-export async function tryEntry(run, signal, market, now) {
-  if (run.portfolio.positionsForMarket(market.id).length > 0) return; // no pyramiding by default
+export async function tryEntry(run, signal, market, now, opts = {}) {
+  const reason = opts.reason || "signal";
+  const reject = (rejectReason) => {
+    recordRejectedEntry(run, signal, market, rejectReason, now, { reason });
+    return { ok: false, reason: rejectReason };
+  };
+  if (run.portfolio.positionsForMarket(market.id).length > 0) {
+    // no pyramiding by default; do not spam rejected trades for this silent guard
+    return { ok: false, reason: "max_positions_per_market", silent: true };
+  }
   const risk = preRiskChecks(run, market, signal, now);
-  if (!risk.ok) {
-    recordRejectedEntry(run, signal, market, risk.reason, now);
-    return;
-  }
+  if (!risk.ok) return reject(risk.reason);
   const budgetUsd = computeBudget(run, market);
-  if (!(budgetUsd > 0)) {
-    recordRejectedEntry(run, signal, market, "insufficient_cash", now);
-    return;
-  }
+  if (!(budgetUsd > 0)) return reject("insufficient_cash");
   const book = run.source?.getBook ? run.source.getBook(signal.tokenId) : null;
-  if (!book) {
-    recordRejectedEntry(run, signal, market, "no_liquidity", now);
-    return;
-  }
+  if (!book) return reject("no_liquidity");
   const fill = simulateBuy({
     book,
     budgetUsd,
@@ -309,14 +310,8 @@ export async function tryEntry(run, signal, market, now) {
     slippageBufferBps: run.config.execution.slippageBufferBps,
     tickSize: market.tickSize,
   });
-  if (!fill.ok) {
-    recordRejectedEntry(run, signal, market, fill.rejectReason, now);
-    return;
-  }
-  if (fill.notional + fill.fee > run.portfolio.cash + 1e-9) {
-    recordRejectedEntry(run, signal, market, "insufficient_cash", now);
-    return;
-  }
+  if (!fill.ok) return reject(fill.rejectReason);
+  if (fill.notional + fill.fee > run.portfolio.cash + 1e-9) return reject("insufficient_cash");
   const quote = signal.outcome === "YES" ? market.quotes?.YES : market.quotes?.NO;
   const reference = quote?.ask ?? fill.price;
   const portfolioPosition = run.portfolio.buy({
@@ -347,7 +342,7 @@ export async function tryEntry(run, signal, market, now) {
     totalCost: fill.totalCost,
     cashDelta: -fill.totalCost,
     signalId: signal.id,
-    reason: "signal",
+    reason,
     status: fill.status,
     rejectReason: null,
     bookLevels: fill.bookLevels,
@@ -355,7 +350,90 @@ export async function tryEntry(run, signal, market, now) {
   });
   recordTrade(run, trade, portfolioPosition);
   run.sampleEquity(now);
+  return { ok: true, trade, fill };
 }
+
+/* ----------------------- first-window fallback (global) ------------------- */
+
+const FALLBACK_MAX_CANDIDATES = 5;
+
+/**
+ * Global fallback: when `execution.firstWindowFallbackBuy` is enabled, wait one
+ * observation window from the first tick; if the run still has no filled trade,
+ * buy the YES of the highest-implied-probability eligible market (once per run).
+ * Tries the next-highest candidates when a higher one is rejected.
+ */
+export async function maybeFirstWindowFallback(run, now) {
+  const execution = run.config.execution || {};
+  if (!execution.firstWindowFallbackBuy || run._fallbackAttempted) {
+    return { attempted: false };
+  }
+  if (run._fallbackDueAt === null) {
+    run._fallbackDueAt = now + Math.max(0, Number(run.config.signal.windowSec) || 0) * 1000;
+  }
+  if (now < run._fallbackDueAt) return { attempted: false };
+  if (run.filledTradeCount > 0) {
+    run._fallbackAttempted = true;
+    return { attempted: false, reason: "already_traded" };
+  }
+  run._fallbackAttempted = true;
+  const result = await tryFallbackEntry(run, now);
+  if (result.ok) {
+    run.sse.log(
+      "info",
+      `首窗兜底买入：${result.market.city} ${result.market.bracket} YES ${result.trade.shares} 股 @ ${result.trade.price}`,
+      run.id,
+    );
+  } else {
+    run.sse.log("warn", `首窗兜底买入未成交（${result.reason}）`, run.id);
+  }
+  return { attempted: true, ...result };
+}
+
+async function tryFallbackEntry(run, now) {
+  const candidates = [];
+  const universe = run.config.universe;
+  for (const marketId of run.marketIds) {
+    const market = run.markets.get(marketId);
+    if (!market || market.closed || market.acceptingOrders === false) continue;
+    const yes = market.quotes?.YES;
+    const prob = Number(market.impliedProbability);
+    if (!yes || !(yes.ask > 0)) continue;
+    if (!Number.isFinite(prob)) continue;
+    if (prob < universe.minPrice || prob > universe.maxPrice) continue;
+    if (Number.isFinite(market.spread) && market.spread > universe.maxSpread) continue;
+    candidates.push({ market, prob });
+  }
+  if (!candidates.length) return { ok: false, reason: "no_candidate" };
+  candidates.sort((a, b) => b.prob - a.prob);
+  let lastReason = "no_candidate";
+  for (const { market } of candidates.slice(0, FALLBACK_MAX_CANDIDATES)) {
+    const quote = market.quotes.YES;
+    const signal = {
+      id: null,
+      runId: run.id,
+      ts: now,
+      marketId: market.id,
+      city: market.city,
+      bracket: market.bracket,
+      direction: "up",
+      outcome: "YES",
+      tokenId: market.tokens.yesTokenId,
+      fromPrice: quote.mid ?? quote.ask,
+      toPrice: quote.mid ?? quote.ask,
+      changePct: 0,
+      absChange: 0,
+      windowSec: run.config.signal.windowSec,
+      priceField: "mid",
+      reason: "fallback_entry",
+    };
+    const result = await tryEntry(run, signal, market, now, { reason: "fallback_entry" });
+    if (result.ok) return { ok: true, market, trade: result.trade };
+    lastReason = result.reason;
+  }
+  return { ok: false, reason: lastReason };
+}
+
 
 /* ----------------------------- bookkeeping -------------------------------- */
 
@@ -405,7 +483,7 @@ export function recordTrade(run, trade, position) {
   );
 }
 
-export function recordRejectedEntry(run, signal, market, rejectReason, now) {
+export function recordRejectedEntry(run, signal, market, rejectReason, now, opts = {}) {
   const trade = makeTrade(run, {
     market,
     tokenId: signal.tokenId,
@@ -421,7 +499,7 @@ export function recordRejectedEntry(run, signal, market, rejectReason, now) {
     totalCost: 0,
     cashDelta: 0,
     signalId: signal.id,
-    reason: "signal",
+    reason: opts.reason || "signal",
     status: "rejected",
     rejectReason,
     bookLevels: [],
