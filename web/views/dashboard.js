@@ -67,6 +67,15 @@ function marketName(market) {
   return `${cityLabel(market)} ${bracketLabel(market)}`.trim();
 }
 
+/** 卡片日期短标签（MM/DD，用于区分同一城市不同日期的市场）。 */
+function shortDate(iso) {
+  if (!iso) return "";
+  const ts = typeof iso === "number" ? iso : Date.parse(iso);
+  if (!Number.isFinite(ts)) return "";
+  const date = new Date(ts);
+  return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function quoteOf(market, side = "YES") {
   return (market && market.quotes && market.quotes[side]) || {};
 }
@@ -777,15 +786,16 @@ export async function mount(root, ctx) {
     const stale = Boolean(market.stale) || (num(market.updatedAt) !== null && Date.now() - market.updatedAt > 20000);
     const closed = Boolean(market.closed);
     const notAccepting = market.acceptingOrders === false;
+    const marketDate = shortDate(market.endDate);
 
     const badges = [];
     if (stale) badges.push('<span class="mkt-stale">行情过期</span>');
     if (closed) badges.push('<span class="mkt-stale mkt-closed">已关闭</span>');
     else if (notAccepting) badges.push('<span class="mkt-stale">暂停接单</span>');
 
-    return `<button type="button" class="mkt ${selected ? "is-selected" : ""}" data-market-id="${ui.escapeHtml(market.id)}" style="--mkt-tint:${tint}" aria-pressed="${selected ? "true" : "false"}" aria-label="${ui.escapeHtml(marketName(market))}，YES ${priceText(display.value)}，隐含概率 ${prob === null ? "未知" : ui.fmtProb(prob)}">
+    return `<button type="button" class="mkt ${selected ? "is-selected" : ""}" data-market-id="${ui.escapeHtml(market.id)}" style="--mkt-tint:${tint}" title="${ui.escapeHtml(`${market.question || marketName(market)}${marketDate ? `（结算 ${marketDate}）` : ""}`)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${ui.escapeHtml(marketName(market))}，YES ${priceText(display.value)}，隐含概率 ${prob === null ? "未知" : ui.fmtProb(prob)}">
       <div class="mkt-top">
-        <span class="mkt-city"><i aria-hidden="true"></i>${ui.escapeHtml(cityLabel(market))}</span>
+        <span class="mkt-city"><i aria-hidden="true"></i>${ui.escapeHtml(cityLabel(market))}${marketDate ? `<span class="mkt-date">${ui.escapeHtml(marketDate)}</span>` : ""}</span>
         <canvas class="mkt-spark" data-spark-id="${ui.escapeHtml(market.id)}" width="62" height="20" aria-hidden="true"></canvas>
       </div>
       <div class="mkt-bracket">${ui.escapeHtml(bracketLabel(market))}</div>
@@ -851,7 +861,7 @@ export async function mount(root, ctx) {
     const yes = quoteOf(market, "YES");
     const no = quoteOf(market, "NO");
     const prob = num(market.impliedProbability) !== null ? market.impliedProbability : midOf(market, "YES");
-    el.selectedTitle.textContent = marketName(market);
+    el.selectedTitle.textContent = `${marketName(market)}${shortDate(market.endDate) ? ` · ${shortDate(market.endDate)}` : ""}`;
     if (probBadge) probBadge.textContent = `概率 ${prob === null ? "—" : ui.fmtProb(prob)}`;
     el.selectedMeta.innerHTML = [
       `<span class="feed-chip">YES 买 ${ui.escapeHtml(priceText(yes.bid))} / 卖 ${ui.escapeHtml(priceText(yes.ask))} / 中 ${ui.escapeHtml(priceText(yes.mid))}</span>`,

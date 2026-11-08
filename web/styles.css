@@ -1639,3 +1639,9 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .strategy-card.is-clickable { cursor: pointer; }
 .strategy-card.is-clickable:hover { border-color: var(--cyan); }
 .strategy-card.is-clickable:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* ---------- B19. 市场卡片日期标签（区分同日/次日市场） ---------- */
+.mkt-date {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 500;
+  color: var(--text-3); letter-spacing: 0.3px;
+}
