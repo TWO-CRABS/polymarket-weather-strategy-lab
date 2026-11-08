@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Polymarket 城市最高温度市场策略验证系统：组合策略参数、启动实时模拟交易、查看成交/盈亏/概率与运行历史。">
+<title>PolyTemp Terminal · 城市最高温策略验证系统</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='8'%20fill='%230b1017'/%3E%3Ctext%20x='16'%20y='22'%20font-size='13'%20text-anchor='middle'%20fill='%2367e8f9'%20font-family='monospace'%3E%C2%B0C%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/web/styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ══════════════ 顶栏：品牌 / 行情状态 / 服务端时间 / 契约版本 ══════════════ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">°C</div>
+      <div class="brand-text"><strong>PolyTemp</strong><span>TERMINAL</span></div>
+    </div>
+
+    <div class="feed-status" id="feedStatus" data-state="connecting" role="status" aria-live="polite"
+         aria-label="行情通道状态">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span class="feed-status-label" id="feedStatusLabel">行情连接中</span>
+    </div>
+
+    <div class="top-stats">
+      <div class="top-stat">
+        <span class="top-label">服务端时间 · Asia/Shanghai</span>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">--:--:--</strong>
+      </div>
+      <div class="top-stat">
+        <span class="top-label">行情延迟</span>
+        <strong class="num" id="feedLatency" title="最近一次行情更新延迟">—</strong>
+      </div>
+      <div class="top-stat">
+        <span class="top-label">契约版本</span>
+        <strong class="num" id="contractVersion" title="前后端共享契约版本">v1.0.0</strong>
+      </div>
+    </div>
+
+    <div class="env-badge" title="所有订单均为本地模拟成交，不提交链上订单、不接触私钥">PAPER · 模拟盘</div>
+  </header>
+
+  <!-- ══════════════ 主导航 ══════════════ -->
+  <nav class="nav-tabs" role="tablist" aria-label="主导航">
+    <a class="tab" href="#/builder" data-route="builder" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">⚙</span>策略构建
+    </a>
+    <a class="tab" href="#/dashboard" data-route="dashboard" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">◷</span>实时看板
+      <span class="tab-pip" id="navLivePip" title="模拟运行中" hidden></span>
+    </a>
+    <a class="tab" href="#/history" data-route="history" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">≡</span>运行历史
+    </a>
+    <a class="tab" href="#/library" data-route="library" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">◈</span>策略库
+    </a>
+    <div class="nav-spacer"></div>
+    <div class="nav-meta mono" id="navMeta" title="所有时间以 Asia/Shanghai 显示">TZ ASIA/SHANGHAI</div>
+  </nav>
+
+  <!-- ══════════════ 视图挂载点 ══════════════ -->
+  <main class="workspace" id="view-mount" tabindex="-1">
+    <noscript>
+      <div class="panel">
+        <div class="panel-body">
+          <p class="empty-state">本系统为原生 ES Modules 单页应用，需要启用 JavaScript 才能显示策略构建与实时看板。</p>
+        </div>
+      </div>
+    </noscript>
+  </main>
+
+  <!-- ══════════════ 页脚：模拟盘声明 ══════════════ -->
+  <footer class="app-footer">
+    <span>模拟交易验证系统 · 不接入真实资金、不提交链上订单 · 不构成投资建议</span>
+    <span class="mono">PAPER TRADING ONLY · NOT FINANCIAL ADVICE</span>
+  </footer>
+</div>
+
+<div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
+
+<script type="module" src="/web/app.js"></script>
+</body>
+</html>
