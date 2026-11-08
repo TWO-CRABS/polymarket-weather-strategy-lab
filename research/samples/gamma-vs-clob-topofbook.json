@@ -1,0 +1,123 @@
+[
+ {
+  "bracket": "9°C or below",
+  "gammaBid": null,
+  "gammaAsk": 0.001,
+  "liveBid": null,
+  "liveAsk": 0.001,
+  "bidDiff": null,
+  "askDiff": 0,
+  "ms": 522,
+  "depth": "0/53"
+ },
+ {
+  "bracket": "10°C",
+  "gammaBid": null,
+  "gammaAsk": 0.001,
+  "liveBid": null,
+  "liveAsk": 0.001,
+  "bidDiff": null,
+  "askDiff": 0,
+  "ms": 267,
+  "depth": "0/58"
+ },
+ {
+  "bracket": "11°C",
+  "gammaBid": null,
+  "gammaAsk": 0.001,
+  "liveBid": null,
+  "liveAsk": 0.001,
+  "bidDiff": null,
+  "askDiff": 0,
+  "ms": 263,
+  "depth": "0/62"
+ },
+ {
+  "bracket": "12°C",
+  "gammaBid": null,
+  "gammaAsk": 0.001,
+  "liveBid": null,
+  "liveAsk": 0.001,
+  "bidDiff": null,
+  "askDiff": 0,
+  "ms": 271,
+  "depth": "0/72"
+ },
+ {
+  "bracket": "13°C",
+  "gammaBid": null,
+  "gammaAsk": 0.001,
+  "liveBid": null,
+  "liveAsk": 0.001,
+  "bidDiff": null,
+  "askDiff": 0,
+  "ms": 272,
+  "depth": "0/63"
+ },
+ {
+  "bracket": "14°C",
+  "gammaBid": null,
+  "gammaAsk": 0.001,
+  "liveBid": null,
+  "liveAsk": 0.001,
+  "bidDiff": null,
+  "askDiff": 0,
+  "ms": 252,
+  "depth": "0/57"
+ },
+ {
+  "bracket": "15°C",
+  "gammaBid": 0.991,
+  "gammaAsk": 0.998,
+  "liveBid": 0.991,
+  "liveAsk": 0.998,
+  "bidDiff": 0,
+  "askDiff": 0,
+  "ms": 253,
+  "depth": "19/2"
+ },
+ {
+  "bracket": "16°C",
+  "gammaBid": 0.001,
+  "gammaAsk": 0.009,
+  "liveBid": 0.001,
+  "liveAsk": 0.008,
+  "bidDiff": 0,
+  "askDiff": -0.001,
+  "ms": 280,
+  "depth": "1/47"
+ },
+ {
+  "bracket": "17°C",
+  "gammaBid": null,
+  "gammaAsk": 0.009,
+  "liveBid": null,
+  "liveAsk": 0.006,
+  "bidDiff": null,
+  "askDiff": -0.003,
+  "ms": 253,
+  "depth": "0/52"
+ },
+ {
+  "bracket": "18°C",
+  "gammaBid": 0.001,
+  "gammaAsk": 0.003,
+  "liveBid": null,
+  "liveAsk": 0.003,
+  "bidDiff": -0.001,
+  "askDiff": 0,
+  "ms": 279,
+  "depth": "0/57"
+ },
+ {
+  "bracket": "19°C or higher",
+  "gammaBid": null,
+  "gammaAsk": 0.001,
+  "liveBid": null,
+  "liveAsk": 0.001,
+  "bidDiff": null,
+  "askDiff": 0,
+  "ms": 258,
+  "depth": "0/59"
+ }
+]

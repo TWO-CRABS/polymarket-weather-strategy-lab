@@ -5,6 +5,9 @@
 
 /* ---------- 1. Design tokens ---------- */
 :root {
+  color-scheme: dark;
+  accent-color: var(--cyan);
+
   /* 背景层级 */
   --bg-0: #070A0F;
   --bg-1: #0B1017;
@@ -118,10 +121,25 @@ a { color: var(--cyan-text); }
 .down { color: var(--down-text); }
 .amber { color: var(--amber-text); }
 
+.mt-3 { margin-top: var(--sp-3); }
+.mt-4 { margin-top: var(--sp-4); }
+.cell-sub {
+  display: block;
+  font-size: 9px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.trade-dir { display: flex; align-items: center; gap: 4px; }
+
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* 统一 hidden 语义，避免被组件的 display 规则覆盖 */
+[hidden] { display: none !important; }
 
 :focus-visible {
   outline: 2px solid var(--cyan);
@@ -1177,6 +1195,7 @@ select.input {
 @media (max-width: 1180px) {
   .span-8, .span-7 { grid-column: span 12; }
   .span-5, .span-4 { grid-column: span 6; }
+  .panel-signals { grid-column: span 12; }
   .builder-grid { grid-template-columns: minmax(0, 1fr) 320px; }
   .top-stat:nth-child(3) { display: none; }
 }

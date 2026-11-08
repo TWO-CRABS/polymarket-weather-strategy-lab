@@ -70,7 +70,7 @@
           <p class="sub">组合温度市场参数，保存草稿或直接启动实时模拟验证。</p>
         </div>
         <div class="view-actions">
-          <span class="chip chip-ghost">预设 · 动量极速 v2</span>
+          <span class="chip chip-ghost">预设 · 均衡 · ±20%/1min 动量</span>
           <button class="btn btn-ghost" id="btnSaveDraft" type="button">保存草稿</button>
           <button class="btn btn-primary" id="btnLaunch" type="button"><span aria-hidden="true">▶</span> 启动模拟运行</button>
         </div>
@@ -85,42 +85,57 @@
               <span class="panel-step">01</span>
               <div class="panel-title">
                 <h2 id="h-universe">市场范围</h2>
-                <p>选择城市、温度区间与流动性门槛。</p>
+                <p>城市、价格带、流动性与到期时间过滤（universe）。</p>
               </div>
               <span class="badge badge-ghost" id="universeBadge">5 城 · 11 市场</span>
             </header>
             <div class="panel-body">
               <div class="field">
-                <span class="field-label" id="cityLabel">城市 · 最高温市场（多选）</span>
+                <span class="field-label" id="cityLabel">城市 · 最高温市场（多选，空选 = 全部）</span>
                 <div class="city-picker" id="cityPicker" role="group" aria-labelledby="cityLabel">
                   <label class="city-option is-on"><input type="checkbox" value="nyc" data-city="纽约" checked><span class="city-code" aria-hidden="true">NY</span><span class="city-name">纽约</span><span class="city-meta">KJFK</span></label>
                   <label class="city-option is-on"><input type="checkbox" value="lon" data-city="伦敦" checked><span class="city-code" aria-hidden="true">LD</span><span class="city-name">伦敦</span><span class="city-meta">EGLC</span></label>
                   <label class="city-option is-on"><input type="checkbox" value="sel" data-city="首尔" checked><span class="city-code" aria-hidden="true">SE</span><span class="city-name">首尔</span><span class="city-meta">RKSI</span></label>
-                  <label class="city-option"><input type="checkbox" value="ckg" data-city="重庆"><span class="city-code" aria-hidden="true">CQ</span><span class="city-name">重庆</span><span class="city-meta">ZUCK</span></label>
+                  <label class="city-option is-on"><input type="checkbox" value="ckg" data-city="重庆" checked><span class="city-code" aria-hidden="true">CQ</span><span class="city-name">重庆</span><span class="city-meta">ZUCK</span></label>
                   <label class="city-option is-on"><input type="checkbox" value="hkg" data-city="香港" checked><span class="city-code" aria-hidden="true">HK</span><span class="city-name">香港</span><span class="city-meta">VHHH</span></label>
                 </div>
               </div>
               <div class="field-row field-row-4">
                 <div class="field">
-                  <label class="field-label" for="bracketMode">温度区间选择</label>
-                  <select class="input" id="bracketMode">
-                    <option value="all" selected>全部区间（≤ / = / ≥）</option>
-                    <option value="middle">仅中间区间（排除两端）</option>
-                    <option value="hot">仅高温区间 ≥ 28°C</option>
-                    <option value="neighbors">相邻区间组（3 档）</option>
-                  </select>
+                  <label class="field-label" for="maxMarkets">最大市场数 <span class="hint">maxMarkets</span></label>
+                  <input class="input num" id="maxMarkets" type="number" value="12" min="1" max="40" step="1">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="maxSpread">最大买卖价差 <span class="hint">¢</span></label>
-                  <input class="input num" id="maxSpread" type="number" value="2" min="0.5" step="0.5">
+                  <label class="field-label" for="minLiquidityUsd">最小流动性 <span class="hint">USD</span></label>
+                  <input class="input num" id="minLiquidityUsd" type="number" value="500" min="0" step="100">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="minLiq">最小盘口流动性 <span class="hint">USD</span></label>
-                  <input class="input num" id="minLiq" type="number" value="500" min="0" step="100">
+                  <label class="field-label" for="maxSpread">最大价差 <span class="hint">¢</span></label>
+                  <input class="input num" id="maxSpread" type="number" value="3" min="0.5" step="0.5">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="ttr">最短到期时间 <span class="hint">h</span></label>
-                  <input class="input num" id="ttr" type="number" value="4" min="0.5" step="0.5">
+                  <label class="field-label" for="minPrice">价格带下限 <span class="hint">minPrice · ¢</span></label>
+                  <input class="input num" id="minPrice" type="number" value="2" min="0.1" step="0.5">
+                </div>
+              </div>
+              <div class="field-row field-row-4 mt-3">
+                <div class="field">
+                  <label class="field-label" for="maxPrice">价格带上限 <span class="hint">maxPrice · ¢</span></label>
+                  <input class="input num" id="maxPrice" type="number" value="98" min="50" step="0.5">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="ttrMinH">最短到期 <span class="hint">h</span></label>
+                  <input class="input num" id="ttrMinH" type="number" value="0.25" min="0.08" step="0.25">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="ttrMaxH">最长到期 <span class="hint">h</span></label>
+                  <input class="input num" id="ttrMaxH" type="number" value="36" min="1" step="1">
+                </div>
+                <div class="field switch-field">
+                  <label class="switch-row" for="onlyAcceptingOrders"><span class="field-label">仅可交易市场</span>
+                    <span class="switch"><input type="checkbox" id="onlyAcceptingOrders" checked><i aria-hidden="true"></i></span>
+                  </label>
+                  <p class="hint">active && acceptingOrders</p>
                 </div>
               </div>
             </div>
@@ -132,24 +147,24 @@
               <span class="panel-step">02</span>
               <div class="panel-title">
                 <h2 id="h-signal">信号规则</h2>
-                <p>短周期价格动量触发；UP = YES 买入侧，DOWN = NO 买入侧。</p>
+                <p>短周期价格动量；UP = 买入 YES，DOWN = 买入 NO。</p>
               </div>
               <span class="badge badge-up"><span aria-hidden="true">▲</span> 动量入场</span>
             </header>
             <div class="panel-body">
               <div class="field-row field-row-4">
                 <div class="field">
-                  <label class="field-label" for="refPrice">参考价格字段</label>
-                  <select class="input" id="refPrice">
+                  <label class="field-label" for="priceField">参考价格字段 <span class="hint">priceField</span></label>
+                  <select class="input" id="priceField">
                     <option value="mid" selected>中间价 mid</option>
-                    <option value="last">最新成交价 last</option>
-                    <option value="bid">买一价 bid</option>
-                    <option value="ask">卖一价 ask</option>
+                    <option value="last">最新成交 last</option>
+                    <option value="best_bid">买一 best_bid</option>
+                    <option value="best_ask">卖一 best_ask</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="window">动量观察窗口 <span class="hint">s</span></label>
-                  <select class="input" id="window">
+                  <label class="field-label" for="windowSec">动量观察窗口 <span class="hint">S</span></label>
+                  <select class="input" id="windowSec">
                     <option value="30">30 秒</option>
                     <option value="60" selected>60 秒</option>
                     <option value="120">120 秒</option>
@@ -157,42 +172,46 @@
                   </select>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="minMove">最小绝对变动 <span class="hint">¢</span></label>
-                  <input class="input num" id="minMove" type="number" value="1.5" min="0" step="0.5">
+                  <label class="field-label" for="minAbsMove">最小绝对变动 <span class="hint">minAbsMove · ¢</span></label>
+                  <input class="input num" id="minAbsMove" type="number" value="1" min="0" step="0.5">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="confirmTicks">确认 Tick 数</label>
-                  <input class="input num" id="confirmTicks" type="number" value="2" min="1" max="5" step="1">
+                  <label class="field-label" for="confirmationTicks">确认 Tick 数 <span class="hint">confirmation</span></label>
+                  <input class="input num" id="confirmationTicks" type="number" value="1" min="1" max="30" step="1">
                 </div>
               </div>
 
               <div class="slider-row">
                 <div class="slider-head">
-                  <label class="field-label" for="threshold">触发阈值 · 窗口内价格变动</label>
-                  <output class="range-val" id="thresholdOut" for="threshold">+20.0%</output>
+                  <label class="field-label" for="moveThresholdPct">触发阈值 · 窗口内价格变动 <span class="hint">moveThresholdPct</span></label>
+                  <output class="range-val" id="thresholdOut" for="moveThresholdPct">+20.0%</output>
                 </div>
-                <input class="range" id="threshold" type="range" min="5" max="50" step="1" value="20">
+                <input class="range" id="moveThresholdPct" type="range" min="5" max="50" step="1" value="20">
                 <div class="range-scale"><span>+5%</span><span>+15%</span><span>+25%</span><span>+35%</span><span>+50%</span></div>
               </div>
 
-              <div class="field-row field-row-4">
+              <div class="field-row field-row-4 mt-3">
                 <div class="field">
-                  <label class="field-label" for="cooldown">冷却时间 <span class="hint">s</span></label>
-                  <input class="input num" id="cooldown" type="number" value="90" min="0" step="10">
+                  <label class="field-label" for="direction">触发方向 <span class="hint">direction</span></label>
+                  <select class="input" id="direction">
+                    <option value="both" selected>both（涨跌均可）</option>
+                    <option value="up">up（仅做多 YES）</option>
+                    <option value="down">down（仅做空 YES）</option>
+                  </select>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="maxSignals">单市场最大信号数</label>
-                  <input class="input num" id="maxSignals" type="number" value="6" min="1" step="1">
+                  <label class="field-label" for="cooldownSec">冷却时间 <span class="hint">s</span></label>
+                  <input class="input num" id="cooldownSec" type="number" value="300" min="0" step="10">
                 </div>
                 <div class="field">
-                  <span class="field-label">方向映射（只读）</span>
-                  <div class="mapping"><span class="badge badge-up"><span aria-hidden="true">▲</span> UP → YES</span><span class="mapping-arrow" aria-hidden="true">/</span><span class="badge badge-down"><span aria-hidden="true">▼</span> DOWN → NO</span></div>
+                  <label class="field-label" for="maxSignalsPerMarket">单市场最大信号数</label>
+                  <input class="input num" id="maxSignalsPerMarket" type="number" value="5" min="1" step="1">
                 </div>
                 <div class="field switch-field">
-                  <label class="switch-row" for="oppositeSignal"><span class="field-label">反向动量信号</span>
-                    <span class="switch"><input type="checkbox" id="oppositeSignal" checked><i aria-hidden="true"></i></span>
+                  <label class="switch-row" for="requireSpreadOk"><span class="field-label">价差超限不触发</span>
+                    <span class="switch"><input type="checkbox" id="requireSpreadOk" checked><i aria-hidden="true"></i></span>
                   </label>
-                  <p class="hint">开启后 DOWN 方向同样可开空（买入 NO）。</p>
+                  <p class="hint">spread ≤ maxSpread 才评估</p>
                 </div>
               </div>
             </div>
@@ -204,67 +223,60 @@
               <span class="panel-step">03</span>
               <div class="panel-title">
                 <h2 id="h-exec">执行与仓位</h2>
-                <p>市价 IOC 模拟撮合，按真实盘口逐档成交并计入滑点。</p>
+                <p>market / book_walk 逐档撮合，VWAP 成交，计入滑点成本。</p>
               </div>
               <span class="badge badge-amber">TAKER</span>
             </header>
             <div class="panel-body">
               <div class="field-row field-row-4">
                 <div class="field">
-                  <label class="field-label" for="orderType">订单类型</label>
+                  <label class="field-label" for="orderType">订单类型 <span class="hint">orderType</span></label>
                   <select class="input" id="orderType">
-                    <option>市价单 · IOC</option>
-                    <option>市价单 · FOK</option>
-                    <option>限价单（仅模拟）</option>
+                    <option value="market" selected>market（FAK 市价）</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="sizingMode">仓位模式</label>
+                  <label class="field-label" for="sizingMode">仓位模式 <span class="hint">sizingMode</span></label>
                   <select class="input" id="sizingMode">
-                    <option value="fixed" selected>固定名义金额</option>
-                    <option value="pct">按权益比例</option>
-                    <option value="kelly">分数 Kelly</option>
+                    <option value="fixed_stake" selected>fixed_stake（固定 USD）</option>
+                    <option value="pct_equity">pct_equity（权益 %）</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="maxSlippage">滑点上限 <span class="hint">¢</span></label>
-                  <input class="input num" id="maxSlippage" type="number" value="2" min="0.5" step="0.5">
+                  <label class="field-label" for="maxPositionUsd">单市场成本上限 <span class="hint">USD</span></label>
+                  <input class="input num" id="maxPositionUsd" type="number" value="50" min="1" step="10">
                 </div>
                 <div class="field">
-                  <span class="field-label">最小订单数量（只读）</span>
-                  <div class="input input-ro num">5 股</div>
+                  <label class="field-label" for="maxPositions">最大并发持仓 <span class="hint">maxPositions</span></label>
+                  <input class="input num" id="maxPositions" type="number" value="5" min="1" step="1">
                 </div>
               </div>
 
               <div class="slider-row">
                 <div class="slider-head">
-                  <label class="field-label" for="notional">单笔名义金额</label>
-                  <output class="range-val" id="notionalOut" for="notional">$100</output>
+                  <label class="field-label" for="sizingValue">单笔仓位大小 <span class="hint">sizingValue</span></label>
+                  <output class="range-val" id="notionalOut" for="sizingValue">$25</output>
                 </div>
-                <input class="range" id="notional" type="range" min="25" max="500" step="25" value="100">
-                <div class="range-scale"><span>$25</span><span>$100</span><span>$250</span><span>$400</span><span>$500</span></div>
+                <input class="range" id="sizingValue" type="range" min="10" max="500" step="5" value="25">
+                <div class="range-scale"><span>$10</span><span>$100</span><span>$250</span><span>$400</span><span>$500</span></div>
               </div>
 
-              <div class="field-row field-row-4">
+              <div class="field-row field-row-4 mt-3">
                 <div class="field">
-                  <label class="field-label" for="perMarketCap">单市场敞口上限 <span class="hint">% 权益</span></label>
-                  <input class="input num" id="perMarketCap" type="number" value="15" min="1" max="100" step="1">
-                </div>
-                <div class="field switch-field">
-                  <label class="switch-row" for="allowPartial"><span class="field-label">允许部分成交</span>
-                    <span class="switch"><input type="checkbox" id="allowPartial" checked><i aria-hidden="true"></i></span>
-                  </label>
-                  <p class="hint">深度不足时按实际成交量记账。</p>
-                </div>
-                <div class="field switch-field">
-                  <label class="switch-row" for="useBook"><span class="field-label">逐档盘口撮合</span>
-                    <span class="switch"><input type="checkbox" id="useBook" checked><i aria-hidden="true"></i></span>
-                  </label>
-                  <p class="hint">否则按买一价一次性成交。</p>
+                  <label class="field-label" for="maxPositionsPerMarket">单市场持仓上限 <span class="hint">笔</span></label>
+                  <input class="input num" id="maxPositionsPerMarket" type="number" value="1" min="1" step="1">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="latency">模拟数据延迟 <span class="hint">ms</span></label>
-                  <input class="input num" id="latency" type="number" value="250" min="0" step="50">
+                  <label class="field-label" for="fillModel">撮合模型 <span class="hint">fillModel</span></label>
+                  <div class="input input-ro num">book_walk</div>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="slippageBufferBps">价格保护 <span class="hint">bps</span></label>
+                  <input class="input num" id="slippageBufferBps" type="number" value="0" min="0" step="10">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="tickIntervalMs">行情 Tick 间隔 <span class="hint">ms</span></label>
+                  <input class="input num" id="tickIntervalMs" type="number" value="1000" min="250" step="250">
                 </div>
               </div>
             </div>
@@ -276,35 +288,34 @@
               <span class="panel-step">04</span>
               <div class="panel-title">
                 <h2 id="h-exit">退出规则</h2>
-                <p>止盈 / 止损 / 超时 / 反向信号，按优先级依次判定。</p>
+                <p>take_profit / stop_loss / max_hold / opposite_signal 按优先级判定。</p>
               </div>
               <span class="badge badge-ghost">4 条规则</span>
             </header>
             <div class="panel-body">
               <div class="field-row field-row-4">
                 <div class="field">
-                  <label class="field-label" for="takeProfit">止盈 <span class="hint">%</span></label>
-                  <input class="input num" id="takeProfit" type="number" value="35" min="5" step="5">
+                  <label class="field-label" for="takeProfitPct">止盈（费用后净收益） <span class="hint">%</span></label>
+                  <input class="input num" id="takeProfitPct" type="number" value="50" min="1" step="5">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="stopLoss">止损 <span class="hint">%</span></label>
-                  <input class="input num" id="stopLoss" type="number" value="18" min="5" step="1">
+                  <label class="field-label" for="stopLossPct">止损（费用后净收益） <span class="hint">%</span></label>
+                  <input class="input num" id="stopLossPct" type="number" value="30" min="1" step="1">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="maxHold">最大持仓时间 <span class="hint">s</span></label>
-                  <input class="input num" id="maxHold" type="number" value="300" min="30" step="30">
+                  <label class="field-label" for="maxHoldSec">最大持仓时间 <span class="hint">s</span></label>
+                  <input class="input num" id="maxHoldSec" type="number" value="3600" min="10" step="60">
                 </div>
-                <div class="field">
-                  <label class="field-label" for="holdToResolution">到期处理</label>
-                  <select class="input" id="holdToResolution">
-                    <option value="resolve" selected>持有至结算</option>
-                    <option value="flat">结算前 30 分钟平仓</option>
-                  </select>
+                <div class="field switch-field">
+                  <label class="switch-row" for="holdToResolution"><span class="field-label">持有至结算</span>
+                    <span class="switch"><input type="checkbox" id="holdToResolution"><i aria-hidden="true"></i></span>
+                  </label>
+                  <p class="hint">关闭时启用止盈/止损/超时/反向退出</p>
                 </div>
               </div>
-              <div class="field switch-field">
-                <label class="switch-row" for="exitOpposite"><span class="field-label">反向信号出现时平仓</span>
-                  <span class="switch"><input type="checkbox" id="exitOpposite" checked><i aria-hidden="true"></i></span>
+              <div class="field switch-field mt-3">
+                <label class="switch-row" for="exitOnOppositeSignal"><span class="field-label">反向信号出现时平仓（exitOnOppositeSignal）</span>
+                  <span class="switch"><input type="checkbox" id="exitOnOppositeSignal" checked><i aria-hidden="true"></i></span>
                 </label>
                 <p class="hint">反方向动量达到同一阈值时，先平掉现有仓位再考虑反手。</p>
               </div>
@@ -317,27 +328,29 @@
               <span class="panel-step">05</span>
               <div class="panel-title">
                 <h2 id="h-risk">风控</h2>
-                <p>组合级敞口与熔断，触发后停止开新仓。</p>
+                <p>组合级回撤 / 单日亏损熔断；触发即停止开新仓。</p>
               </div>
               <span class="badge badge-ghost" id="riskBadge">未触发</span>
             </header>
             <div class="panel-body">
               <div class="field-row field-row-4">
                 <div class="field">
-                  <label class="field-label" for="bankroll">初始资金 <span class="hint">USD</span></label>
-                  <input class="input num" id="bankroll" type="number" value="10000" min="100" step="500">
+                  <label class="field-label" for="bankrollUsd">初始资金 <span class="hint">bankrollUsd</span></label>
+                  <input class="input num" id="bankrollUsd" type="number" value="10000" min="10" step="500">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="maxPositions">最大并发持仓</label>
-                  <input class="input num" id="maxPositions" type="number" value="6" min="1" step="1">
+                  <label class="field-label" for="maxDrawdownPct">最大回撤熔断 <span class="hint">%</span></label>
+                  <input class="input num" id="maxDrawdownPct" type="number" value="20" min="1" max="100" step="1">
                 </div>
                 <div class="field">
-                  <label class="field-label" for="dailyStop">单日最大亏损熔断 <span class="hint">%</span></label>
-                  <input class="input num" id="dailyStop" type="number" value="8" min="1" max="100" step="1">
+                  <label class="field-label" for="dailyLossLimitUsd">单日亏损上限 <span class="hint">USD · 0=关闭</span></label>
+                  <input class="input num" id="dailyLossLimitUsd" type="number" value="500" min="0" step="50">
                 </div>
-                <div class="field">
-                  <label class="field-label" for="lossStreak">连续亏损熔断 <span class="hint">笔</span></label>
-                  <input class="input num" id="lossStreak" type="number" value="5" min="2" step="1">
+                <div class="field switch-field">
+                  <label class="switch-row" for="killSwitch"><span class="field-label">熔断后停止运行</span>
+                    <span class="switch"><input type="checkbox" id="killSwitch" checked><i aria-hidden="true"></i></span>
+                  </label>
+                  <p class="hint">killSwitch</p>
                 </div>
               </div>
             </div>
@@ -349,40 +362,61 @@
               <span class="panel-step">06</span>
               <div class="panel-title">
                 <h2 id="h-fee">费率与模拟</h2>
-                <p>Polymarket 天气市场 taker 费，计入每笔成交成本。</p>
+                <p>Polymarket 天气市场 taker 费逐笔计提，运行参数只影响仿真。</p>
               </div>
               <span class="badge badge-amber">FEE model</span>
             </header>
             <div class="panel-body">
               <div class="fee-formula">
                 <div>
-                  <span class="field-label">官方手续费公式</span>
+                  <span class="field-label">官方手续费公式 · weather_fees</span>
                   <code>fee = shares × 0.05 × p × (1 − p)</code>
                 </div>
                 <div class="fee-formula-note">
-                  <span class="tag-amber">5%</span> 天气市场 taker 费率 · 仅对 taker 收取 · 结果保留 5 位小数，最小 0.00001
+                  <span class="tag-amber">5%</span> taker 费率 · 仅吃单收费 · 结果 half-up 保留 5 位小数，&lt; 0.00001 记 0
                 </div>
               </div>
               <div class="field-row field-row-4">
                 <div class="field">
-                  <label class="field-label" for="feeRate">taker 费率 <span class="hint">只读</span></label>
-                  <div class="input input-ro num" id="feeRate">5.0%</div>
+                  <label class="field-label" for="feeModel">费用模型 <span class="hint">fees.model</span></label>
+                  <div class="input input-ro num" id="feeModel">weather_taker</div>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="makerRebate">maker 返佣 <span class="hint">只读</span></label>
-                  <div class="input input-ro num" id="makerRebate">25%</div>
+                  <label class="field-label" for="takerFeeRate">taker 费率 <span class="hint">只读</span></label>
+                  <div class="input input-ro num" id="takerFeeRate">0.05</div>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="simSpeed">模拟速度</label>
-                  <select class="input" id="simSpeed">
-                    <option value="1">1× 实时</option>
-                    <option value="5" selected>5× 加速</option>
-                    <option value="20">20× 加速</option>
+                  <label class="field-label" for="makerRebateRate">maker 返佣 <span class="hint">只读</span></label>
+                  <div class="input input-ro num" id="makerRebateRate">25%</div>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="simMode">运行模式 <span class="hint">sim.mode</span></label>
+                  <select class="input" id="simMode">
+                    <option value="live" selected>live · 实时行情</option>
+                    <option value="replay">replay · 历史回放</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row field-row-4 mt-3">
+                <div class="field">
+                  <label class="field-label" for="replayLookbackMin">回放窗口 <span class="hint">min</span></label>
+                  <input class="input num" id="replayLookbackMin" type="number" value="60" min="5" step="5">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="speed">仿真倍速 <span class="hint">sim.speed</span></label>
+                  <select class="input" id="speed">
+                    <option value="1">1×</option>
+                    <option value="5" selected>5×</option>
+                    <option value="20">20×</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label class="field-label" for="seed">随机种子</label>
-                  <input class="input num" id="seed" type="number" value="20261108" step="1">
+                  <span class="field-label">最小下单量（只读）</span>
+                  <div class="input input-ro num">5 股</div>
+                </div>
+                <div class="field">
+                  <span class="field-label">价格精度（只读）</span>
+                  <div class="input input-ro num">0.001 USDC</div>
                 </div>
               </div>
             </div>
@@ -403,12 +437,12 @@
               <div class="validation-list" id="validationList" aria-live="polite"></div>
 
               <div class="cost-box">
-                <div class="cost-box-head"><span>单笔交易成本估算</span><span class="mono">p = 50¢</span></div>
-                <div class="cost-row"><span>名义金额</span><strong class="num" id="sideNotional">$100.00</strong></div>
+                <div class="cost-box-head"><span>单笔交易成本估算</span><span class="mono">p = 50¢ · 假设半价差 1¢</span></div>
+                <div class="cost-row"><span>单笔名义金额</span><strong class="num" id="sideNotional">$100.00</strong></div>
                 <div class="cost-row"><span>预计手续费 <span class="tag-amber">taker 5%</span></span><strong class="num amber" id="sideFee">$1.25</strong></div>
-                <div class="cost-row"><span>点差 + 滑点成本</span><strong class="num" id="sideSlip">$1.90</strong></div>
-                <div class="cost-row total"><span>合计成本</span><strong class="num amber" id="sideTotal">$3.15</strong></div>
-                <div class="cost-row"><span>盈亏平衡所需价格变动</span><strong class="num" id="sideBreakeven">+3.2%</strong></div>
+                <div class="cost-row"><span>点差 + 滑点（归因）</span><strong class="num" id="sideSlip">$2.00</strong></div>
+                <div class="cost-row total"><span>合计成本</span><strong class="num amber" id="sideTotal">$3.25</strong></div>
+                <div class="cost-row"><span>最低盈利涨幅门槛 <span class="tag-amber">minProfitableMovePct</span></span><strong class="num" id="sideMinMove">+9.0%</strong></div>
               </div>
 
               <div class="side-actions">
@@ -416,7 +450,7 @@
                 <button class="btn btn-ghost btn-block" id="btnPreviewJson" type="button" aria-expanded="false">查看策略 JSON</button>
               </div>
               <pre class="json-preview mono" id="jsonPreview" hidden></pre>
-              <p class="footnote">模拟盘仅用于策略验证：不提交链上订单、不接触私钥，所有成交为本地撮合结果。</p>
+              <p class="footnote">校验规则对齐 <code>shared/contract.js</code> 的 <code>validateStrategy()</code>：errors 拒绝启动，warnings 仅提示。模拟盘不提交链上订单、不接触私钥。</p>
             </div>
           </section>
         </aside>
@@ -430,7 +464,7 @@
       <div class="view-head">
         <div>
           <h1>实时面板 <span class="run-tag mono" id="dashRunId">RUN-20261108-0412</span></h1>
-          <p class="sub">动量极速 · ±20% / 60s · 5 城 · 11 市场 · 已运行 <span id="dashElapsed" class="mono">32:07</span></p>
+          <p class="sub">均衡 · ±20%/1min 动量 · 5 城 · 11 市场 · <span class="live-label"><span class="live-dot live-dot-sm" aria-hidden="true"></span>CLOB WS · live</span> · 已运行 <span id="dashElapsed" class="mono">32:07</span></p>
         </div>
         <div class="view-actions run-controls">
           <div class="segmented" role="group" aria-label="模拟速度">
@@ -468,7 +502,7 @@
         <article class="metric">
           <span class="metric-label">手续费合计</span>
           <strong class="metric-value num amber" id="mFees">$37.42</strong>
-          <span class="metric-sub muted">占成交额 0.82%</span>
+          <span class="metric-sub muted" id="mFeeSub">费用拖累 0.37% · 成本率 0.82%</span>
         </article>
         <article class="metric">
           <span class="metric-label">最大回撤</span>
@@ -495,7 +529,7 @@
         </section>
 
         <!-- 信号流 -->
-        <section class="panel span-4" aria-labelledby="h-signals">
+        <section class="panel span-4 panel-signals" aria-labelledby="h-signals">
           <header class="panel-head">
             <div class="panel-title">
               <h2 id="h-signals">信号流</h2>
@@ -560,7 +594,7 @@
               <span>累计成本合计</span>
               <strong class="num amber" id="costTotal">$54.04</strong>
             </div>
-            <p class="footnote">手续费按 <code>fee = shares × 0.05 × p × (1−p)</code> 逐笔计提；点差、滑点按实际成交价与中间价之差累加。</p>
+            <p class="footnote" id="costFoot">手续费按 <code>fee = shares × 0.05 × p × (1−p)</code> 逐笔计提；点差、滑点为归因项，已包含在成交价内，不二次扣减。</p>
           </div>
         </section>
 
@@ -575,9 +609,9 @@
           </header>
           <div class="table-wrap">
             <table class="data-table table-positions">
-              <caption class="sr-only">当前持仓明细，包含市场、方向、数量、均价、现价、隐含概率与未实现盈亏</caption>
+              <caption class="sr-only">当前持仓明细，包含市场、方向、数量、含费均价、现价、隐含概率与未实现盈亏</caption>
               <thead>
-                <tr><th scope="col">市场</th><th scope="col">方向</th><th scope="col" class="num-col">数量</th><th scope="col" class="num-col">均价</th><th scope="col" class="num-col">现价</th><th scope="col" class="num-col">盈亏</th></tr>
+                <tr><th scope="col">市场</th><th scope="col">方向</th><th scope="col" class="num-col">数量 / 均价</th><th scope="col" class="num-col">现价 / 概率</th><th scope="col" class="num-col">未实现盈亏</th></tr>
               </thead>
               <tbody id="positionsBody"><!-- JS 渲染 --></tbody>
             </table>
@@ -605,7 +639,7 @@
                   <th scope="col">时间</th><th scope="col">市场</th><th scope="col">方向</th>
                   <th scope="col" class="num-col">数量</th><th scope="col" class="num-col">成交价</th>
                   <th scope="col" class="num-col">名义</th><th scope="col" class="num-col">手续费</th>
-                  <th scope="col" class="num-col">滑点</th><th scope="col" class="num-col">盈亏</th><th scope="col">状态</th>
+                  <th scope="col" class="num-col">滑点成本</th><th scope="col" class="num-col">已实现盈亏</th><th scope="col">状态 / 原因</th>
                 </tr>
               </thead>
               <tbody id="tradesBody"><!-- JS 渲染 --></tbody>
@@ -631,9 +665,10 @@
           </div>
           <select class="input" id="historyFilter" aria-label="按状态筛选">
             <option value="all">全部状态</option>
+            <option value="running">运行中</option>
+            <option value="paused">已暂停</option>
             <option value="ended">已结束</option>
-            <option value="live">运行中</option>
-            <option value="failed">异常中止</option>
+            <option value="error">异常中止</option>
           </select>
           <button class="btn btn-ghost" id="btnCompareMode" type="button" aria-pressed="false">对比模式</button>
         </div>

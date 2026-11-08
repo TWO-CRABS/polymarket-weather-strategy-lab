@@ -65,10 +65,10 @@
     "slippageBufferBps": 0
   },
   "exit": {
-    "takeProfitPct": 50,             // 相对入场价的涨幅
+    "takeProfitPct": 50,             // 相对入场价的涨幅（按费用后净收益评估）
     "stopLossPct": 30,
     "maxHoldSec": 3600,
-    "holdToResolution": true,
+    "holdToResolution": false,       // true = 忽略 TP/SL/超时，持有到结算
     "exitOnOppositeSignal": false
   },
   "risk": {
@@ -143,6 +143,8 @@
 | `totalCost` | BUY: notional + fee；SELL: notional − fee |
 | `cashDelta` | BUY 为负，SELL 为正 |
 | `realizedPnl` | SELL 时已实现盈亏（已扣费），BUY 为 0 |
+| `referenceMid?` | 可选：成交时中间价，用于点差成本归因（向后兼容，可缺省） |
+| `spreadCost?` | 可选：`shares × \|参考对手价 − referenceMid\|`，点差成本（USDC，向后兼容） |
 | `signalId` | 关联信号，可为 null |
 | `reason` | `signal` / `take_profit` / `stop_loss` / `max_hold` / `opposite_signal` / `hold_to_resolution` / `resolution` / `manual` / `risk_kill_switch` |
 | `status` | `filled` / `partial` / `rejected` |
@@ -168,6 +170,7 @@
 
 ### 3.7 RunSummary
 `{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, marketsTracked, feedStatus }`
+`strategyId` 为已保存策略 id，使用内联 strategy 启动时为 `null`。
 `status ∈ created | starting | running | paused | stopping | stopped | ended | error`
 `feedStatus ∈ connecting | live | degraded | offline`
 
@@ -184,7 +187,7 @@
 ### 4.2 市场
 | Method | Path | 参数 | 响应 |
 |---|---|---|---|
-| GET | `/api/markets` | `city?`, `limit?`(≤100), `includeClosed?` | `{markets:[MarketSnapshot], count, updatedAt}` |
+| GET | `/api/markets` | `city?`, `limit?`(默认100, ≤500), `includeClosed?` | `{markets:[MarketSnapshot], count, updatedAt}` |
 | GET | `/api/markets/:marketId` | — | `{market: MarketSnapshot}` |
 | GET | `/api/markets/:marketId/history` | `seconds?`(默认300, ≤3600) | `{marketId, points:[{ts, mid, last, bid, ask}], windowSec}` |
 | GET | `/api/events` | — | `{events:[{id,title,slug,city,date,marketCount,endDate}]}` |
@@ -204,7 +207,7 @@
 |---|---|---|---|
 | POST | `/api/runs` | 启动模拟。body: `{strategy?: StrategyConfig, strategyId?: string, mode?: "live"\|"replay", replay?: {lookbackMin?, speed?}}`；`strategy` 优先于 `strategyId` | `201 {run: RunSummary}` |
 | GET | `/api/runs` | 运行列表（新→旧，最多 50） | `{runs:[RunSummary]}` |
-| GET | `/api/runs/:id` | 运行详情 | `{run: RunSummary, config: StrategyConfig, metrics: Metrics, positions:[Position]}` |
+| GET | `/api/runs/:id` | 运行详情（`costBreakdown` 为可选附加字段，向后兼容） | `{run: RunSummary, config: StrategyConfig, metrics: Metrics, positions:[Position], costBreakdown?: {feesPaid, spreadCost, depthSlippageCost, totalFriction}}` |
 | POST | `/api/runs/:id/stop` | 停止（幂等） | `{run: RunSummary}` |
 | DELETE | `/api/runs/:id` | 删除运行记录 | `204` |
 | GET | `/api/runs/:id/trades` | `limit?`(默认500) `offset?` | `{trades:[Trade], total}` |
@@ -266,7 +269,6 @@ weather: takerFeeRate = 0.05, taker-only, maker rebate 25%
 | `RUN_NOT_FOUND` | 404 | run 不存在 |
 | `STRATEGY_NOT_FOUND` | 404 | 策略不存在 |
 | `MARKET_NOT_FOUND` | 404 | 市场不存在 |
-| `RUN_NOT_ACTIVE` | 409 | 对非运行状态 run 执行停止 |
 | `UPSTREAM_ERROR` | 502 | 官方 API 连续失败且无缓存可用 |
 | `RATE_LIMITED` | 429 | 上游限流（前端提示稍后重试） |
 | `INTERNAL` | 500 | 未分类错误 |

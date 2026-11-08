@@ -1,0 +1,72 @@
+{
+ "p1": {
+  "data": [
+   {
+    "timestamp": 1794117480,
+    "price": 0.265,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794117540,
+    "price": 0.26,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794117600,
+    "price": 0.26,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794117660,
+    "price": 0.26,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794117720,
+    "price": 0.26,
+    "resolution_seconds": 60
+   }
+  ],
+  "pagination": {
+   "limit": 5,
+   "offset": 0,
+   "has_more": true,
+   "next_cursor": "eyJkYXRhIjp7InR5cGUiOiJwcmljZXNfaGlzdG9yeSIsInBhcmFtcyI6eyJsIjo1LCJ0cyI6MTc5NDExNzcyMCwic3EiOiI2MCIsImQiOjV9fSwic2lnIjoiZWEzYTk0MWU0ZmVjNzFjMWNkNzNmN2JjN2NkODVlNjIifQ"
+  }
+ },
+ "p2": {
+  "data": [
+   {
+    "timestamp": 1794117780,
+    "price": 0.26,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794117840,
+    "price": 0.26,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794117900,
+    "price": 0.27,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794117960,
+    "price": 0.27,
+    "resolution_seconds": 60
+   },
+   {
+    "timestamp": 1794118020,
+    "price": 0.27,
+    "resolution_seconds": 60
+   }
+  ],
+  "pagination": {
+   "limit": 5,
+   "offset": 5,
+   "has_more": true,
+   "next_cursor": "eyJkYXRhIjp7InR5cGUiOiJwcmljZXNfaGlzdG9yeSIsInBhcmFtcyI6eyJsIjo1LCJ0cyI6MTc5NDExODAyMCwic3EiOiI2MCIsImQiOjEwfX0sInNpZyI6IjJmOGJjODRjMWM4NzUwMmM0Njg3NTk2MmE2NWQ4OGEzIn0"
+  }
+ }
+}

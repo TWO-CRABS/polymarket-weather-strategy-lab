@@ -1,0 +1,94 @@
+{
+ "idle": {
+  "label": "idle-no-ping",
+  "frame": {
+   "assets_ids": [
+    "32128651339227986179394223933165322263117899155965245915826868410059996579797"
+   ],
+   "type": "market"
+  },
+  "duration_ms": 40000,
+  "opened": true,
+  "close": {
+   "code": 1005,
+   "reason": "",
+   "at_ms": 41513
+  },
+  "messages": [
+   {
+    "t": 2723,
+    "data": "[{\"market\":\"0xdb632c0674b353c1323dfa18b7ca14f8bb9fa9fe671f55d80253bcd1a363a0e6\",\"asset_id\":\"32128651339227986179394223933165322263117899155965245915826868410059996579797\",\"timestamp\":\"1794120894599\",\"hash\":\"9f58a8e77b193c3b5fce2316b4c8ff7cf049eb2c\",\"bids\":[],\"asks\":[{\"price\":\"0.999\",\"size\":\"26447.06\"},{\"price\":\"0.998\",\"size\":\"2500\"},{\"price\":\"0.997\",\"size\":\"1666.66\"},{\"price\":\"0.996\",\"size\":\"1250\"},{\"price\":\"0.995\",\"size\":\"1000\"},{\"price\":\"0.994\",\"size\":\"3166.65\"},{\"price\":\"0.993\",\"size\":\"714.28\"},{\"price\":\"0.992\",\"size\":\"1500\"},{\"price\":\"0.991\",\"size\":\"555.55\"},{\"price\":\"0.99\",\"size\":\"700\"},{\"price\":\"0.98\",\"size\":\"3010\"},{\"price\":\"0.974\",\"size\":\"2500\"},{\"price\":\"0.97\",\"size\":\"10\"},{\"price\":"
+   },
+   {
+    "t": 8873,
+    "data": "{\"market\":\"0xdb632c0674b353c1323dfa18b7ca14f8bb9fa9fe671f55d80253bcd1a363a0e6\", \"price_changes\":[{\"asset_id\":\"47465635273740171777022424341986250689783689232409856693755831583813134335934\", \"price\":\"0.77\", \"size\":\"20\", \"side\":\"BUY\", \"hash\":\"d3561dc789f7b049640bc6c5990d81c1c300ecd5\", \"best_bid\":\"0.999\", \"best_ask\":\"1\"}, {\"asset_id\":\"32128651339227986179394223933165322263117899155965245915826868410059996579797\", \"price\":\"0.23\", \"size\":\"20\", \"side\":\"SELL\", \"hash\":\"5fd087b9b1002a2a732b5cf27e8ea522ffb62d92\", \"best_bid\":\"0\", \"best_ask\":\"0.001\"}], \"timestamp\":\"1794120904599\", \"event_type\":\"price_change\"}"
+   },
+   {
+    "t": 13056,
+    "data": "{\"market\":\"0xdb632c0674b353c1323dfa18b7ca14f8bb9fa9fe671f55d80253bcd1a363a0e6\", \"price_changes\":[{\"asset_id\":\"47465635273740171777022424341986250689783689232409856693755831583813134335934\", \"price\":\"0.1\", \"size\":\"70\", \"side\":\"BUY\", \"hash\":\"617ba458b5e7845af484e5356b8d6c267bb6073e\", \"best_bid\":\"0.999\", \"best_ask\":\"1\"}, {\"asset_id\":\"32128651339227986179394223933165322263117899155965245915826868410059996579797\", \"price\":\"0.9\", \"size\":\"70\", \"side\":\"SELL\", \"hash\":\"206d4b8082f049a90452ac98c1a502f0e538eec8\", \"best_bid\":\"0\", \"best_ask\":\"0.001\"}], \"timestamp\":\"1794120908784\", \"event_type\":\"price_change\"}"
+   },
+   {
+    "t": 21049,
+    "data": "{\"market\":\"0xdb632c0674b353c1323dfa18b7ca14f8bb9fa9fe671f55d80253bcd1a363a0e6\", \"price_changes\":[{\"asset_id\":\"47465635273740171777022424341986250689783689232409856693755831583813134335934\", \"price\":\"0.05\", \"size\":\"140\", \"side\":\"BUY\", \"hash\":\"5c24e761131288b3a70c759f6bdc5e4707eac766\", \"best_bid\":\"0.999\", \"best_ask\":\"1\"}, {\"asset_id\":\"32128651339227986179394223933165322263117899155965245915826868410059996579797\", \"price\":\"0.95\", \"size\":\"140\", \"side\":\"SELL\", \"hash\":\"a3b4745aafca114e93f2b349d968382cd8ea5640\", \"best_bid\":\"0\", \"best_ask\":\"0.001\"}], \"timestamp\":\"1794120916777\", \"event_type\":\"price_change\"}"
+   }
+  ],
+  "open_ms": 2265,
+  "timed_out": true
+ },
+ "wrongKey": {
+  "label": "wrong-key-asset_ids",
+  "frame": {
+   "asset_ids": [
+    "32128651339227986179394223933165322263117899155965245915826868410059996579797"
+   ],
+   "type": "market"
+  },
+  "duration_ms": 6000,
+  "opened": true,
+  "close": {
+   "code": 1005,
+   "reason": "",
+   "at_ms": 7419
+  },
+  "messages": [],
+  "open_ms": 1355,
+  "timed_out": true
+ },
+ "invalidToken": {
+  "label": "invalid-token",
+  "frame": {
+   "assets_ids": [
+    "1"
+   ],
+   "type": "market"
+  },
+  "duration_ms": 6000,
+  "opened": true,
+  "close": {
+   "code": 1005,
+   "reason": "",
+   "at_ms": 7366
+  },
+  "messages": [
+   {
+    "t": 2673,
+    "data": "[]\n"
+   }
+  ],
+  "open_ms": 2309,
+  "timed_out": true
+ },
+ "badJson": {
+  "label": "bad-json",
+  "frame": "{not json",
+  "duration_ms": 6000,
+  "opened": true,
+  "close": {
+   "code": 1008,
+   "reason": "invalid subscription payload",
+   "at_ms": 2552
+  },
+  "messages": [],
+  "open_ms": 1195
+ }
+}
