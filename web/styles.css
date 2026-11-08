@@ -1600,3 +1600,37 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .link-btn.danger { color: var(--down-text); }
 .link-btn.danger:hover { background: var(--down-bg); }
 .data-table tr.is-marked td { background: rgba(240, 80, 106, 0.05); }
+
+/* ---------- B17. 字段说明气泡 + 看板运行切换 ---------- */
+.help-dot {
+  width: 14px; height: 14px; padding: 0; margin-left: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-strong); border-radius: 50%;
+  background: transparent; color: var(--text-3);
+  font-family: var(--font-mono); font-size: 9px; line-height: 1;
+  cursor: help; vertical-align: middle;
+}
+.help-dot:hover, .help-dot:focus-visible {
+  color: var(--cyan-text); border-color: var(--cyan);
+  background: var(--cyan-bg); outline: none;
+}
+.field-tip {
+  position: fixed; z-index: 120; max-width: 300px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-2);
+  background: var(--panel-2, #121a23); color: var(--text-1);
+  font-size: 11px; line-height: 1.55;
+  box-shadow: var(--shadow-2, 0 10px 28px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+.field-tip[hidden] { display: none; }
+
+.run-switch { display: inline-flex; align-items: center; min-width: 0; }
+.run-switch .input { height: 30px; padding: 0 8px; font-size: 11px; max-width: 340px; }
+@media (max-width: 1080px) {
+  .run-switch { max-width: 220px; }
+  .run-switch .input { max-width: 220px; }
+}
+@media (max-width: 900px) {
+  .run-switch { display: none; }
+}

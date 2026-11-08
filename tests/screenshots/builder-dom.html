@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">15:29:36</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">17:39:51</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -127,35 +127,35 @@
         <span class="badge badge-ghost">9 项参数</span>
       </header>
       <div class="panel-body"><div class="field" data-cities-wrap="">
-      <label class="field-label" for="f-universe-cities-csv">城市（多选，不选 = 全部城市）</label>
+      <label class="field-label" for="f-universe-cities-csv">城市（多选，不选 = 全部城市）<button type="button" class="help-dot" data-tip="只在这些城市的最高温市场里交易；不勾选 = 全部城市。城市越少可选市场越少，可能长时间没有信号。" aria-label="说明：只在这些城市的最高温市场里交易；不勾选 = 全部城市。城市越少可选市场越少，可能长时间没有信号。">?</button></label>
       <input class="input" id="f-universe-cities-csv" type="text" data-path="universe.cities" data-kind="cities-csv" value="" placeholder="留空 = 全部城市；多个城市用英文逗号分隔">
       <span class="field-help" id="citiesHelp">城市元数据暂不可用；可手动输入城市名，例如 New York, London。</span>
     </div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-universe-maxMarkets">最大市场数 <span class="hint">个</span></label>
+      <label class="field-label" for="f-universe-maxMarkets">最大市场数 <span class="hint">个</span><button type="button" class="help-dot" data-tip="从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡。" aria-label="说明：从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡。">?</button></label>
       <input class="input num" type="number" id="f-universe-maxMarkets" data-path="universe.maxMarkets" data-kind="number" data-min="1" data-max="40" data-step="1" min="1" max="40" step="1" value="12" inputmode="decimal">
       <span class="field-help">按流动性/成交额选取</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-minPrice">最低 YES 价格 <span class="hint">USDC 0–1</span></label>
+      <label class="field-label" for="f-universe-minPrice">最低 YES 价格 <span class="hint">USDC 0–1</span><button type="button" class="help-dot" data-tip="只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。" aria-label="说明：只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。">?</button></label>
       <input class="input num" type="number" id="f-universe-minPrice" data-path="universe.minPrice" data-kind="number" data-min="0.001" data-max="0.5" data-step="0.001" min="0.001" max="0.5" step="0.001" value="0.02" inputmode="decimal">
       <span class="field-help">0.02 = 2¢，过滤极端低价</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-maxPrice">最高 YES 价格 <span class="hint">USDC 0–1</span></label>
+      <label class="field-label" for="f-universe-maxPrice">最高 YES 价格 <span class="hint">USDC 0–1</span><button type="button" class="help-dot" data-tip="只交易 YES 中间价 ≤ 该值的市场（0.98 = 98¢）。过滤接近确定的极端高价括号。" aria-label="说明：只交易 YES 中间价 ≤ 该值的市场（0.98 = 98¢）。过滤接近确定的极端高价括号。">?</button></label>
       <input class="input num" type="number" id="f-universe-maxPrice" data-path="universe.maxPrice" data-kind="number" data-min="0.5" data-max="0.999" data-step="0.001" min="0.5" max="0.999" step="0.001" value="0.98" inputmode="decimal">
       <span class="field-help">0.98 = 98¢</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-minLiquidityUsd">最小流动性 <span class="hint">USD</span></label>
+      <label class="field-label" for="f-universe-minLiquidityUsd">最小流动性 <span class="hint">USD</span><button type="button" class="help-dot" data-tip="市场流动性低于该值不参与。数据源流动性可能偏高，建议同时用点差过滤。" aria-label="说明：市场流动性低于该值不参与。数据源流动性可能偏高，建议同时用点差过滤。">?</button></label>
       <input class="input num" type="number" id="f-universe-minLiquidityUsd" data-path="universe.minLiquidityUsd" data-kind="number" data-min="0" data-max="1000000" data-step="100" min="0" max="1000000" step="100" value="500" inputmode="decimal">
       <span class="field-help">范围 0 – 1000000</span>
     </div></div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-universe-maxSpread">最大点差 <span class="hint">USDC</span></label>
+      <label class="field-label" for="f-universe-maxSpread">最大点差 <span class="hint">USDC</span><button type="button" class="help-dot" data-tip="买一卖一价差超过该值不参与且不触发信号（0.03 = 3¢）。市价单先承担点差，点差过宽会吃掉利润。" aria-label="说明：买一卖一价差超过该值不参与且不触发信号（0.03 = 3¢）。市价单先承担点差，点差过宽会吃掉利润。">?</button></label>
       <input class="input num" type="number" id="f-universe-maxSpread" data-path="universe.maxSpread" data-kind="number" data-min="0.001" data-max="0.2" data-step="0.001" min="0.001" max="0.2" step="0.001" value="0.03" inputmode="decimal">
       <span class="field-help">0.03 = 3¢；市价单点差成本显著</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-minTimeToResolutionSec">最短距结算 <span class="hint">秒</span></label>
+      <label class="field-label" for="f-universe-minTimeToResolutionSec">最短距结算 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距市场结算至少还有多少秒才参与（900 = 15 分钟）。太近时价格已基本确定，交易价值低。" aria-label="说明：距市场结算至少还有多少秒才参与（900 = 15 分钟）。太近时价格已基本确定，交易价值低。">?</button></label>
       <input class="input num" type="number" id="f-universe-minTimeToResolutionSec" data-path="universe.minTimeToResolutionSec" data-kind="number" data-min="300" data-max="604800" data-step="60" min="300" max="604800" step="60" value="900" inputmode="decimal">
       <span class="field-help">900 = 15 分钟</span>
     </div><div class="field">
-      <label class="field-label" for="f-universe-maxTimeToResolutionSec">最长距结算 <span class="hint">秒</span></label>
+      <label class="field-label" for="f-universe-maxTimeToResolutionSec">最长距结算 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距市场结算最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。" aria-label="说明：距市场结算最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。">?</button></label>
       <input class="input num" type="number" id="f-universe-maxTimeToResolutionSec" data-path="universe.maxTimeToResolutionSec" data-kind="number" data-min="3600" data-max="1209600" data-step="600" min="3600" max="1209600" step="600" value="129600" inputmode="decimal">
       <span class="field-help">129600 = 36 小时</span>
     </div><div class="field switch-field">
@@ -163,7 +163,7 @@
           <span class="field-label">仅接受可接单市场</span>
           <span class="switch"><input type="checkbox" id="f-universe-onlyAcceptingOrders" data-path="universe.onlyAcceptingOrders" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
         </label>
-        <p class="hint">关闭后可能纳入暂停接单市场（不建议）</p>
+        <p class="hint"><button type="button" class="help-dot" data-tip="只交易当前可接单的市场；关闭后可能选到暂停/已关闭的市场，不建议关闭。" aria-label="说明：只交易当前可接单的市场；关闭后可能选到暂停/已关闭的市场，不建议关闭。">?</button>关闭后可能纳入暂停接单市场（不建议）</p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-signal">
       <header class="panel-head">
@@ -172,14 +172,14 @@
         <span class="badge badge-ghost">9 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
-        <label class="field-label" for="f-signal-priceField">参考价格字段</label>
+        <label class="field-label" for="f-signal-priceField">参考价格字段<button type="button" class="help-dot" data-tip="用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。" aria-label="说明：用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。">?</button></label>
         <select class="input" id="f-signal-priceField" data-path="signal.priceField" data-kind="select">
           <option value="mid" selected="">中间价 mid</option><option value="last">最新成交价 last</option><option value="best_bid">买一价 best_bid</option><option value="best_ask">卖一价 best_ask</option>
         </select>
         
       </div></div><div class="slider-row" data-slider-path="signal.windowSec">
         <div class="slider-head">
-          <label class="field-label" for="f-signal-windowSec">观察窗口 <span class="hint">秒</span></label>
+          <label class="field-label" for="f-signal-windowSec">观察窗口 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="回看多少秒内的涨跌幅。60 秒就是需求里的『1 分钟』。" aria-label="说明：回看多少秒内的涨跌幅。60 秒就是需求里的『1 分钟』。">?</button></label>
           <output class="range-val" id="f-signal-windowSec-out" data-out-for="signal.windowSec" for="f-signal-windowSec">60s</output>
         </div>
         <input class="range" type="range" id="f-signal-windowSec" data-path="signal.windowSec" data-kind="range" min="10" max="3600" step="10" value="60" style="--pct:1.392757660167131%">
@@ -187,32 +187,32 @@
         <span class="field-help">需求示例：60 秒</span>
       </div><div class="slider-row" data-slider-path="signal.moveThresholdPct">
         <div class="slider-head">
-          <label class="field-label" for="f-signal-moveThresholdPct">触发阈值 <span class="hint">%（±）</span></label>
+          <label class="field-label" for="f-signal-moveThresholdPct">触发阈值 <span class="hint">%（±）</span><button type="button" class="help-dot" data-tip="窗口内涨跌幅达到 ±该百分比就触发。20 = ±20%。" aria-label="说明：窗口内涨跌幅达到 ±该百分比就触发。20 = ±20%。">?</button></label>
           <output class="range-val" id="f-signal-moveThresholdPct-out" data-out-for="signal.moveThresholdPct" for="f-signal-moveThresholdPct">±20%</output>
         </div>
         <input class="range" type="range" id="f-signal-moveThresholdPct" data-path="signal.moveThresholdPct" data-kind="range" min="1" max="500" step="1" value="20" style="--pct:3.807615230460922%">
         <div class="range-scale"><span>1</span><span>250.50</span><span>500</span></div>
         <span class="field-help">需求示例：20（±20%）</span>
       </div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-signal-minAbsMove">最小绝对变动 <span class="hint">USDC</span></label>
+      <label class="field-label" for="f-signal-minAbsMove">最小绝对变动 <span class="hint">USDC</span><button type="button" class="help-dot" data-tip="同时要求绝对价格变动 ≥ 该值（0.01 = 1¢）。低价区间 0.001→0.0012 也是 +20%，但只涨 0.02¢，必须过滤。" aria-label="说明：同时要求绝对价格变动 ≥ 该值（0.01 = 1¢）。低价区间 0.001→0.0012 也是 +20%，但只涨 0.02¢，必须过滤。">?</button></label>
       <input class="input num" type="number" id="f-signal-minAbsMove" data-path="signal.minAbsMove" data-kind="number" data-min="0" data-max="0.5" data-step="0.001" min="0" max="0.5" step="0.001" value="0.01" inputmode="decimal">
       <span class="field-help">过滤低价噪声；0.01 = 1¢，强烈建议 ≥ 0.01</span>
     </div><div class="field">
-        <label class="field-label" for="f-signal-direction">信号方向</label>
+        <label class="field-label" for="f-signal-direction">信号方向<button type="button" class="help-dot" data-tip="只做上涨信号、只做下跌信号，或双向都做。UP 买入 YES，DOWN 买入 NO。" aria-label="说明：只做上涨信号、只做下跌信号，或双向都做。UP 买入 YES，DOWN 买入 NO。">?</button></label>
         <select class="input" id="f-signal-direction" data-path="signal.direction" data-kind="select">
           <option value="up">仅上涨</option><option value="down">仅下跌</option><option value="both" selected="">双向</option>
         </select>
         
       </div><div class="field">
-      <label class="field-label" for="f-signal-confirmationTicks">确认 Tick 数 <span class="hint">次</span></label>
+      <label class="field-label" for="f-signal-confirmationTicks">确认 Tick 数 <span class="hint">次</span><button type="button" class="help-dot" data-tip="需要连续多少个 tick 都满足条件才触发；2 次确认可过滤瞬间毛刺。" aria-label="说明：需要连续多少个 tick 都满足条件才触发；2 次确认可过滤瞬间毛刺。">?</button></label>
       <input class="input num" type="number" id="f-signal-confirmationTicks" data-path="signal.confirmationTicks" data-kind="number" data-min="1" data-max="30" data-step="1" min="1" max="30" step="1" value="1" inputmode="decimal">
       <span class="field-help">范围 1 – 30</span>
     </div><div class="field">
-      <label class="field-label" for="f-signal-cooldownSec">同市场冷却 <span class="hint">秒</span></label>
+      <label class="field-label" for="f-signal-cooldownSec">同市场冷却 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="同一市场触发一次后，多少秒内不再开新仓。" aria-label="说明：同一市场触发一次后，多少秒内不再开新仓。">?</button></label>
       <input class="input num" type="number" id="f-signal-cooldownSec" data-path="signal.cooldownSec" data-kind="number" data-min="0" data-max="86400" data-step="10" min="0" max="86400" step="10" value="300" inputmode="decimal">
       <span class="field-help">范围 0 – 86400</span>
     </div></div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-signal-maxSignalsPerMarket">单市场最大信号数 <span class="hint">次</span></label>
+      <label class="field-label" for="f-signal-maxSignalsPerMarket">单市场最大信号数 <span class="hint">次</span><button type="button" class="help-dot" data-tip="整个运行期间该市场最多触发几次信号。" aria-label="说明：整个运行期间该市场最多触发几次信号。">?</button></label>
       <input class="input num" type="number" id="f-signal-maxSignalsPerMarket" data-path="signal.maxSignalsPerMarket" data-kind="number" data-min="1" data-max="100" data-step="1" min="1" max="100" step="1" value="5" inputmode="decimal">
       <span class="field-help">范围 1 – 100</span>
     </div><div class="field switch-field">
@@ -220,7 +220,7 @@
           <span class="field-label">点差超限时跳过信号</span>
           <span class="switch"><input type="checkbox" id="f-signal-requireSpreadOk" data-path="signal.requireSpreadOk" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
         </label>
-        <p class="hint">真实成交成本的一部分，建议保持开启</p>
+        <p class="hint"><button type="button" class="help-dot" data-tip="实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。" aria-label="说明：实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。">?</button>真实成交成本的一部分，建议保持开启</p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-execution">
       <header class="panel-head">
@@ -229,39 +229,39 @@
         <span class="badge badge-ghost">6 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
-        <span class="field-label">订单类型</span>
+        <span class="field-label">订单类型<button type="button" class="help-dot" data-tip="系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。" aria-label="说明：系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。">?</button></span>
         <div class="input input-ro num" id="f-execution-orderType">市价单 · IOC（模拟撮合）</div>
       </div><div class="field">
-        <label class="field-label" for="f-execution-sizingMode">仓位模式</label>
+        <label class="field-label" for="f-execution-sizingMode">仓位模式<button type="button" class="help-dot" data-tip="固定名义金额：每次固定下单多少 USD 名义额；按权益百分比：每次用当前总权益的百分之几。" aria-label="说明：固定名义金额：每次固定下单多少 USD 名义额；按权益百分比：每次用当前总权益的百分之几。">?</button></label>
         <select class="input" id="f-execution-sizingMode" data-path="execution.sizingMode" data-kind="select">
           <option value="fixed_stake" selected="">固定名义金额（USD）</option><option value="pct_equity">按权益百分比（%）</option>
         </select>
         
       </div></div><div class="slider-row" data-slider-path="execution.sizingValue">
         <div class="slider-head">
-          <label class="field-label" for="f-execution-sizingValue">单笔仓位 <span class="hint">USD / %</span></label>
+          <label class="field-label" for="f-execution-sizingValue">单笔仓位 <span class="hint">USD / %</span><button type="button" class="help-dot" data-tip="每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。" aria-label="说明：每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。">?</button></label>
           <output class="range-val" id="f-execution-sizingValue-out" data-out-for="execution.sizingValue" for="f-execution-sizingValue">25</output>
         </div>
         <input class="range" type="range" id="f-execution-sizingValue" data-path="execution.sizingValue" data-kind="range" min="1" max="100000" step="1" value="25" style="--pct:0.024000240002400024%">
         <div class="range-scale"><span>1</span><span>50000.50</span><span>100000</span></div>
-        <span class="field-help">fixed_stake 单位为 USD；pct_equity 单位为权益百分比</span>
+        <span class="field-help">fixed_stake 为订单名义额（USD）；pct_equity 为权益百分比；手续费另从现金扣除</span>
       </div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-execution-maxPositionUsd">单笔名义上限 <span class="hint">USD</span></label>
+      <label class="field-label" for="f-execution-maxPositionUsd">单笔名义上限 <span class="hint">USD</span><button type="button" class="help-dot" data-tip="单笔/单市场累计成本上限（USD），与设定的仓位金额取较小者。" aria-label="说明：单笔/单市场累计成本上限（USD），与设定的仓位金额取较小者。">?</button></label>
       <input class="input num" type="number" id="f-execution-maxPositionUsd" data-path="execution.maxPositionUsd" data-kind="number" data-min="1" data-max="100000" data-step="1" min="1" max="100000" step="1" value="50" inputmode="decimal">
       <span class="field-help">范围 1 – 100000</span>
     </div><div class="field">
-      <label class="field-label" for="f-execution-maxPositions">最大并发持仓 <span class="hint">个</span></label>
+      <label class="field-label" for="f-execution-maxPositions">最大并发持仓 <span class="hint">个</span><button type="button" class="help-dot" data-tip="同时最多持有多少个不同市场的仓位（并发持仓数）。" aria-label="说明：同时最多持有多少个不同市场的仓位（并发持仓数）。">?</button></label>
       <input class="input num" type="number" id="f-execution-maxPositions" data-path="execution.maxPositions" data-kind="number" data-min="1" data-max="100" data-step="1" min="1" max="100" step="1" value="5" inputmode="decimal">
       <span class="field-help">范围 1 – 100</span>
     </div><div class="field">
-      <label class="field-label" for="f-execution-maxPositionsPerMarket">单市场持仓上限 <span class="hint">个</span></label>
+      <label class="field-label" for="f-execution-maxPositionsPerMarket">单市场持仓上限 <span class="hint">个</span><button type="button" class="help-dot" data-tip="同一个市场最多同时持有几笔仓位，防止过度集中。" aria-label="说明：同一个市场最多同时持有几笔仓位，防止过度集中。">?</button></label>
       <input class="input num" type="number" id="f-execution-maxPositionsPerMarket" data-path="execution.maxPositionsPerMarket" data-kind="number" data-min="1" data-max="10" data-step="1" min="1" max="10" step="1" value="1" inputmode="decimal">
       <span class="field-help">范围 1 – 10</span>
     </div><div class="field">
-        <span class="field-label">撮合模型</span>
+        <span class="field-label">撮合模型<button type="button" class="help-dot" data-tip="逐档吃单（book_walk）：从最优卖价开始按盘口深度成交，计算加权平均成交价 VWAP。" aria-label="说明：逐档吃单（book_walk）：从最优卖价开始按盘口深度成交，计算加权平均成交价 VWAP。">?</button></span>
         <div class="input input-ro num" id="f-execution-fillModel">逐档吃单 book_walk</div>
       </div></div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-execution-slippageBufferBps">滑点保护 <span class="hint">bps</span></label>
+      <label class="field-label" for="f-execution-slippageBufferBps">滑点保护 <span class="hint">bps</span><button type="button" class="help-dot" data-tip="允许成交价超出买一价的最大比例（bps，100 = 1%）。0 = 只吃最优一档；调大可吃更深流动性但成本更高。" aria-label="说明：允许成交价超出买一价的最大比例（bps，100 = 1%）。0 = 只吃最优一档；调大可吃更深流动性但成本更高。">?</button></label>
       <input class="input num" type="number" id="f-execution-slippageBufferBps" data-path="execution.slippageBufferBps" data-kind="number" data-min="0" data-max="1000" data-step="1" min="0" max="1000" step="1" value="0" inputmode="decimal">
       <span class="field-help">允许超出买一价的最大比例</span>
     </div></div></div>
@@ -273,7 +273,7 @@
       </header>
       <div class="panel-body"><div class="slider-row" data-slider-path="exit.takeProfitPct">
         <div class="slider-head">
-          <label class="field-label" for="f-exit-takeProfitPct">止盈 <span class="hint">%（相对入场价）</span></label>
+          <label class="field-label" for="f-exit-takeProfitPct">止盈 <span class="hint">%（相对入场价）</span><button type="button" class="help-dot" data-tip="按含费成本计算的净收益率达到 +X% 时卖出止盈。" aria-label="说明：按含费成本计算的净收益率达到 +X% 时卖出止盈。">?</button></label>
           <output class="range-val" id="f-exit-takeProfitPct-out" data-out-for="exit.takeProfitPct" for="f-exit-takeProfitPct">+50%</output>
         </div>
         <input class="range" type="range" id="f-exit-takeProfitPct" data-path="exit.takeProfitPct" data-kind="range" min="1" max="1000" step="1" value="50" style="--pct:4.904904904904905%">
@@ -281,14 +281,14 @@
         
       </div><div class="slider-row" data-slider-path="exit.stopLossPct">
         <div class="slider-head">
-          <label class="field-label" for="f-exit-stopLossPct">止损 <span class="hint">%</span></label>
+          <label class="field-label" for="f-exit-stopLossPct">止损 <span class="hint">%</span><button type="button" class="help-dot" data-tip="按含费成本计算的净亏损达到 −X% 时卖出止损。" aria-label="说明：按含费成本计算的净亏损达到 −X% 时卖出止损。">?</button></label>
           <output class="range-val" id="f-exit-stopLossPct-out" data-out-for="exit.stopLossPct" for="f-exit-stopLossPct">-30%</output>
         </div>
         <input class="range" type="range" id="f-exit-stopLossPct" data-path="exit.stopLossPct" data-kind="range" min="1" max="1000" step="1" value="30" style="--pct:2.902902902902903%">
         <div class="range-scale"><span>1</span><span>500.50</span><span>1000</span></div>
         
       </div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-exit-maxHoldSec">最长持仓 <span class="hint">秒</span></label>
+      <label class="field-label" for="f-exit-maxHoldSec">最长持仓 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="持仓超过该秒数强制平仓（3600 = 1 小时）。" aria-label="说明：持仓超过该秒数强制平仓（3600 = 1 小时）。">?</button></label>
       <input class="input num" type="number" id="f-exit-maxHoldSec" data-path="exit.maxHoldSec" data-kind="number" data-min="10" data-max="604800" data-step="10" min="10" max="604800" step="10" value="3600" inputmode="decimal">
       <span class="field-help">3600 = 1 小时</span>
     </div><div class="field switch-field">
@@ -296,13 +296,13 @@
           <span class="field-label">持有到市场结算</span>
           <span class="switch"><input type="checkbox" id="f-exit-holdToResolution" data-path="exit.holdToResolution" data-kind="toggle"><i aria-hidden="true"></i></span>
         </label>
-        <p class="hint">开启后未触发止盈/止损的仓位持有至结算价兑付</p>
+        <p class="hint"><button type="button" class="help-dot" data-tip="开启后止盈/止损/超时/反向信号全部不生效，只等市场结算按 1/0 兑付；短线策略应关闭。" aria-label="说明：开启后止盈/止损/超时/反向信号全部不生效，只等市场结算按 1/0 兑付；短线策略应关闭。">?</button>开启后未触发止盈/止损的仓位持有至结算价兑付</p>
       </div><div class="field switch-field">
         <label class="switch-row" for="f-exit-exitOnOppositeSignal">
           <span class="field-label">反向信号出现时平仓</span>
           <span class="switch"><input type="checkbox" id="f-exit-exitOnOppositeSignal" data-path="exit.exitOnOppositeSignal" data-kind="toggle"><i aria-hidden="true"></i></span>
         </label>
-        
+        <p class="hint"><button type="button" class="help-dot" data-tip="持有 YES 时出现已确认的 DOWN 信号（或反之）则平仓；仅在『持有到结算』关闭时生效。" aria-label="说明：持有 YES 时出现已确认的 DOWN 信号（或反之）则平仓；仅在『持有到结算』关闭时生效。">?</button></p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-risk">
       <header class="panel-head">
@@ -311,19 +311,19 @@
         <span class="badge badge-ghost">4 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-risk-bankrollUsd">初始资金 <span class="hint">USD</span></label>
+      <label class="field-label" for="f-risk-bankrollUsd">初始资金 <span class="hint">USD</span><button type="button" class="help-dot" data-tip="模拟账户的初始资金（paper trading，不涉及真实资金）。" aria-label="说明：模拟账户的初始资金（paper trading，不涉及真实资金）。">?</button></label>
       <input class="input num" type="number" id="f-risk-bankrollUsd" data-path="risk.bankrollUsd" data-kind="number" data-min="10" data-max="10000000" data-step="100" min="10" max="10000000" step="100" value="1000" inputmode="decimal">
       <span class="field-help">范围 10 – 10000000</span>
     </div></div><div class="slider-row" data-slider-path="risk.maxDrawdownPct">
         <div class="slider-head">
-          <label class="field-label" for="f-risk-maxDrawdownPct">最大回撤熔断 <span class="hint">%</span></label>
+          <label class="field-label" for="f-risk-maxDrawdownPct">最大回撤熔断 <span class="hint">%</span><button type="button" class="help-dot" data-tip="权益从历史最高点回撤超过该百分比时触发熔断，停止开新仓。" aria-label="说明：权益从历史最高点回撤超过该百分比时触发熔断，停止开新仓。">?</button></label>
           <output class="range-val" id="f-risk-maxDrawdownPct-out" data-out-for="risk.maxDrawdownPct" for="f-risk-maxDrawdownPct">20%</output>
         </div>
         <input class="range" type="range" id="f-risk-maxDrawdownPct" data-path="risk.maxDrawdownPct" data-kind="range" min="1" max="100" step="1" value="20" style="--pct:19.19191919191919%">
         <div class="range-scale"><span>1</span><span>50.50</span><span>100</span></div>
         
       </div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-risk-dailyLossLimitUsd">单日最大亏损 <span class="hint">USD</span></label>
+      <label class="field-label" for="f-risk-dailyLossLimitUsd">单日最大亏损 <span class="hint">USD</span><button type="button" class="help-dot" data-tip="当日累计已实现亏损超过该金额时停止开新仓。" aria-label="说明：当日累计已实现亏损超过该金额时停止开新仓。">?</button></label>
       <input class="input num" type="number" id="f-risk-dailyLossLimitUsd" data-path="risk.dailyLossLimitUsd" data-kind="number" data-min="0" data-max="10000000" data-step="10" min="0" max="10000000" step="10" value="100" inputmode="decimal">
       <span class="field-help">范围 0 – 10000000</span>
     </div><div class="field switch-field">
@@ -331,7 +331,7 @@
           <span class="field-label">启用回撤熔断 kill switch</span>
           <span class="switch"><input type="checkbox" id="f-risk-killSwitch" data-path="risk.killSwitch" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
         </label>
-        <p class="hint">触发后自动停机并记录 risk_kill_switch</p>
+        <p class="hint"><button type="button" class="help-dot" data-tip="熔断开关：触发后运行状态变为 stopped 并记录 risk_kill_switch（不会强制平仓已有持仓）。" aria-label="说明：熔断开关：触发后运行状态变为 stopped 并记录 risk_kill_switch（不会强制平仓已有持仓）。">?</button>触发后自动停机并记录 risk_kill_switch</p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-fees">
       <header class="panel-head">
@@ -340,10 +340,10 @@
         <span class="badge badge-ghost">1 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
-        <span class="field-label">费率模型</span>
+        <span class="field-label">费率模型<button type="button" class="help-dot" data-tip="Polymarket 天气市场官方 taker 费率模型，系统在每笔成交上自动计提。" aria-label="说明：Polymarket 天气市场官方 taker 费率模型，系统在每笔成交上自动计提。">?</button></span>
         <div class="input input-ro num" id="f-fees-model">weather_taker</div>
       </div><div class="field">
-      <label class="field-label" for="f-fees-takerFeeRate">taker 费率 <span class="hint">小数（0.05 = 5%）</span></label>
+      <label class="field-label" for="f-fees-takerFeeRate">taker 费率 <span class="hint">小数（0.05 = 5%）</span><button type="button" class="help-dot" data-tip="官方天气市场 taker 费率 = 0.05（5%）。手续费 = 股数 × 费率 × 价格 × (1−价格)，从账户现金另扣，不占用订单名义额。" aria-label="说明：官方天气市场 taker 费率 = 0.05（5%）。手续费 = 股数 × 费率 × 价格 × (1−价格)，从账户现金另扣，不占用订单名义额。">?</button></label>
       <input class="input num" type="number" id="f-fees-takerFeeRate" data-path="fees.takerFeeRate" data-kind="number" data-min="0" data-max="0.2" data-step="0.001" min="0" max="0.2" step="0.001" value="0.05" inputmode="decimal">
       <span class="field-help">官方 5% · 仅 taker 收取 · 保留 5 位小数</span>
     </div></div><div class="fee-formula"><div><span class="field-label">官方手续费公式</span><code>fee = shares × 0.05 × p × (1 − p)</code></div><div class="fee-formula-note"><span class="tag-amber">5%</span> 天气市场 taker 费率 · maker 返佣 25% · 最小非零费用 0.00001 USDC</div></div></div>
@@ -354,21 +354,21 @@
         <span class="badge badge-ghost">4 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
-        <label class="field-label" for="f-sim-mode">运行模式</label>
+        <label class="field-label" for="f-sim-mode">运行模式<button type="button" class="help-dot" data-tip="live 使用官方实时行情；replay 使用历史分钟价回放，适合复现和无行情时演示。" aria-label="说明：live 使用官方实时行情；replay 使用历史分钟价回放，适合复现和无行情时演示。">?</button></label>
         <select class="input" id="f-sim-mode" data-path="sim.mode" data-kind="select">
           <option value="live" selected="">实时（live）</option><option value="replay">回放（replay）</option>
         </select>
         
       </div><div class="field">
-      <label class="field-label" for="f-sim-tickIntervalMs">tick 间隔 <span class="hint">毫秒</span></label>
+      <label class="field-label" for="f-sim-tickIntervalMs">tick 间隔 <span class="hint">毫秒</span><button type="button" class="help-dot" data-tip="引擎每多少毫秒处理一次行情（1000 = 1 秒）。" aria-label="说明：引擎每多少毫秒处理一次行情（1000 = 1 秒）。">?</button></label>
       <input class="input num" type="number" id="f-sim-tickIntervalMs" data-path="sim.tickIntervalMs" data-kind="number" data-min="250" data-max="60000" data-step="250" min="250" max="60000" step="250" value="1000" inputmode="decimal">
       <span class="field-help">范围 250 – 60000</span>
     </div><div class="field">
-      <label class="field-label" for="f-sim-replayLookbackMin">回放窗口 <span class="hint">分钟</span></label>
+      <label class="field-label" for="f-sim-replayLookbackMin">回放窗口 <span class="hint">分钟</span><button type="button" class="help-dot" data-tip="回放模式下回看最近多少分钟的历史数据。" aria-label="说明：回放模式下回看最近多少分钟的历史数据。">?</button></label>
       <input class="input num" type="number" id="f-sim-replayLookbackMin" data-path="sim.replayLookbackMin" data-kind="number" data-min="5" data-max="1440" data-step="5" min="5" max="1440" step="5" value="60" inputmode="decimal">
       <span class="field-help">范围 5 – 1440</span>
     </div><div class="field">
-      <label class="field-label" for="f-sim-speed">回放速度 <span class="hint">倍</span></label>
+      <label class="field-label" for="f-sim-speed">回放速度 <span class="hint">倍</span><button type="button" class="help-dot" data-tip="回放时的时间压缩倍率，50 = 50 倍速。" aria-label="说明：回放时的时间压缩倍率，50 = 50 倍速。">?</button></label>
       <input class="input num" type="number" id="f-sim-speed" data-path="sim.speed" data-kind="number" data-min="1" data-max="100" data-step="1" min="1" max="100" step="1" value="10" inputmode="decimal">
       <span class="field-help">回放模式下的时间压缩倍率</span>
     </div></div></div>

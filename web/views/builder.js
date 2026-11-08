@@ -140,6 +140,61 @@ const GROUP_DEFS = [
   },
 ];
 
+/* ------------------------------------------------------------------ */
+/* 字段说明（点击/悬停 ? 查看）                                          */
+/* ------------------------------------------------------------------ */
+
+const FIELD_TIPS = {
+  "universe.cities": "只在这些城市的最高温市场里交易；不勾选 = 全部城市。城市越少可选市场越少，可能长时间没有信号。",
+  "universe.maxMarkets": "从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡。",
+  "universe.minPrice": "只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。",
+  "universe.maxPrice": "只交易 YES 中间价 ≤ 该值的市场（0.98 = 98¢）。过滤接近确定的极端高价括号。",
+  "universe.minLiquidityUsd": "市场流动性低于该值不参与。数据源流动性可能偏高，建议同时用点差过滤。",
+  "universe.maxSpread": "买一卖一价差超过该值不参与且不触发信号（0.03 = 3¢）。市价单先承担点差，点差过宽会吃掉利润。",
+  "universe.minTimeToResolutionSec": "距市场结算至少还有多少秒才参与（900 = 15 分钟）。太近时价格已基本确定，交易价值低。",
+  "universe.maxTimeToResolutionSec": "距市场结算最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。",
+  "universe.onlyAcceptingOrders": "只交易当前可接单的市场；关闭后可能选到暂停/已关闭的市场，不建议关闭。",
+  "signal.priceField": "用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。",
+  "signal.windowSec": "回看多少秒内的涨跌幅。60 秒就是需求里的『1 分钟』。",
+  "signal.moveThresholdPct": "窗口内涨跌幅达到 ±该百分比就触发。20 = ±20%。",
+  "signal.minAbsMove": "同时要求绝对价格变动 ≥ 该值（0.01 = 1¢）。低价区间 0.001→0.0012 也是 +20%，但只涨 0.02¢，必须过滤。",
+  "signal.direction": "只做上涨信号、只做下跌信号，或双向都做。UP 买入 YES，DOWN 买入 NO。",
+  "signal.confirmationTicks": "需要连续多少个 tick 都满足条件才触发；2 次确认可过滤瞬间毛刺。",
+  "signal.cooldownSec": "同一市场触发一次后，多少秒内不再开新仓。",
+  "signal.maxSignalsPerMarket": "整个运行期间该市场最多触发几次信号。",
+  "signal.requireSpreadOk": "实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。",
+  "execution.orderType": "系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。",
+  "execution.sizingMode": "固定名义金额：每次固定下单多少 USD 名义额；按权益百分比：每次用当前总权益的百分之几。",
+  "execution.sizingValue": "每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。",
+  "execution.maxPositionUsd": "单笔/单市场累计成本上限（USD），与设定的仓位金额取较小者。",
+  "execution.maxPositions": "同时最多持有多少个不同市场的仓位（并发持仓数）。",
+  "execution.maxPositionsPerMarket": "同一个市场最多同时持有几笔仓位，防止过度集中。",
+  "execution.fillModel": "逐档吃单（book_walk）：从最优卖价开始按盘口深度成交，计算加权平均成交价 VWAP。",
+  "execution.slippageBufferBps": "允许成交价超出买一价的最大比例（bps，100 = 1%）。0 = 只吃最优一档；调大可吃更深流动性但成本更高。",
+  "exit.takeProfitPct": "按含费成本计算的净收益率达到 +X% 时卖出止盈。",
+  "exit.stopLossPct": "按含费成本计算的净亏损达到 −X% 时卖出止损。",
+  "exit.maxHoldSec": "持仓超过该秒数强制平仓（3600 = 1 小时）。",
+  "exit.holdToResolution": "开启后止盈/止损/超时/反向信号全部不生效，只等市场结算按 1/0 兑付；短线策略应关闭。",
+  "exit.exitOnOppositeSignal": "持有 YES 时出现已确认的 DOWN 信号（或反之）则平仓；仅在『持有到结算』关闭时生效。",
+  "risk.bankrollUsd": "模拟账户的初始资金（paper trading，不涉及真实资金）。",
+  "risk.maxDrawdownPct": "权益从历史最高点回撤超过该百分比时触发熔断，停止开新仓。",
+  "risk.dailyLossLimitUsd": "当日累计已实现亏损超过该金额时停止开新仓。",
+  "risk.killSwitch": "熔断开关：触发后运行状态变为 stopped 并记录 risk_kill_switch（不会强制平仓已有持仓）。",
+  "fees.model": "Polymarket 天气市场官方 taker 费率模型，系统在每笔成交上自动计提。",
+  "fees.takerFeeRate": "官方天气市场 taker 费率 = 0.05（5%）。手续费 = 股数 × 费率 × 价格 × (1−价格)，从账户现金另扣，不占用订单名义额。",
+  "sim.mode": "live 使用官方实时行情；replay 使用历史分钟价回放，适合复现和无行情时演示。",
+  "sim.tickIntervalMs": "引擎每多少毫秒处理一次行情（1000 = 1 秒）。",
+  "sim.replayLookbackMin": "回放模式下回看最近多少分钟的历史数据。",
+  "sim.speed": "回放时的时间压缩倍率，50 = 50 倍速。",
+};
+
+/** 字段说明的「?」按钮（悬停/点击/键盘聚焦显示说明气泡）。 */
+function fieldTipDot(path) {
+  const text = FIELD_TIPS[path];
+  if (!text) return "";
+  return `<button type="button" class="help-dot" data-tip="${escapeAttr(text)}" aria-label="说明：${escapeAttr(text)}">?</button>`;
+}
+
 const MODE_HINT = {
   live: "实时模式使用 Polymarket 官方行情（Gamma + CLOB）驱动本地模拟撮合。",
   replay: "回放模式使用历史分钟价驱动同一引擎，适合无行情 / 复现验证。",
@@ -217,6 +272,76 @@ export async function mount(root, ctx) {
   };
   const timers = { validate: 0 };
   let validateController = null;
+  let tipEl = null;
+
+  /* -------------------- 字段说明气泡 -------------------- */
+
+  function ensureTip() {
+    if (!tipEl) {
+      tipEl = document.createElement("div");
+      tipEl.className = "field-tip";
+      tipEl.setAttribute("role", "tooltip");
+      tipEl.hidden = true;
+      document.body.appendChild(tipEl);
+    }
+    return tipEl;
+  }
+
+  function showFieldTip(dot) {
+    const text = dot.getAttribute("data-tip");
+    if (!text) return;
+    const tip = ensureTip();
+    tip.textContent = text;
+    tip.hidden = false;
+    const rect = dot.getBoundingClientRect();
+    const tr = tip.getBoundingClientRect();
+    const left = Math.min(
+      window.innerWidth - tr.width - 10,
+      Math.max(10, rect.left + rect.width / 2 - tr.width / 2),
+    );
+    // 默认显示在下方（字段标签多在面板顶部，避免遮住标题）；空间不足再翻到上方。
+    let top = rect.bottom + 8;
+    if (top + tr.height > window.innerHeight - 10) top = rect.top - tr.height - 8;
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(top)}px`;
+  }
+
+  function hideFieldTip() {
+    if (tipEl) tipEl.hidden = true;
+  }
+
+  function helpDotFrom(event) {
+    return event.target instanceof Element ? event.target.closest(".help-dot") : null;
+  }
+
+  function onHelpOver(event) {
+    const dot = helpDotFrom(event);
+    if (dot) showFieldTip(dot);
+  }
+
+  function onHelpOut(event) {
+    const dot = helpDotFrom(event);
+    if (!dot) return;
+    const to = event.relatedTarget instanceof Element ? event.relatedTarget.closest(".help-dot") : null;
+    if (to !== dot) hideFieldTip();
+  }
+
+  function onHelpFocus(event) {
+    const dot = helpDotFrom(event);
+    if (dot) showFieldTip(dot);
+  }
+
+  function onHelpBlur(event) {
+    if (helpDotFrom(event)) hideFieldTip();
+  }
+
+  function onHelpClick(event) {
+    const dot = helpDotFrom(event);
+    if (!dot) return;
+    event.preventDefault();
+    event.stopPropagation();
+    showFieldTip(dot);
+  }
 
   // 1) 初始配置：已保存策略 > 预设 > 默认
   const presets = presetList(ctx.store);
@@ -425,29 +550,31 @@ export async function mount(root, ctx) {
     const label = ui.escapeHtml(field.label);
     const unit = field.unit ? ` <span class="hint">${ui.escapeHtml(field.unit)}</span>` : "";
     const help = field.help ? `<span class="field-help">${ui.escapeHtml(field.help)}</span>` : "";
+    const dot = fieldTipDot(field.path);
 
     if (field.kind === "cities") return renderCitiesField(field);
 
     if (field.kind === "toggle") {
+      const hintLine = field.help || dot ? `<p class="hint">${dot}${field.help ? ui.escapeHtml(field.help) : ""}</p>` : "";
       return `<div class="field switch-field">
         <label class="switch-row" for="${id}">
           <span class="field-label">${label}</span>
           <span class="switch"><input type="checkbox" id="${id}" data-path="${field.path}" data-kind="toggle" ${value ? "checked" : ""}><i aria-hidden="true"></i></span>
         </label>
-        ${field.help ? `<p class="hint">${ui.escapeHtml(field.help)}</p>` : ""}
+        ${hintLine}
       </div>`;
     }
 
     if (field.kind === "readonly") {
       return `<div class="field">
-        <span class="field-label">${label}</span>
+        <span class="field-label">${label}${dot}</span>
         <div class="input input-ro num" id="${id}">${ui.escapeHtml(field.valueLabel || value)}</div>
       </div>`;
     }
 
     if (field.kind === "select") {
       return `<div class="field">
-        <label class="field-label" for="${id}">${label}</label>
+        <label class="field-label" for="${id}">${label}${dot}</label>
         <select class="input" id="${id}" data-path="${field.path}" data-kind="select">
           ${(field.options || []).map((opt) => `<option value="${escapeAttr(opt.value)}" ${String(value) === String(opt.value) ? "selected" : ""}>${ui.escapeHtml(opt.label)}</option>`).join("")}
         </select>
@@ -462,7 +589,7 @@ export async function mount(root, ctx) {
       const fmtScale = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
       return `<div class="slider-row" data-slider-path="${field.path}">
         <div class="slider-head">
-          <label class="field-label" for="${id}">${label}${unit}</label>
+          <label class="field-label" for="${id}">${label}${unit}${dot}</label>
           <output class="range-val" id="${id}-out" data-out-for="${field.path}" for="${id}">${ui.escapeHtml(outText)}</output>
         </div>
         <input class="range" type="range" id="${id}" data-path="${field.path}" data-kind="range"
@@ -474,7 +601,7 @@ export async function mount(root, ctx) {
 
     // number
     return `<div class="field">
-      <label class="field-label" for="${id}">${label}${unit}</label>
+      <label class="field-label" for="${id}">${label}${unit}${dot}</label>
       <input class="input num" type="number" id="${id}" data-path="${field.path}" data-kind="number"
         data-min="${field.min}" data-max="${field.max}" data-step="${field.step}"
         min="${field.min}" max="${field.max}" step="${field.step}" value="${value}" inputmode="decimal">
@@ -488,7 +615,7 @@ export async function mount(root, ctx) {
     const selectedSet = new Set(selected);
     if (cities.length) {
       return `<div class="field" data-cities-wrap>
-        <span class="field-label" id="lb-cities">${ui.escapeHtml(field.label)}</span>
+        <span class="field-label" id="lb-cities">${ui.escapeHtml(field.label)}${fieldTipDot("universe.cities")}</span>
         <div class="city-picker" role="group" aria-labelledby="lb-cities">
           ${cities.map((city) => `<label class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
             <input type="checkbox" value="${escapeAttr(city.name)}" data-city="${escapeAttr(city.name)}" ${selectedSet.has(city.name) ? "checked" : ""}>
@@ -501,7 +628,7 @@ export async function mount(root, ctx) {
       </div>`;
     }
     return `<div class="field" data-cities-wrap>
-      <label class="field-label" for="f-universe-cities-csv">${ui.escapeHtml(field.label)}</label>
+      <label class="field-label" for="f-universe-cities-csv">${ui.escapeHtml(field.label)}${fieldTipDot("universe.cities")}</label>
       <input class="input" id="f-universe-cities-csv" type="text" data-path="universe.cities" data-kind="cities-csv"
         value="${escapeAttr(selected.join(", "))}" placeholder="留空 = 全部城市；多个城市用英文逗号分隔">
       <span class="field-help" id="citiesHelp">城市元数据暂不可用；可手动输入城市名，例如 New York, London。</span>
@@ -990,6 +1117,10 @@ export async function mount(root, ctx) {
   }
 
   function onKeydown(event) {
+    if (event.key === "Escape") {
+      hideFieldTip();
+      return;
+    }
     // 数字输入框回车立即触发校验，避免等待 debounce
     if (event.key === "Enter" && event.target instanceof HTMLElement && event.target.matches("input[data-path]")) {
       event.preventDefault();
@@ -1001,6 +1132,12 @@ export async function mount(root, ctx) {
   root.addEventListener("change", onControlEvent);
   root.addEventListener("click", onClick);
   root.addEventListener("keydown", onKeydown);
+  root.addEventListener("mouseover", onHelpOver);
+  root.addEventListener("mouseout", onHelpOut);
+  root.addEventListener("focusin", onHelpFocus);
+  root.addEventListener("focusout", onHelpBlur);
+  root.addEventListener("click", onHelpClick);
+  window.addEventListener("scroll", hideFieldTip, true);
 
   // 首屏校验
   scheduleValidate(60);
@@ -1029,6 +1166,16 @@ export async function mount(root, ctx) {
       root.removeEventListener("change", onControlEvent);
       root.removeEventListener("click", onClick);
       root.removeEventListener("keydown", onKeydown);
+      root.removeEventListener("mouseover", onHelpOver);
+      root.removeEventListener("mouseout", onHelpOut);
+      root.removeEventListener("focusin", onHelpFocus);
+      root.removeEventListener("focusout", onHelpBlur);
+      root.removeEventListener("click", onHelpClick);
+      window.removeEventListener("scroll", hideFieldTip, true);
+      if (tipEl) {
+        tipEl.remove();
+        tipEl = null;
+      }
     },
   };
 }

@@ -240,6 +240,26 @@ async function captureWithCdp({ edge, baseUrl, route, profileDir, shotPath }) {
       await delay(200);
     }
     await delay(600);
+    // Re-sample after the settle delay: the mount poll can catch the SPA shell
+    // before async REST data has rendered dashboard content, so the final text
+    // snapshot must be taken after the delay (otherwise the content regex races).
+    try {
+      const finalEval = await cdp.send("Runtime.evaluate", {
+        expression: `JSON.stringify({
+          title: document.title,
+          hash: location.hash,
+          readyState: document.readyState,
+          nodes: document.querySelectorAll('*').length,
+          textLength: (document.body && document.body.innerText || '').length,
+          text: (document.body && document.body.innerText || '').slice(0, 4000),
+        })`,
+        returnByValue: true,
+      });
+      const finalState = JSON.parse(finalEval.result?.value ?? "null");
+      if (finalState) state = finalState;
+    } catch {
+      /* keep the initial poll state */
+    }
     const screenshot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
     const domResult = await cdp.send("Runtime.evaluate", {
       expression: "document.documentElement.outerHTML",

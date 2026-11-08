@@ -197,6 +197,7 @@ export async function mount(root, ctx) {
   root.innerHTML = renderShell();
   const el = {
     runTag: root.querySelector("#dashRunId"),
+    runSwitcher: root.querySelector("#runSwitcher"),
     sub: root.querySelector("#dashSub"),
     statusPill: root.querySelector("#dashStatusPill"),
     connBanner: root.querySelector("#connBanner"),
@@ -250,6 +251,7 @@ export async function mount(root, ctx) {
   });
 
   root.addEventListener("click", onRootClick);
+  root.addEventListener("change", onRootChange);
 
   /* -------------------- REST 快照 -------------------- */
 
@@ -335,6 +337,7 @@ export async function mount(root, ctx) {
   }
   selectInitialMarket();
   renderAll();
+  loadRunOptions();
   appendLog("info", `已加载运行 ${state.runId} 快照（${state.trades.length} 笔成交 / ${state.equity.length} 个权益点）`);
 
   // 选中市场走势
@@ -353,6 +356,7 @@ export async function mount(root, ctx) {
     const result = await fetchSnapshot();
     if (result.ok) {
       renderAll();
+      loadRunOptions();
       if (state.selectedMarketId) loadMarketHistory(state.selectedMarketId);
       ui.toast("看板数据已刷新", { type: "info", timeout: 1600 });
     } else {
@@ -382,6 +386,10 @@ export async function mount(root, ctx) {
             <p class="sub" id="dashSub">正在加载运行数据…</p>
           </div>
           <div class="view-actions run-controls">
+            <label class="run-switch" title="切换查看其他运行">
+              <span class="sr-only">切换运行</span>
+              <select class="input" id="runSwitcher" aria-label="切换运行"></select>
+            </label>
             <span id="dashStatusPill"></span>
             <div class="segmented segmented-sm" role="group" aria-label="权益曲线时间范围">
               ${EQUITY_RANGES.map((range) => `<button type="button" class="seg ${range.seconds === 0 ? "is-active" : ""}" data-range="${range.seconds}">${range.label}</button>`).join("")}
@@ -1315,6 +1323,60 @@ export async function mount(root, ctx) {
 
   /* -------------------- 事件 -------------------- */
 
+  /* -------------------- 运行切换 -------------------- */
+
+  function statusLabel(status) {
+    return (
+      {
+        running: "运行中",
+        starting: "启动中",
+        paused: "已暂停",
+        stopping: "停止中",
+        stopped: "已停止",
+        ended: "已结束",
+        error: "错误",
+      }[status] || status || "—"
+    );
+  }
+
+  async function loadRunOptions() {
+    if (!el.runSwitcher) return;
+    try {
+      const data = await api.getJSON("/api/runs");
+      const runs = Array.isArray(data && data.runs) ? data.runs : [];
+      if (!runs.length) {
+        el.runSwitcher.innerHTML = '<option value="">暂无运行</option>';
+        el.runSwitcher.disabled = true;
+        return;
+      }
+      const current = runs.find((run) => run.id === state.runId);
+      const options = runs.map((run) => {
+        const liveMark = ["running", "starting", "paused"].includes(run.status) ? "● " : "";
+        const label = `${liveMark}${run.strategyName || "未命名策略"} · ${run.id} · ${statusLabel(run.status)}`;
+        return `<option value="${ui.escapeHtml(run.id)}" ${run.id === state.runId ? "selected" : ""}>${ui.escapeHtml(label)}</option>`;
+      });
+      if (!current) {
+        options.unshift(
+          `<option value="${ui.escapeHtml(state.runId)}" selected>${ui.escapeHtml(`${state.runId}（当前）`)}</option>`,
+        );
+      }
+      el.runSwitcher.innerHTML = options.join("");
+      el.runSwitcher.disabled = false;
+    } catch {
+      el.runSwitcher.disabled = true;
+    }
+  }
+
+  function onRootChange(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.id !== "runSwitcher") return;
+    const next = target.value;
+    if (!next || next === state.runId) return;
+    ctx.rememberRun(next);
+    ctx.navigate(`/dashboard?run=${encodeURIComponent(next)}`);
+  }
+
   function onRootClick(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -1393,6 +1455,7 @@ export async function mount(root, ctx) {
   function destroy() {
     state.destroyed = true;
     root.removeEventListener("click", onRootClick);
+    root.removeEventListener("change", onRootChange);
     if (stream) {
       stream.close();
       stream = null;
