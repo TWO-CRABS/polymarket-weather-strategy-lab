@@ -475,6 +475,18 @@ test("BUY trims by 0.01 shares so notional + fee fits available cash", () => {
   assert.ok(lessCash.notional + lessCash.fee <= 2.5 + 1e-9);
 });
 
+test("BUY top-up: a $1 budget at high prices still meets the $1 exchange minimum", () => {
+  for (const price of [0.52, 0.72, 0.95]) {
+    const book = makeOrderBook({ asks: [{ price, size: 1000 }] });
+    const fill = simulateBuy({ book, budgetUsd: 1, cashUsd: 100 });
+    assert.equal(fill.ok, true, `price ${price} should fill`);
+    assert.ok(fill.notional >= 1 - 1e-9, `notional ${fill.notional} must reach $1`);
+    assert.ok(fill.notional <= 1 + price * 0.01 + 1e-9, "top-up is limited to one 0.01-share lot");
+    assert.ok(fill.shares > 0);
+    assert.equal(fill.fee, calcTakerFee(fill.shares, fill.price));
+  }
+});
+
 test("BUY rejects below the $1 market-buy minimum / without liquidity / with no cash", () => {
   // Market BUY only needs $1 notional; 3 shares at 40¢ = $1.20 is a valid order.
   const thin = simulateBuy({ book: ORDER_BOOK_THIN, budgetUsd: 100 });

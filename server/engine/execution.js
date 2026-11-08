@@ -146,6 +146,31 @@ export function simulateBuy(args) {
   }
   // Market BUY minimum value: $1 notional. There is NO market-order share minimum
   // (5 shares is the LIMIT-order rule), so a 1.4-share $1 order is valid.
+  // Because shares are floored to 0.01 lots, a budget exactly at $1 can land a
+  // hair below the minimum (e.g. 1.05 × 0.95 = 0.9975). Top up by the smallest
+  // lot at the best ask when the intended budget already covers the minimum,
+  // so a legitimate $1 order is executable (docs/03 §3.3).
+  if (notional + 1e-9 < minOrderValueUsd && filled > 0 && budgetUsd + 1e-9 >= minOrderValueUsd) {
+    const shortfall = minOrderValueUsd - notional;
+    const needed = Math.ceil((shortfall / bestAsk) * 100 - 1e-9) / 100;
+    const extraShares = roundTo(Math.max(0.01, needed), 2);
+    const extraNotional = roundTo(extraShares * bestAsk, 5);
+    const newFilled = roundTo(filled + extraShares, 2);
+    const newNotional = roundTo(notional + extraNotional, 5);
+    const newPrice = roundTo(newNotional / newFilled, 6);
+    const newFee = calcTakerFee(newFilled, newPrice, feeRate);
+    if (!Number.isFinite(cashUsd) || newNotional + newFee <= cashUsd + 1e-9) {
+      filled = newFilled;
+      notional = newNotional;
+      price = newPrice;
+      fee = newFee;
+      if (bookLevels.length > 0 && Math.abs(bookLevels[0].price - bestAsk) < 1e-9) {
+        bookLevels[0].size = roundTo(bookLevels[0].size + extraShares, 2);
+      } else {
+        bookLevels.unshift({ price: bestAsk, size: extraShares });
+      }
+    }
+  }
   if (notional + 1e-9 < minOrderValueUsd) return rejected("below_min_order", { limitPrice });
 
   price = roundTo(notional / filled, 6);
