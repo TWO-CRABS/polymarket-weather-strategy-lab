@@ -294,7 +294,7 @@ holdSec     = (now - entryTs)/1000
 
 ### 4.3 结算（`resolution`）
 
-- **结算时点**：`endDate`（温度市场通常为观察日次日 12:00 UTC = 北京时间 20:00）只是**停止交易**时间，**不是**结算时间，也不会在当日 24:00 按现价强制兑付。真正的 settlement 以官方裁决为准（METAR 数据 → Gamma `closed` + `outcomePrices`）。
+- **结算时点**：`endDate`（温度市场为**观察日 12:00 UTC = 北京 20:00**）只是**停止交易**时间，**不是**结算时间；也不会按现价强制兑付。官方裁决时间为**观察日次日 00:00 UTC（即 24:00 UTC）之后的首份 METAR**；若迟迟没有首份报文，最迟到**次日 23:59 ET**，两者先到为准。实测：Nov 7 伦敦市场于 `2026-11-08T00:41Z`（24:00 UTC 后 41 分钟）closed 并给出 `outcomePrices`。
 - **当前实现（live）**：每 20 秒通过 Gamma `/markets/<id>` 轮询；当 `closed=true` 且 `outcomePrices` 明确为 `["1","0"]` / `["0","1"]`（或极罕见 50/50）时兑付；未裁决则标记 `resolution_pending=true` 并继续轮询。CLOB WS `market_resolved` 事件目前未接入（可作为增强）。
 - 二元市场赢家 1.0 USD/股、输家 0（极罕见 50/50 按 0.50 兑付）；`cash += payout`，**结算不收费**，`realizedPnl = payout - costBasis`，Trade 记 `reason=resolution`，随后删除持仓。
 - negRisk 温度组应恰有一个 YES；若出现 0/多个 winner（异常或未定），持仓按最后 mid 保留并标记 `resolution_pending=true`，继续轮询，不虚构成交。

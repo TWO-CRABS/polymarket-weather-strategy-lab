@@ -102,6 +102,20 @@ function fmtIso(iso) {
   return Number.isFinite(ts) ? ui.fmtDateTime(ts) : iso;
 }
 
+/**
+ * 结算提示：温度市场在观察日次日 00:00 UTC（即 24:00 UTC）后、
+ * 以首份 METAR 裁决；或最迟次日 23:59 ET（以先到为准）。
+ */
+function settlementHint(market) {
+  const endMs = Date.parse(market?.endDate);
+  if (!Number.isFinite(endMs)) return "";
+  const end = new Date(endMs);
+  const next = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() + 1, 0, 0, 0));
+  const mm = String(next.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(next.getUTCDate()).padStart(2, "0");
+  return `${mm}/${dd} 00:00 UTC（24:00 UTC）后`;
+}
+
 function bracketSortKey(market) {
   const text = String((market && market.bracket) || "");
   const match = text.match(/-?\d+(?:\.\d+)?/);
@@ -813,7 +827,7 @@ export async function mount(root, ctx) {
     if (closed) badges.push('<span class="mkt-stale mkt-closed">已关闭</span>');
     else if (notAccepting) badges.push('<span class="mkt-stale">暂停接单</span>');
 
-    return `<button type="button" class="mkt ${selected ? "is-selected" : ""}" data-market-id="${ui.escapeHtml(market.id)}" style="--mkt-tint:${tint}" title="${ui.escapeHtml(`${market.question || marketName(market)}${marketDate ? `（结算 ${marketDate}）` : ""}`)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${ui.escapeHtml(marketName(market))}，YES ${priceText(display.value)}，隐含概率 ${prob === null ? "未知" : ui.fmtProb(prob)}">
+    return `<button type="button" class="mkt ${selected ? "is-selected" : ""}" data-market-id="${ui.escapeHtml(market.id)}" style="--mkt-tint:${tint}" title="${ui.escapeHtml(`${market.question || marketName(market)}${marketDate ? `（交易日 ${marketDate}，预计结算 ${settlementHint(market)}）` : ""}`)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${ui.escapeHtml(marketName(market))}，YES ${priceText(display.value)}，隐含概率 ${prob === null ? "未知" : ui.fmtProb(prob)}">
       <div class="mkt-top">
         <span class="mkt-city"><i aria-hidden="true"></i>${ui.escapeHtml(cityLabel(market))}${marketDate ? `<span class="mkt-date">${ui.escapeHtml(marketDate)}</span>` : ""}</span>
         <canvas class="mkt-spark" data-spark-id="${ui.escapeHtml(market.id)}" width="62" height="20" aria-hidden="true"></canvas>
@@ -888,7 +902,8 @@ export async function mount(root, ctx) {
       `<span class="feed-chip">NO 买 ${ui.escapeHtml(priceText(no.bid))} / 卖 ${ui.escapeHtml(priceText(no.ask))} / 中 ${ui.escapeHtml(priceText(no.mid))}</span>`,
       `<span class="feed-chip">点差 ${ui.escapeHtml(ui.fmtCents(num(market.spread) || 0, 1))}</span>`,
       `<span class="feed-chip">流动性 ${ui.escapeHtml(ui.fmtMoney(num(market.liquidityUsd)))}</span>`,
-      `<span class="feed-chip">结算 ${ui.escapeHtml(fmtIso(market.endDate))}</span>`,
+      `<span class="feed-chip">交易截止 ${ui.escapeHtml(fmtIso(market.endDate))}</span>`,
+      `<span class="feed-chip" title="结算 = 观察日次日 00:00 UTC（24:00 UTC）后首份 METAR，或最迟次日 23:59 ET">预计结算 ${ui.escapeHtml(settlementHint(market))}</span>`,
     ].join("");
   }
 
@@ -1477,7 +1492,7 @@ export async function mount(root, ctx) {
     }
     const confirmed = await ui.confirmDialog({
       title: "停止本次模拟运行？",
-      message: `将停止运行 ${state.runId}（${state.run.strategyName || "未命名策略"}）。停止后按当前市值为未平仓持仓结算，运行会写入历史并保留全部成交与指标。`,
+      message: `将停止运行 ${state.runId}（${state.run.strategyName || "未命名策略"}）。停止后保留未平仓持仓，等待官方裁决自动结算（不会按当前市值强平；服务重启后仍会继续结算）。`,
       confirmText: "停止并结算",
       danger: true,
     });
