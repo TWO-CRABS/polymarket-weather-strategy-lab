@@ -34,6 +34,15 @@ const MAX_TRADES = 500;
 const MAX_EQUITY = 4000;
 const MAX_LOGS = 120;
 
+const TRADE_GROUP_OPTIONS = [
+  { value: "none", label: "不分组" },
+  { value: "city", label: "按城市" },
+  { value: "market", label: "按市场" },
+  { value: "side", label: "按方向" },
+  { value: "outcome", label: "按 YES/NO" },
+  { value: "reason", label: "按原因" },
+];
+
 /* ------------------------------------------------------------------ */
 /* 小工具                                                              */
 /* ------------------------------------------------------------------ */
@@ -103,17 +112,53 @@ function fmtIso(iso) {
 }
 
 /**
- * 结算提示：温度市场在观察日次日 00:00 UTC（即 24:00 UTC）后、
- * 以首份 METAR 裁决；或最迟次日 23:59 ET（以先到为准）。
+ * 温度市场实际交易截止：观察日 24:00 UTC（次日 00:00Z）。
+ * 官方 Gamma 的 endDate 是观察日 12:00Z，不是真实截止时间（CLOB 实测交易到 00:00Z 后）。
  */
-function settlementHint(market) {
+function tradingCutoffMs(market) {
+  const explicit = Date.parse(market?.tradingCutoff);
+  if (Number.isFinite(explicit)) return explicit;
+  const endMs = Date.parse(market?.endDate);
+  if (!Number.isFinite(endMs)) return NaN;
+  if (market?.negRisk && new Date(endMs).getUTCHours() === 12) return endMs + 12 * 3600_000;
+  return endMs;
+}
+
+function utcDateParts(ms) {
+  const date = new Date(ms);
+  return {
+    day: `${String(date.getUTCMonth() + 1).padStart(2, "0")}/${String(date.getUTCDate()).padStart(2, "0")}`,
+    year: date.getUTCFullYear(),
+  };
+}
+
+/** 交易截止提示：观察日 24:00 UTC。 */
+function tradingEndHint(market) {
   const endMs = Date.parse(market?.endDate);
   if (!Number.isFinite(endMs)) return "";
-  const end = new Date(endMs);
-  const next = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() + 1, 0, 0, 0));
-  const mm = String(next.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(next.getUTCDate()).padStart(2, "0");
-  return `${mm}/${dd} 00:00 UTC（24:00 UTC）后`;
+  return `${utcDateParts(endMs).day} 24:00 UTC`;
+}
+
+/** 结算提示：观察日次日 00:00 UTC 后首份 METAR（通常 ~00:30–01:00 UTC）。 */
+function settlementHint(market) {
+  const cutoffMs = tradingCutoffMs(market);
+  if (!Number.isFinite(cutoffMs)) return "";
+  const next = new Date(cutoffMs);
+  const label = `${String(next.getUTCMonth() + 1).padStart(2, "0")}/${String(next.getUTCDate()).padStart(2, "0")}`;
+  return `${label} 00:00 UTC 后（首份 METAR）`;
+}
+
+/** 官方 Polymarket 事件页（zh）。 */
+function polymarketEventUrl(market) {
+  const slug = market?.eventSlug;
+  return slug ? `https://polymarket.com/zh/event/${encodeURIComponent(slug)}` : null;
+}
+
+function marketLinkHtml(market, city, bracket) {
+  const label = `<span class="mkt-name"><b>${ui.escapeHtml(city)}</b><span>${ui.escapeHtml(bracket)}</span></span>`;
+  const url = polymarketEventUrl(market);
+  if (!url) return label;
+  return `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer" title="在 Polymarket 查看该事件">${label}</a>`;
 }
 
 function bracketSortKey(market) {
@@ -201,6 +246,8 @@ export async function mount(root, ctx) {
     streamStatus: "connecting",
     streamAttempt: 0,
     equityRange: 0,
+    tradeGroupBy: "none",
+    tradeFilter: "all",
     error: null,
     destroyed: false,
     lastTickAt: Date.now(),
@@ -236,6 +283,8 @@ export async function mount(root, ctx) {
     tradesBody: root.querySelector("#tradesBody"),
     tradesEmpty: root.querySelector("#tradesEmpty"),
     tradeBadge: root.querySelector("#tradeCountBadge"),
+    tradeGroupBy: root.querySelector("#tradeGroupBy"),
+    tradeFilter: root.querySelector("#tradeFilter"),
     positionsBody: root.querySelector("#positionsBody"),
     positionsEmpty: root.querySelector("#positionsEmpty"),
     positionBadge: root.querySelector("#positionBadge"),
@@ -254,6 +303,16 @@ export async function mount(root, ctx) {
     equityTableBody: root.querySelector("#equityTableBody"),
     stopBtn: root.querySelector("#btnStop"),
   };
+
+  el.tradeGroupBy?.addEventListener("change", () => {
+    state.tradeGroupBy = el.tradeGroupBy.value;
+    state.tradeFilter = "all";
+    renderTrades();
+  });
+  el.tradeFilter?.addEventListener("change", () => {
+    state.tradeFilter = el.tradeFilter.value;
+    renderTrades();
+  });
 
   // 图表实例（画布在外壳里已存在，先创建，之后 setData）
   equityChart = createLineChart(el.equityCanvas, {
@@ -497,7 +556,21 @@ export async function mount(root, ctx) {
                 <h2 id="h-trades">成交明细 <span class="live-label"><span class="live-dot live-dot-sm" aria-hidden="true"></span>STREAM</span></h2>
                 <p>每笔市价单的成交价、手续费（5 位小数）、滑点与已实现盈亏</p>
               </div>
-              <span class="badge badge-ghost" id="tradeCountBadge">0 笔</span>
+              <div class="trade-controls">
+                <label class="trade-control">
+                  <span>分组</span>
+                  <select class="input input-xs" id="tradeGroupBy" aria-label="成交明细分组方式">
+                    ${TRADE_GROUP_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="trade-control">
+                  <span>筛选</span>
+                  <select class="input input-xs" id="tradeFilter" aria-label="成交明细筛选">
+                    <option value="all">全部</option>
+                  </select>
+                </label>
+                <span class="badge badge-ghost" id="tradeCountBadge">0 笔</span>
+              </div>
             </header>
             <div class="table-wrap table-scroll">
               <table class="data-table table-trades">
@@ -827,7 +900,7 @@ export async function mount(root, ctx) {
     if (closed) badges.push('<span class="mkt-stale mkt-closed">已关闭</span>');
     else if (notAccepting) badges.push('<span class="mkt-stale">暂停接单</span>');
 
-    return `<button type="button" class="mkt ${selected ? "is-selected" : ""}" data-market-id="${ui.escapeHtml(market.id)}" style="--mkt-tint:${tint}" title="${ui.escapeHtml(`${market.question || marketName(market)}${marketDate ? `（交易日 ${marketDate}，预计结算 ${settlementHint(market)}）` : ""}`)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${ui.escapeHtml(marketName(market))}，YES ${priceText(display.value)}，隐含概率 ${prob === null ? "未知" : ui.fmtProb(prob)}">
+    return `<button type="button" class="mkt ${selected ? "is-selected" : ""}" data-market-id="${ui.escapeHtml(market.id)}" style="--mkt-tint:${tint}" title="${ui.escapeHtml(`${market.question || marketName(market)}${marketDate ? `（交易日 ${marketDate}，交易截止 ${tradingEndHint(market)}，预计结算 ${settlementHint(market)}）` : ""}`)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${ui.escapeHtml(marketName(market))}，YES ${priceText(display.value)}，隐含概率 ${prob === null ? "未知" : ui.fmtProb(prob)}">
       <div class="mkt-top">
         <span class="mkt-city"><i aria-hidden="true"></i>${ui.escapeHtml(cityLabel(market))}${marketDate ? `<span class="mkt-date">${ui.escapeHtml(marketDate)}</span>` : ""}</span>
         <canvas class="mkt-spark" data-spark-id="${ui.escapeHtml(market.id)}" width="62" height="20" aria-hidden="true"></canvas>
@@ -902,8 +975,8 @@ export async function mount(root, ctx) {
       `<span class="feed-chip">NO 买 ${ui.escapeHtml(priceText(no.bid))} / 卖 ${ui.escapeHtml(priceText(no.ask))} / 中 ${ui.escapeHtml(priceText(no.mid))}</span>`,
       `<span class="feed-chip">点差 ${ui.escapeHtml(ui.fmtCents(num(market.spread) || 0, 1))}</span>`,
       `<span class="feed-chip">流动性 ${ui.escapeHtml(ui.fmtMoney(num(market.liquidityUsd)))}</span>`,
-      `<span class="feed-chip">交易截止 ${ui.escapeHtml(fmtIso(market.endDate))}</span>`,
-      `<span class="feed-chip" title="结算 = 观察日次日 00:00 UTC（24:00 UTC）后首份 METAR，或最迟次日 23:59 ET">预计结算 ${ui.escapeHtml(settlementHint(market))}</span>`,
+      `<span class="feed-chip" title="观察日 24:00 UTC 停止交易（Gamma endDate 12:00Z 不是真实截止）">交易截止 ${ui.escapeHtml(tradingEndHint(market))}</span>`,
+      `<span class="feed-chip" title="官方裁决：观察日次日 00:00 UTC 后首份 METAR；最迟次日 23:59 ET，以先到为准">预计结算 ${ui.escapeHtml(settlementHint(market))}</span>`,
     ].join("");
   }
 
@@ -1000,25 +1073,55 @@ export async function mount(root, ctx) {
 
   function renderTrades() {
     if (!el.tradesBody) return;
-    const trades = state.trades.slice(0, 200);
-    if (el.tradeBadge) el.tradeBadge.textContent = `${state.trades.length} 笔`;
-    if (el.tradesEmpty) el.tradesEmpty.hidden = trades.length > 0;
-    if (!trades.length) {
-      el.tradesBody.innerHTML = "";
-      return;
-    }
-    el.tradesBody.innerHTML = trades.map((trade) => {
+    const groupBy = TRADE_GROUP_OPTIONS.some((option) => option.value === state.tradeGroupBy)
+      ? state.tradeGroupBy
+      : "none";
+    const decorated = state.trades.map((trade) => {
       const market = trade.marketId ? state.markets.get(trade.marketId) : null;
       const city = market ? cityLabel(market) : (trade.city || trade.marketId || "—");
       const bracket = market ? bracketLabel(market) : (trade.bracket || "");
+      const reason = ui.reasonLabel(trade.reason) || trade.reason || "—";
+      return { trade, market, city, bracket, marketLabel: bracket ? `${city} · ${bracket}` : city, reason };
+    });
+    const groupValue = (row) => {
+      switch (groupBy) {
+        case "city": return row.city;
+        case "market": return row.marketLabel;
+        case "side": return row.trade.side === "SELL" ? "SELL（卖出）" : "BUY（买入）";
+        case "outcome": return row.trade.outcome || "—";
+        case "reason": return row.reason;
+        default: return "";
+      }
+    };
+    const values = [...new Set(decorated.map(groupValue).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+    if (groupBy === "none") state.tradeFilter = "all";
+    else if (state.tradeFilter !== "all" && !values.includes(state.tradeFilter)) state.tradeFilter = "all";
+    if (el.tradeFilter) {
+      el.tradeFilter.innerHTML = [
+        '<option value="all">全部</option>',
+        ...values.map((value) => `<option value="${ui.escapeHtml(value)}">${ui.escapeHtml(value)}</option>`),
+      ].join("");
+      el.tradeFilter.value = state.tradeFilter;
+      el.tradeFilter.disabled = groupBy === "none";
+    }
+    const visible = decorated.filter((row) => state.tradeFilter === "all" || groupValue(row) === state.tradeFilter);
+    const limited = groupBy === "none" ? visible.slice(0, MAX_TRADES) : visible;
+    if (el.tradeBadge) {
+      el.tradeBadge.textContent = state.tradeFilter === "all"
+        ? `${state.trades.length} 笔`
+        : `${visible.length}/${state.trades.length} 笔`;
+    }
+    if (el.tradesEmpty) el.tradesEmpty.hidden = limited.length > 0;
+    if (!limited.length) {
+      el.tradesBody.innerHTML = "";
+      return;
+    }
+    const renderRow = ({ trade, market, city, bracket, reason }) => {
       const rejected = trade.status === "rejected";
       const pnl = num(trade.realizedPnl);
-      const reason = trade.side === "SELL"
-        ? ui.reasonLabel(trade.reason)
-        : (trade.reason === "signal" ? ui.reasonLabel("signal") : ui.reasonLabel(trade.reason));
       return `<tr class="${rejected ? "row-rejected" : ""}">
         <td class="num-col cell-dim">${ui.escapeHtml(ui.fmtTime(trade.ts))}</td>
-        <td><span class="mkt-name"><b>${ui.escapeHtml(city)}</b><span>${ui.escapeHtml(bracket)}</span></span></td>
+        <td>${marketLinkHtml(market, city, bracket)}</td>
         <td><span class="side-badge ${trade.side === "SELL" ? "sell" : "buy"}">${ui.escapeHtml(trade.side || "—")}</span> ${ui.outcomeBadge(trade.outcome)}</td>
         <td class="num-col">${ui.escapeHtml(ui.fmtShares(trade.shares, 2))}</td>
         <td class="num-col">${ui.escapeHtml(priceText(trade.price))}</td>
@@ -1029,7 +1132,20 @@ export async function mount(root, ctx) {
         <td class="trade-reason"><b>${ui.escapeHtml(reason)}</b>${rejected && trade.rejectReason ? `<br><span class="down">${ui.escapeHtml(ui.rejectReasonLabel(trade.rejectReason))}</span>` : ""}</td>
         <td>${ui.tradeStatusBadge(trade.status)}</td>
       </tr>`;
-    }).join("");
+    };
+    if (groupBy === "none") {
+      el.tradesBody.innerHTML = limited.map(renderRow).join("");
+      return;
+    }
+    const groups = new Map();
+    for (const row of limited) {
+      const key = groupValue(row);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    }
+    el.tradesBody.innerHTML = [...groups.entries()]
+      .map(([key, items]) => `<tr class="trade-group-row"><td colspan="11"><span class="trade-group-label">${ui.escapeHtml(key)}</span><span class="trade-group-count">${items.length} 笔</span></td></tr>${items.map(renderRow).join("")}`)
+      .join("");
   }
 
   /* -------------------- 持仓 -------------------- */
@@ -1052,7 +1168,7 @@ export async function mount(root, ctx) {
         ? position.impliedProbability
         : (market ? midOf(market, position.outcome || "YES") : null);
       return `<tr>
-        <td><span class="mkt-name"><b>${ui.escapeHtml(city)}</b><span>${ui.escapeHtml(bracket)}</span></span></td>
+        <td>${marketLinkHtml(market, city, bracket)}</td>
         <td>${ui.outcomeBadge(position.outcome)}</td>
         <td class="num-col">${ui.escapeHtml(ui.fmtShares(position.shares, 2))}</td>
         <td class="num-col">${ui.escapeHtml(priceText(position.avgPrice))}</td>

@@ -40,7 +40,7 @@
     "maxPrice": 0.98,                // YES 中间价上限
     "minLiquidityUsd": 500,
     "maxSpread": 0.03,               // 允许的最大点差（USDC）
-    "minTimeToResolutionSec": 900,   // 距 endDate 最短时间
+    "minTimeToResolutionSec": 900,   // 距实际交易截止（tradingCutoff，24:00 UTC）最短时间
     "maxTimeToResolutionSec": 129600,
     "onlyAcceptingOrders": true
   },
@@ -121,7 +121,8 @@
 | `volume24hUsd` | number | 24h 成交额 |
 | `tickSize` | number | 最小价格变动（0.001） |
 | `minOrderShares` | number | 卖出最小份额（5；市价 BUY 无股数下限，仅 $1 名义额门槛） |
-| `endDate` | string | ISO 时间 |
+| `endDate` | string | ISO 时间（Gamma endDate；温度市场为观察日 12:00Z，**不是真实交易截止**） |
+| `tradingCutoff` | string | ISO 时间；温度 negRisk 市场实际交易截止 = 观察日 24:00 UTC（次日 00:00Z），用于 ttr/结算轮询 |
 | `eventStartTime` | string | ISO 时间 |
 | `acceptingOrders` | boolean | 是否可接单 |
 | `closed` | boolean | 是否已关闭/结算 |

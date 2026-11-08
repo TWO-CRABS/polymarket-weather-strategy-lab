@@ -9,6 +9,7 @@
 import { calcTakerFee } from "./fee.js";
 import { bookMid, simulateBuy, simulateSell } from "./execution.js";
 import { evaluateSignal, createSignalState } from "./signal.js";
+import { effectiveTradingEndMs } from "../data/gamma.js";
 import { newId, roundTo } from "../util.js";
 
 export const RESOLUTION_POLL_MS = 20_000;
@@ -19,7 +20,7 @@ export async function handleSettlements(run, now) {
   if (!run.source || run.source.mode !== "live" || typeof run.resolutionProvider !== "function") return;
   for (const market of run.markets.values()) {
     if (run._settledMarkets.has(market.id)) continue;
-    const endMs = Date.parse(market.endDate);
+    const endMs = effectiveTradingEndMs(market);
     const due = market.closed || (Number.isFinite(endMs) && endMs <= now);
     if (!due) continue;
     if (run.portfolio.positionsForMarket(market.id).length === 0) {
@@ -245,7 +246,7 @@ export function preRiskChecks(run, market, signal, now) {
   if (Number.isFinite(market.spread) && market.spread > run.config.universe.maxSpread) {
     return { ok: false, reason: "spread_too_wide" };
   }
-  const ttrSec = (Date.parse(market.endDate) - now) / 1000;
+  const ttrSec = (effectiveTradingEndMs(market) - now) / 1000;
   if (!Number.isFinite(ttrSec)) return { ok: false, reason: "risk_blocked" };
   if (ttrSec < run.config.universe.minTimeToResolutionSec || ttrSec > run.config.universe.maxTimeToResolutionSec) {
     return { ok: false, reason: "risk_blocked" };

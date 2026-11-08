@@ -14,7 +14,7 @@ import { RUN_MODES, STRATEGY_VERSION, deepMerge, clone, roundTo, validateStrateg
 import { AppError, nowMs, newId } from "../util.js";
 import { Run } from "./run.js";
 import { ReplaySource, loadFixtureMarkets } from "../data/replay.js";
-import { compareMarketsForSelection } from "../data/gamma.js";
+import { compareMarketsForSelection, effectiveTradingEndMs } from "../data/gamma.js";
 import { createSettler, marketsFromTrades, rehydratePortfolio, settlePendingPositions } from "./settlementRecovery.js";
 
 const RUNS_LIST_LIMIT = 50;
@@ -146,9 +146,9 @@ export class RunManager {
       return true;
     });
     const timeFiltered = base.filter((market) => {
-      const endMs = Date.parse(market.endDate);
-      if (!Number.isFinite(endMs)) return false;
-      const ttrSec = (endMs - now) / 1000;
+      const cutoffMs = effectiveTradingEndMs(market);
+      if (!Number.isFinite(cutoffMs)) return false;
+      const ttrSec = (cutoffMs - now) / 1000;
       return ttrSec >= u.minTimeToResolutionSec && ttrSec <= u.maxTimeToResolutionSec;
     });
     let candidates = timeFiltered;
@@ -686,8 +686,8 @@ export class RunManager {
         else {
           const existing = run.markets.get(marketId);
           if (existing) {
-            const endMs = Date.parse(existing.endDate);
-            if (Number.isFinite(endMs) && endMs <= nowMs()) existing.closed = true;
+            const cutoffMs = effectiveTradingEndMs(existing);
+            if (Number.isFinite(cutoffMs) && cutoffMs <= nowMs()) existing.closed = true;
           }
         }
       }

@@ -325,6 +325,9 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-20 | 看板/历史对存在待结算或已结算的运行显示「待结算 N / 已结算 N」标识；停止后详情页仍能看到未结算持仓（从 journal 重建） |
 | AC-21 | 每周期兜底按**城市/日期事件组独立**：每个空仓城市组各自买「组内概率第 1 高 YES + 第 3 高 NO」，某城市已有持仓只跳过该城市、不阻止其他城市建仓；城市组按组内最高概率降序消费资金/仓位（`tests/engine.test.js`） |
 | AC-22 | `universe.selectionMode` 支持 `per_market`（默认，按流动性取前 N 个）与 `per_event`（按城市/日期事件整组选入，容量不够时跳过整组、不拆事件）；后者让城市内概率排名与第 3 高 NO 有真实意义（`tests/selection.test.js`） |
+| AC-23 | 实时看板的「成交明细」「当前持仓」市场列链接到官方事件页 `https://polymarket.com/zh/event/<eventSlug>`（`eventSlug` 来自市场快照）；无 slug 时退化为纯文本 |
+| AC-24 | 成交明细支持「分组」（不分组/城市/市场/方向/YES-NO/原因）与「筛选」（按分组值过滤）；分组行显示每组笔数，badge 显示 `过滤后/总数` |
+| AC-25 | 温度市场实际**交易截止 = 观察日 24:00 UTC**（快照 `tradingCutoff`，次日 00:00Z）；看板显示「交易截止 11/09 24:00 UTC」「预计结算 11/10 00:00 UTC 后（首份 METAR）」；TTR/入场风控/结算轮询均使用该截止（`tests/market-time.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

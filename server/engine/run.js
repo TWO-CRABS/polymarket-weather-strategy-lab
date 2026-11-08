@@ -17,6 +17,7 @@
 import { Portfolio } from "./portfolio.js";
 import { computeMetrics } from "./metrics.js";
 import { createSignalState } from "./signal.js";
+import { effectiveTradingEndMs } from "../data/gamma.js";
 import { nowMs, roundTo } from "../util.js";
 import {
   computeBudget,
@@ -479,7 +480,7 @@ export class Run {
     if (this.markets.size === 0) return;
     if (this.portfolio.positions.size > 0) return;
     const allOver = [...this.markets.values()].every((market) => {
-      const endMs = Date.parse(market.endDate);
+      const endMs = effectiveTradingEndMs(market);
       return market.closed || (Number.isFinite(endMs) && endMs + 6 * 3600_000 < now);
     });
     if (allOver) {
@@ -534,7 +535,7 @@ export class Run {
     for (const position of this.portfolio.positions.values()) {
       const market = this.markets.get(position.marketId);
       if (!market) continue;
-      const endMs = Date.parse(market.endDate);
+      const endMs = effectiveTradingEndMs(market);
       if (market.closed || market.resolutionPending) pending += 1;
       else if (Number.isFinite(endMs) && endMs <= now) pending += 1;
     }

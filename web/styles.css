@@ -1645,3 +1645,13 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
   font-family: var(--font-mono); font-size: 9px; font-weight: 500;
   color: var(--text-3); letter-spacing: 0.3px;
 }
+
+/* ---------- B20. 成交分组筛选 + 官方市场链接 ---------- */
+.mkt-link { color: inherit; text-decoration: none; }
+.mkt-link:hover b { color: var(--cyan-text); text-decoration: underline; }
+.trade-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.trade-control { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-3); }
+.trade-control .input-xs { height: 24px; padding: 0 6px; font-size: 10px; min-width: 92px; }
+.trade-group-row td { background: var(--bg-2); color: var(--text-2); font-size: 10px; font-weight: 600; padding: 5px 8px !important; border-top: 1px solid var(--line); }
+.trade-group-label { color: var(--cyan-text); }
+.trade-group-count { margin-left: 8px; color: var(--text-3); font-weight: 500; }

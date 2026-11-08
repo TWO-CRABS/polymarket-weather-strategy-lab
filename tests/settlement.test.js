@@ -224,6 +224,22 @@ test("losing resolution settles at 0 and records the realized loss", async () =>
   assert.equal(metrics.avgLoss, totalCost);
 });
 
+test("trading cutoff: a position is not settled before observation-day 24:00 UTC", async () => {
+  const market = makeMarket({ id: "settle-noon", endDate: "2026-11-09T12:00:00Z" });
+  const { run } = makeRunWithPosition({
+    market,
+    // Even though resolution would already be "resolved", the real cutoff is
+    // Nov 10 00:00Z and NOW=2026-11-09T02:00Z, so settlement must wait.
+    resolution: { status: "resolved", closed: true, yesWon: true, payout: 1, outcomePrices: [1, 0] },
+  });
+  const cashBefore = run.portfolio.cash;
+  await run._handleSettlements(NOW);
+  assert.equal(run.portfolio.positions.size, 1);
+  assert.equal(run.portfolio.cash, cashBefore);
+  assert.equal(run.trades.filter((trade) => trade.reason === "resolution").length, 0);
+  assert.equal(run._settledMarkets.has(market.id), false);
+});
+
 test("closed but unresolved market keeps the position and marks resolution_pending", async () => {
   const { run, market } = makeRunWithPosition({
     resolution: { status: "pending", closed: true, yesWon: null, payout: null, outcomePrices: [] },

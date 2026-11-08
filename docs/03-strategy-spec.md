@@ -97,7 +97,7 @@
 |---|---|
 | `universe.minPrice/maxPrice` | ①市场发现时按 YES mid 过滤；②信号样本护栏（`p_ref`、`p_now` 都须在带内）；③入场执行时目标 token 的 bestAsk 也须在带内 |
 | `minLiquidityUsd` | `Σ_{top10 asks}(price×size) + Σ_{top10 bids}(price×size)`；盘口缺失记 0 |
-| `min/maxTimeToResolutionSec` | `resolutionTime = market.endDate`；`ttr=(endDate-now)/1000`，仅 `min≤ttr≤max` 可选 |
+| `min/maxTimeToResolutionSec` | `resolutionTime = effectiveTradingEnd(market)`：温度 negRisk 市场为**观察日 24:00 UTC（次日 00:00Z）**；`ttr=(cutoff-now)/1000`，仅 `min≤ttr≤max` 可选（Gamma `endDate` 12:00Z 不是真实截止） |
 | `signal.priceField` | 见 §2.1；信号序列固定 YES token，不用 NO 序列（避免镜像重复计数） |
 | `execution.sizingValue` | 下单预算上限来源；实际预算还与现金、`maxPositionUsd`、最小下单量取 min（§3.2） |
 | `exit.holdToResolution` | `true`：禁用 TP/SL/maxHold/反向退出，只有结算（`resolution`）可平仓；`false`：全部主动退出生效。需求所述短线策略应为 `false` |
@@ -294,7 +294,7 @@ holdSec     = (now - entryTs)/1000
 
 ### 4.3 结算（`resolution`）
 
-- **结算时点**：`endDate`（温度市场为**观察日 12:00 UTC = 北京 20:00**）只是**停止交易**时间，**不是**结算时间；也不会按现价强制兑付。官方裁决时间为**观察日次日 00:00 UTC（即 24:00 UTC）之后的首份 METAR**；若迟迟没有首份报文，最迟到**次日 23:59 ET**，两者先到为准。实测：Nov 7 伦敦市场于 `2026-11-08T00:41Z`（24:00 UTC 后 41 分钟）closed 并给出 `outcomePrices`。
+- **结算时点**：温度市场的**实际交易截止 = 观察日 24:00 UTC（次日 00:00Z）**（Gamma `endDate` 的观察日 12:00Z 不是真实截止；CLOB 价格历史显示交易/更新持续到次日 00:00Z 之后）。官方裁决紧随其后：**观察日次日 00:00 UTC 后首份 METAR**，最迟**次日 23:59 ET**，先到为准。实测：Nov 7 伦敦市场在 `2026-11-08T00:41Z`（24:00 UTC 后 41 分钟）closed 并给出 `outcomePrices`。
 - **当前实现（live）**：每 20 秒通过 Gamma `/markets/<id>` 轮询；当 `closed=true` 且 `outcomePrices` 明确为 `["1","0"]` / `["0","1"]`（或极罕见 50/50）时兑付；未裁决则标记 `resolution_pending=true` 并继续轮询。CLOB WS `market_resolved` 事件目前未接入（可作为增强）。
 - 二元市场赢家 1.0 USD/股、输家 0（极罕见 50/50 按 0.50 兑付）；`cash += payout`，**结算不收费**，`realizedPnl = payout - costBasis`，Trade 记 `reason=resolution`，随后删除持仓。
 - negRisk 温度组应恰有一个 YES；若出现 0/多个 winner（异常或未定），持仓按最后 mid 保留并标记 `resolution_pending=true`，继续轮询，不虚构成交。
