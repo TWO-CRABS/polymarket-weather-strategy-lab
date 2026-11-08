@@ -457,6 +457,30 @@ export class RunManager {
     return true;
   }
 
+  /**
+   * Batch-delete runs (docs/07 §4.4). Active runs are stopped first, then removed.
+   * Unknown ids are reported in `failed` instead of aborting the whole batch.
+   * @param {string[]} ids
+   * @returns {Promise<{deleted:string[], failed:Array<{id:string, reason:string}>}>}
+   */
+  async deleteMany(ids = []) {
+    const deleted = [];
+    const failed = [];
+    const seen = new Set();
+    for (const rawId of Array.isArray(ids) ? ids : []) {
+      const id = String(rawId);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      try {
+        await this.deleteRun(id);
+        deleted.push(id);
+      } catch (err) {
+        failed.push({ id, reason: err?.code || "UNKNOWN" });
+      }
+    }
+    return { deleted, failed };
+  }
+
   /* --------------------------- feed orchestration ------------------------ */
 
   _onDiscoveryRefresh(payload) {

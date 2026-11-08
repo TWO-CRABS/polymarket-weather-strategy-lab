@@ -417,6 +417,44 @@ test("GET /api/runs supports strategyId runs and per-run 404s", async () => {
   assert.equal(delStrategy.status, 204);
 });
 
+test("POST /api/runs/batch-delete validates input and deletes multiple runs", async () => {
+  const ids = [];
+  for (let i = 0; i < 2; i += 1) {
+    const create = await server.http.post("/api/runs", {
+      mode: "replay",
+      strategy: fixtureStrategy(),
+      replay: { speed: 100 },
+    });
+    assert.equal(create.status, 201);
+    ids.push(create.json.run.id);
+  }
+  // invalid bodies
+  assertErrorEnvelope(
+    await server.http.post("/api/runs/batch-delete", { ids: [] }),
+    400,
+    "INVALID_BODY",
+  );
+  assertErrorEnvelope(
+    await server.http.post("/api/runs/batch-delete", {
+      ids: Array.from({ length: 201 }, (_, i) => `run_overflow_${i}`),
+    }),
+    400,
+    "INVALID_BODY",
+  );
+  // batch delete: unknown ids are reported, not fatal
+  const res = await server.http.post("/api/runs/batch-delete", {
+    ids: [...ids, "run_does_not_exist"],
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.json.deleted.length, 2);
+  assert.equal(res.json.failed.length, 1);
+  assert.equal(res.json.failed[0].id, "run_does_not_exist");
+  assert.equal(res.json.failed[0].reason, "RUN_NOT_FOUND");
+  for (const id of ids) {
+    assertErrorEnvelope(await server.http.get(`/api/runs/${encodeURIComponent(id)}`), 404, "RUN_NOT_FOUND");
+  }
+});
+
 /* ------------------------------------------------------------------------- */
 /* 5. SSE                                                                     */
 /* ------------------------------------------------------------------------- */

@@ -115,6 +115,7 @@ export async function mount(root, ctx) {
     loading: true,
     error: null,
     selected: new Set(),
+    toDelete: new Set(),
     detailId: (ctx.params && ctx.params.id) || null,
     detailData: null,
     detailLoading: false,
@@ -133,6 +134,10 @@ export async function mount(root, ctx) {
     compareBar: root.querySelector("#compareBar"),
     compareCount: root.querySelector("#compareCount"),
     btnCompare: root.querySelector("#btnDoCompare"),
+    batchBar: root.querySelector("#batchBar"),
+    batchCount: root.querySelector("#batchCount"),
+    btnDeleteSelected: root.querySelector("#btnDeleteSelected"),
+    chkSelectAll: root.querySelector("#chkSelectAll"),
     detailPanel: root.querySelector("#detailPanel"),
     comparePanel: root.querySelector("#comparePanel"),
     errorBox: root.querySelector("#historyError"),
@@ -187,6 +192,13 @@ export async function mount(root, ctx) {
         <button type="button" class="btn btn-ghost btn-sm" id="btnClearCompare">清空选择</button>
       </div>
 
+      <div class="batch-bar" id="batchBar" hidden>
+        <label class="batch-check"><input type="checkbox" id="chkSelectAll"> 全选</label>
+        <span class="batch-count">已选 <strong id="batchCount">0</strong> 条</span>
+        <span class="batch-hint">删除会同时移除成交/权益记录；运行中的会先停止</span>
+        <button type="button" class="btn btn-danger-ghost btn-sm" id="btnDeleteSelected" disabled>删除选中</button>
+      </div>
+
       <section class="panel" aria-labelledby="h-runs">
         <header class="panel-head">
           <div class="panel-title">
@@ -197,9 +209,10 @@ export async function mount(root, ctx) {
         </header>
         <div class="table-wrap" id="runsTableWrap">
           <table class="data-table table-runs">
-            <caption class="sr-only">历史模拟运行列表：可勾选两条进行对比</caption>
+            <caption class="sr-only">历史模拟运行列表：可勾选两条进行对比，或批量选择删除</caption>
             <thead>
               <tr>
+                <th scope="col" class="check-col"><span class="sr-only">批量选择</span></th>
                 <th scope="col" class="check-col"><span class="sr-only">选择对比</span></th>
                 <th scope="col">Run ID / 策略</th>
                 <th scope="col">模式</th>
@@ -265,7 +278,7 @@ export async function mount(root, ctx) {
   }
 
   function renderLoading() {
-    if (el.runsBody) el.runsBody.innerHTML = `<tr><td colspan="11">${ui.skeletonLines(4)}</td></tr>`;
+    if (el.runsBody) el.runsBody.innerHTML = `<tr><td colspan="12">${ui.skeletonLines(4)}</td></tr>`;
   }
 
   function renderError() {
@@ -297,6 +310,7 @@ export async function mount(root, ctx) {
           actionHtml: '<button type="button" class="btn btn-primary" data-nav="/builder">前往策略构建</button>',
         });
       }
+      updateBatchBar();
       updateCompareBar();
       return;
     }
@@ -304,9 +318,11 @@ export async function mount(root, ctx) {
     el.runsBody.innerHTML = state.runs.map((run) => {
       const metrics = run.metrics || {};
       const selected = state.selected.has(run.id);
+      const marked = state.toDelete.has(run.id);
       const active = ["running", "starting", "paused", "stopping"].includes(run.status);
       const started = num(run.startedAt);
-      return `<tr data-run-id="${ui.escapeHtml(run.id)}" class="${selected ? "is-selected" : ""}" tabindex="0" aria-label="运行 ${ui.escapeHtml(run.id)}，${ui.escapeHtml(run.strategyName || "")}">
+      return `<tr data-run-id="${ui.escapeHtml(run.id)}" class="${selected ? "is-selected" : ""}${marked ? " is-marked" : ""}" tabindex="0" aria-label="运行 ${ui.escapeHtml(run.id)}，${ui.escapeHtml(run.strategyName || "")}">
+        <td class="check-col"><input type="checkbox" class="batch-toggle" data-batch-id="${ui.escapeHtml(run.id)}" ${marked ? "checked" : ""} aria-label="选择运行 ${ui.escapeHtml(run.id)} 批量删除"></td>
         <td class="check-col"><input type="checkbox" class="compare-toggle" data-compare-id="${ui.escapeHtml(run.id)}" ${selected ? "checked" : ""} aria-label="选择运行 ${ui.escapeHtml(run.id)} 参与对比"></td>
         <td><span class="mkt-name"><b>${ui.escapeHtml(run.strategyName || "未命名策略")}</b><span>${ui.escapeHtml(run.id)}</span></span></td>
         <td>${ui.modeBadge(run.mode)}</td>
@@ -321,10 +337,12 @@ export async function mount(root, ctx) {
           <div class="row-actions">
             <button type="button" class="link-btn" data-detail-id="${ui.escapeHtml(run.id)}">详情</button>
             <button type="button" class="link-btn" data-dashboard-id="${ui.escapeHtml(run.id)}">${active ? "看板" : "复盘"}</button>
+            <button type="button" class="link-btn danger" data-delete-id="${ui.escapeHtml(run.id)}">删除</button>
           </div>
         </td>
       </tr>`;
     }).join("");
+    updateBatchBar();
     updateCompareBar();
   }
 
@@ -356,6 +374,67 @@ export async function mount(root, ctx) {
       generateCompare();
     }
     return true;
+  }
+
+  /* -------------------- 批量选择 / 删除 -------------------- */
+
+  function updateBatchBar() {
+    if (!el.batchBar) return;
+    for (const id of [...state.toDelete]) {
+      if (!state.runs.some((run) => run.id === id)) state.toDelete.delete(id);
+    }
+    const count = state.toDelete.size;
+    if (el.batchCount) el.batchCount.textContent = String(count);
+    if (el.btnDeleteSelected) el.btnDeleteSelected.disabled = count === 0;
+    if (el.chkSelectAll) {
+      el.chkSelectAll.checked = state.runs.length > 0 && count === state.runs.length;
+      el.chkSelectAll.indeterminate = count > 0 && count < state.runs.length;
+    }
+    el.batchBar.hidden = state.runs.length === 0;
+  }
+
+  function toggleBatch(id, checked) {
+    if (checked) state.toDelete.add(id);
+    else state.toDelete.delete(id);
+    updateBatchBar();
+  }
+
+  async function deleteRuns(ids) {
+    const list = [...new Set(ids)].filter(Boolean);
+    if (!list.length) return;
+    const ok = await ui.confirmDialog({
+      title: "删除运行记录",
+      message: `将删除 ${list.length} 条运行及其成交/权益记录；运行中的会先停止。此操作不可撤销。`,
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
+    if (el.btnDeleteSelected) el.btnDeleteSelected.disabled = true;
+    try {
+      const res = await api.postJSON("/api/runs/batch-delete", { ids: list });
+      const deleted = Array.isArray(res?.deleted) ? res.deleted.length : 0;
+      const failed = Array.isArray(res?.failed) ? res.failed.length : 0;
+      ui.toast(`已删除 ${deleted} 条运行${failed ? `，${failed} 条失败` : ""}`, {
+        type: failed ? "warn" : "info",
+      });
+      for (const id of list) {
+        state.toDelete.delete(id);
+        state.selected.delete(id);
+      }
+      if (state.detailId && list.includes(state.detailId)) {
+        state.detailId = null;
+        if (el.detailPanel) el.detailPanel.hidden = true;
+      }
+      if (state.compareData) {
+        state.compareData = null;
+        if (el.comparePanel) el.comparePanel.hidden = true;
+      }
+      await loadRuns();
+    } catch (error) {
+      const detail = api.describeError(error);
+      ui.toast("删除失败", { type: "error", detail: detail.title });
+      updateBatchBar();
+    }
   }
 
   /* -------------------- 详情 -------------------- */
@@ -604,6 +683,15 @@ export async function mount(root, ctx) {
       openDetail(detailBtn.dataset.detailId);
       return;
     }
+    const deleteBtn = target.closest("[data-delete-id]");
+    if (deleteBtn) {
+      deleteRuns([deleteBtn.dataset.deleteId]);
+      return;
+    }
+    if (target.closest("#btnDeleteSelected")) {
+      deleteRuns([...state.toDelete]);
+      return;
+    }
     const compareAdd = target.closest("[data-compare-id]");
     if (compareAdd && !target.closest("input[type=checkbox]")) {
       const id = compareAdd.dataset.compareId;
@@ -651,6 +739,18 @@ export async function mount(root, ctx) {
   function onChange(event) {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    if (target.id === "chkSelectAll") {
+      state.toDelete.clear();
+      if (target.checked) for (const run of state.runs) state.toDelete.add(run.id);
+      renderTable();
+      return;
+    }
+    const batch = target.closest("input.batch-toggle");
+    if (batch) {
+      toggleBatch(batch.dataset.batchId, batch.checked);
+      batch.closest("tr")?.classList.toggle("is-marked", batch.checked);
+      return;
+    }
     const checkbox = target.closest("input.compare-toggle");
     if (!checkbox) return;
     const id = checkbox.dataset.compareId;

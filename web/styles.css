@@ -1585,3 +1585,18 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
   font-size: var(--fs-11); color: var(--text-3);
 }
 .app-footer .mono { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.5px; color: var(--text-4, var(--text-3)); }
+
+/* ---------- B16. 运行历史批量删除 ---------- */
+.batch-bar {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  padding: 8px 12px; margin-bottom: var(--sp-3);
+  border: 1px solid var(--line); border-radius: var(--r-3); background: var(--panel);
+}
+.batch-bar[hidden] { display: none; }
+.batch-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-11); color: var(--text-2); cursor: pointer; user-select: none; }
+.batch-count { font-size: var(--fs-11); color: var(--text-3); }
+.batch-count strong { color: var(--cyan-text); font-family: var(--font-mono); }
+.batch-hint { font-size: 10px; color: var(--text-3); margin-left: auto; }
+.link-btn.danger { color: var(--down-text); }
+.link-btn.danger:hover { background: var(--down-bg); }
+.data-table tr.is-marked td { background: rgba(240, 80, 106, 0.05); }

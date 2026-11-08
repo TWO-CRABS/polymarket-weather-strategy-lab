@@ -208,6 +208,7 @@
 |---|---|---|---|
 | POST | `/api/runs` | 启动模拟。body: `{strategy?: StrategyConfig, strategyId?: string, mode?: "live"\|"replay", replay?: {lookbackMin?, speed?}}`；`strategy` 优先于 `strategyId` | `201 {run: RunSummary}` |
 | GET | `/api/runs` | 运行列表（新→旧，最多 50） | `{runs:[RunSummary]}` |
+| POST | `/api/runs/batch-delete` | 批量删除。body: `{ids:string[]}`（1–200 条）；**运行中的会先停止再删除**；未知 id 记入 `failed` 不中断整批 | `{deleted:string[], failed:[{id,reason}]}` |
 | GET | `/api/runs/:id` | 运行详情（`costBreakdown` 为可选附加字段，向后兼容） | `{run: RunSummary, config: StrategyConfig, metrics: Metrics, positions:[Position], costBreakdown?: {feesPaid, spreadCost, depthSlippageCost, totalFriction}}` |
 | POST | `/api/runs/:id/stop` | 停止（幂等） | `{run: RunSummary}` |
 | DELETE | `/api/runs/:id` | 删除运行记录 | `204` |
@@ -265,6 +266,7 @@ weather: takerFeeRate = 0.05, taker-only, maker rebate 25%
 | code | HTTP | 说明 |
 |---|---|---|
 | `INVALID_STRATEGY` | 400 | 策略校验失败（附 `details: errors[]`） |
+| `INVALID_BODY` | 400 | 请求体非法（空 ids、超过 200 条、非法 JSON） |
 | `INVALID_MODE` | 400 | mode 非 live/replay |
 | `NO_MARKETS` | 409 | 当前无可用温度市场（建议回放模式） |
 | `RUN_NOT_FOUND` | 404 | run 不存在 |

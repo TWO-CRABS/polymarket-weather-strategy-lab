@@ -209,6 +209,14 @@ export function createApiHandler(deps) {
       sendJson(res, 200, { runs: runs.listRuns() });
       return true;
     }
+    if (pathname === "/api/runs/batch-delete" && method === "POST") {
+      const body = await readJsonBody(req, config.maxBodyBytes);
+      const ids = Array.isArray(body?.ids) ? body.ids : [];
+      if (!ids.length) throw new AppError(400, "INVALID_BODY", "ids 不能为空");
+      if (ids.length > 200) throw new AppError(400, "INVALID_BODY", "单次最多删除 200 条运行");
+      sendJson(res, 200, await runs.deleteMany(ids));
+      return true;
+    }
 
     const runSubMatch = /^\/api\/runs\/([^/]+)\/(trades|equity|signals|positions|stop)$/.exec(pathname);
     if (runSubMatch) {
