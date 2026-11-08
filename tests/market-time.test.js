@@ -7,7 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { effectiveTradingEndMs } from "../server/data/gamma.js";
+import { effectiveEventTradingEndMs, effectiveTradingEndMs } from "../server/data/gamma.js";
 
 test("negRisk weather market cutoff = observation-day 24:00 UTC (next 00:00Z)", () => {
   const market = { endDate: "2026-11-09T12:00:00.000Z", negRisk: true };
@@ -24,8 +24,21 @@ test("negRisk weather market cutoff = observation-day 24:00 UTC (next 00:00Z)", 
   );
 });
 
-test("non-weather / non-noon endDate are not shifted", () => {
+test("event keyset summaries without negRisk still keep same-day events until 24:00 UTC", () => {
+  // Gamma /events/keyset summaries omit negRisk; using it to decide expiry would
+  // drop the whole observation-day event at 12:00Z (observed bug: only Nov 9 left).
   assert.equal(
+    new Date(effectiveEventTradingEndMs({ endDate: "2026-11-08T12:00:00Z" })).toISOString(),
+    "2026-11-09T00:00:00.000Z",
+  );
+  assert.equal(
+    new Date(effectiveEventTradingEndMs({ endDate: "2026-11-08T00:00:00Z" })).toISOString(),
+    "2026-11-08T00:00:00.000Z",
+  );
+  assert.ok(Number.isNaN(effectiveEventTradingEndMs({})));
+});
+
+test("non-weather / non-noon endDate are not shifted", () => {  assert.equal(
     new Date(effectiveTradingEndMs({ endDate: "2026-11-09T12:00:00.000Z", negRisk: false })).toISOString(),
     "2026-11-09T12:00:00.000Z",
   );
