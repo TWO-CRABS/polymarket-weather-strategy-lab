@@ -166,7 +166,7 @@ const FIELD_TIPS = {
   "signal.requireSpreadOk": "实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。",
   "execution.orderType": "系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。",
   "execution.sizingMode": "固定名义金额：每次固定下单多少 USD 名义额；按权益百分比：每次用当前总权益的百分之几。",
-  "execution.sizingValue": "每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。",
+  "execution.sizingValue": "每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。若设为 $1：因份额按 0.01 股取整，成交名义额可能略高于 $1（<1¢，例如 95¢ 时 1.06 股 = $1.007），这是交易所最小额与份额精度共同决定的。",
   "execution.maxPositionUsd": "单笔/单市场累计成本上限（USD），与设定的仓位金额取较小者。",
   "execution.maxPositions": "同时最多持有多少个不同市场的仓位（并发持仓数）。",
   "execution.maxPositionsPerMarket": "同一个市场最多同时持有几笔仓位，防止过度集中。",
