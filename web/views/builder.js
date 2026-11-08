@@ -88,7 +88,7 @@ const GROUP_DEFS = [
       { path: "execution.maxPositionsPerMarket", label: "单市场持仓上限", unit: "个", min: LIM.execution.maxPositionsPerMarket[0], max: LIM.execution.maxPositionsPerMarket[1], step: 1 },
       { path: "execution.fillModel", kind: "readonly", label: "撮合模型", valueLabel: "逐档吃单 book_walk" },
       { path: "execution.slippageBufferBps", label: "滑点保护", unit: "bps", min: LIM.execution.slippageBufferBps[0], max: LIM.execution.slippageBufferBps[1], step: 1, help: "允许超出买一价的最大比例" },
-      { path: "execution.firstWindowFallbackBuy", kind: "toggle", label: "首窗无成交兜底买入", help: "启动后等满一个观察窗口仍无任何成交时，自动买入当前概率最高的 YES（只执行一次，仍受价格带/仓位/现金约束）" },
+      { path: "execution.fallbackBuyEachWindow", kind: "toggle", label: "每周期空仓兜底建仓", help: "每个观察窗口到期时若当前空仓，自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO（仍受价格带/仓位/现金约束）" },
     ],
   },
   {
@@ -172,7 +172,7 @@ const FIELD_TIPS = {
   "execution.maxPositionsPerMarket": "同一个市场最多同时持有几笔仓位，防止过度集中。",
   "execution.fillModel": "逐档吃单（book_walk）：从最优卖价开始按盘口深度成交，计算加权平均成交价 VWAP。",
   "execution.slippageBufferBps": "允许成交价超出买一价的最大比例（bps，100 = 1%）。0 = 只吃最优一档；调大可吃更深流动性但成本更高。",
-  "execution.firstWindowFallbackBuy": "全局兜底：策略启动后先空转一个观察窗口（signal.windowSec）；到期时如果还没有任何成交，就自动买入当前概率最高的可交易 YES（按名义额/仓位/风控正常下单），整个运行只执行一次。适合避免策略一直空仓。",
+  "execution.fallbackBuyEachWindow": "周期性兜底：每个观察窗口（signal.windowSec）结束时检查一次；如果当前没有任何持仓（买过又卖掉也算空仓），自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO。始终空仓则每个周期都会重新建这两笔仓；已有持仓时该周期跳过。仍受价格带/点差/仓位/现金/风控约束。",
   "exit.takeProfitPct": "按含费成本计算的净收益率达到 +X% 时卖出止盈。",
   "exit.stopLossPct": "按含费成本计算的净亏损达到 −X% 时卖出止损。",
   "exit.maxHoldSec": "持仓超过该秒数强制平仓（3600 = 1 小时）。",

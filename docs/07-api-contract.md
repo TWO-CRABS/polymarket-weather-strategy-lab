@@ -63,7 +63,7 @@
     "maxPositionsPerMarket": 1,
     "fillModel": "book_walk",
     "slippageBufferBps": 0,
-    "firstWindowFallbackBuy": false  // 全局兜底：首窗无成交时买入概率最高的 YES（只执行一次）
+    "fallbackBuyEachWindow": false   // 每个观测窗口周期空仓时：买概率第 1 高 YES + 第 3 高 NO
   },
   "exit": {
     "takeProfitPct": 50,             // 相对入场价的涨幅（按费用后净收益评估）
@@ -94,7 +94,7 @@
 - 触发条件：`ret >= moveThresholdPct`（up）或 `ret <= -moveThresholdPct`（down），且 `|p_now - p_ref| >= minAbsMove`，且连续 `confirmationTicks` 个 tick 满足。
 - 去重：同市场同方向 `cooldownSec` 内不重复触发；每市场最多 `maxSignalsPerMarket` 次。
 - 下单约束（市价单）：**BUY 名义额 ≥ $1，无股数下限**；**SELL（退出）≥ 5 股**（交易所对 <5 股仓位不可卖出）。5 股是限价单规则，本系统不模拟限价单。`sizingValue`/`maxPositionUsd` 按**订单名义额**计，官方 taker 手续费从账户现金单独扣除（现金须 ≥ 名义额 + 手续费）。低于门槛记 `below_min_order` 拒单。
-- 首窗兜底（`execution.firstWindowFallbackBuy`，默认 false）：运行第一个 tick 起等待 `signal.windowSec`，到期时若**仍无任何成交**，自动买入当前**可交易且 YES 隐含概率最高**的市场（按概率降序最多尝试 5 个候选），只执行一次；Trade.reason = `fallback_entry`，不产生 Signal。时间基准为行情时间（live=时钟，replay=历史时间），仍受价格带/点差/仓位/现金/风控约束。
+- 周期兜底（`execution.fallbackBuyEachWindow`，默认 false）：每满一个 `signal.windowSec` 检查一次；若当时**没有任何持仓**（买过又卖掉也算空仓），买入**概率第 1 高**选项的 YES + **概率第 3 高**选项的 NO（候选不足 3 个只做第 1 笔），按正常名义额/价格带/点差/仓位/现金/风控执行；每个周期独立触发，已有持仓的周期跳过。Trade.reason = `fallback_entry`，不产生 Signal。时间基准为行情时间（live=时钟，replay=历史时间）。
 - 校验接口返回 `{valid, errors[], warnings[], normalized}`；`warnings` 用于提示“低价区间 ±20% 被费用吞噬”等退化配置，不阻止运行。
 
 ---

@@ -334,13 +334,13 @@ test("replay fixture run: signals, trades, fees, equity, metrics, positions, SSE
   }
 });
 
-test("first-window fallback buy: no trade in first window -> buys highest-probability YES once", async () => {
+test("periodic fallback buy: flat at window boundary -> buys highest-probability YES", async () => {
   const strategy = fixtureStrategy({
     overrides: {
       name: "fallback fixture",
       // make normal signals impossible so only the fallback can trade
       signal: { moveThresholdPct: 500, minAbsMove: 0.5 },
-      execution: { firstWindowFallbackBuy: true, sizingValue: 25 },
+      execution: { fallbackBuyEachWindow: true, sizingValue: 25 },
     },
   });
   const create = await server.http.post("/api/runs", {

@@ -110,8 +110,8 @@ export async function processMarkets(run, now) {
     await evaluateExits(run, market, now, signal);
     if (signal) await tryEntry(run, signal, market, now);
   }
-  // 全局兜底：首窗到期仍无成交时，买入概率最高的 YES（只执行一次）
-  await maybeFirstWindowFallback(run, now);
+  // 全局兜底：每个观察窗口周期检查一次，空仓则建两笔兜底仓（第 1 高 YES + 第 3 高 NO）
+  await maybePeriodicFallback(run, now);
 }
 
 /** Exit plan: settlement handled earlier; then SL > TP > maxHold > opposite. */
@@ -353,44 +353,20 @@ export async function tryEntry(run, signal, market, now, opts = {}) {
   return { ok: true, trade, fill };
 }
 
-/* ----------------------- first-window fallback (global) ------------------- */
-
-const FALLBACK_MAX_CANDIDATES = 5;
+/* ------------------- periodic fallback entries (global) ------------------- */
 
 /**
- * Global fallback: when `execution.firstWindowFallbackBuy` is enabled, wait one
- * observation window from the first tick; if the run still has no filled trade,
- * buy the YES of the highest-implied-probability eligible market (once per run).
- * Tries the next-highest candidates when a higher one is rejected.
+ * 全局兜底（execution.fallbackBuyEachWindow）：
+ * 每个观察窗口周期（signal.windowSec）结束时检查一次；若当前没有任何持仓
+ * （已买入后又卖掉也算空仓），建立两笔兜底仓：
+ *   ① 概率第 1 高的候选 → BUY YES
+ *   ② 概率第 3 高的候选 → BUY NO（可交易候选不足 3 个时只做第 1 笔）
+ * 周期按行情时间推进（live=时钟，replay=历史时间）；仍走正常风控/仓位/手续费链路，
+ * 不产生 Signal 记录。
  */
-export async function maybeFirstWindowFallback(run, now) {
-  const execution = run.config.execution || {};
-  if (!execution.firstWindowFallbackBuy || run._fallbackAttempted) {
-    return { attempted: false };
-  }
-  if (run._fallbackDueAt === null) {
-    run._fallbackDueAt = now + Math.max(0, Number(run.config.signal.windowSec) || 0) * 1000;
-  }
-  if (now < run._fallbackDueAt) return { attempted: false };
-  if (run.filledTradeCount > 0) {
-    run._fallbackAttempted = true;
-    return { attempted: false, reason: "already_traded" };
-  }
-  run._fallbackAttempted = true;
-  const result = await tryFallbackEntry(run, now);
-  if (result.ok) {
-    run.sse.log(
-      "info",
-      `首窗兜底买入：${result.market.city} ${result.market.bracket} YES ${result.trade.shares} 股 @ ${result.trade.price}`,
-      run.id,
-    );
-  } else {
-    run.sse.log("warn", `首窗兜底买入未成交（${result.reason}）`, run.id);
-  }
-  return { attempted: true, ...result };
-}
 
-async function tryFallbackEntry(run, now) {
+/** 可交易候选按 YES 隐含概率降序排列。 */
+export function collectFallbackCandidates(run) {
   const candidates = [];
   const universe = run.config.universe;
   for (const marketId of run.marketIds) {
@@ -404,11 +380,43 @@ async function tryFallbackEntry(run, now) {
     if (Number.isFinite(market.spread) && market.spread > universe.maxSpread) continue;
     candidates.push({ market, prob });
   }
-  if (!candidates.length) return { ok: false, reason: "no_candidate" };
   candidates.sort((a, b) => b.prob - a.prob);
-  let lastReason = "no_candidate";
-  for (const { market } of candidates.slice(0, FALLBACK_MAX_CANDIDATES)) {
-    const quote = market.quotes.YES;
+  return candidates;
+}
+
+/** 兜底订单计划：第 1 高 → YES；第 3 高 → NO。 */
+export function planFallbackOrders(run) {
+  const candidates = collectFallbackCandidates(run);
+  const legs = [];
+  if (candidates[0]) legs.push({ market: candidates[0].market, outcome: "YES", rank: 1 });
+  if (candidates[2]) legs.push({ market: candidates[2].market, outcome: "NO", rank: 3 });
+  return legs;
+}
+
+export async function maybePeriodicFallback(run, now) {
+  const execution = run.config.execution || {};
+  if (!execution.fallbackBuyEachWindow) return { checked: false };
+  const windowMs = Math.max(0, Number(run.config.signal.windowSec) || 0) * 1000;
+  if (!(windowMs > 0)) return { checked: false };
+  if (run._fallbackNextAt === null) {
+    run._fallbackNextAt = now + windowMs;
+    return { checked: false };
+  }
+  if (now < run._fallbackNextAt) return { checked: false };
+  // 每个窗口最多检查一次；按 now 重新对齐，避免长缺口后连续补发
+  run._fallbackNextAt = now + windowMs;
+  if (run.portfolio.positions.size > 0) {
+    return { checked: true, skipped: "already_holding" };
+  }
+  const legs = planFallbackOrders(run);
+  if (!legs.length) {
+    run.sse.log("warn", "周期兜底建仓跳过：没有可交易候选", run.id);
+    return { checked: true, skipped: "no_candidate" };
+  }
+  const results = [];
+  for (const leg of legs) {
+    const { market, outcome, rank } = leg;
+    const quote = outcome === "YES" ? market.quotes.YES : market.quotes.NO;
     const signal = {
       id: null,
       runId: run.id,
@@ -416,11 +424,11 @@ async function tryFallbackEntry(run, now) {
       marketId: market.id,
       city: market.city,
       bracket: market.bracket,
-      direction: "up",
-      outcome: "YES",
-      tokenId: market.tokens.yesTokenId,
-      fromPrice: quote.mid ?? quote.ask,
-      toPrice: quote.mid ?? quote.ask,
+      direction: outcome === "YES" ? "up" : "down",
+      outcome,
+      tokenId: outcome === "YES" ? market.tokens.yesTokenId : market.tokens.noTokenId,
+      fromPrice: quote?.mid ?? quote?.ask ?? 0,
+      toPrice: quote?.mid ?? quote?.ask ?? 0,
       changePct: 0,
       absChange: 0,
       windowSec: run.config.signal.windowSec,
@@ -428,10 +436,18 @@ async function tryFallbackEntry(run, now) {
       reason: "fallback_entry",
     };
     const result = await tryEntry(run, signal, market, now, { reason: "fallback_entry" });
-    if (result.ok) return { ok: true, market, trade: result.trade };
-    lastReason = result.reason;
+    results.push({ ...result, outcome, rank, marketId: market.id });
+    if (result.ok) {
+      run.sse.log(
+        "info",
+        `周期兜底建仓：概率第 ${rank} 高 → ${outcome === "YES" ? "买 YES" : "买 NO"} ${market.city} ${market.bracket} ${result.trade.shares} 股 @ ${result.trade.price}`,
+        run.id,
+      );
+    } else {
+      run.sse.log("warn", `周期兜底建仓第 ${rank} 高（${outcome}）未成交：${result.reason}`, run.id);
+    }
   }
-  return { ok: false, reason: lastReason };
+  return { checked: true, legs: results };
 }
 
 

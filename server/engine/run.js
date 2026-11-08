@@ -97,9 +97,8 @@ export class Run {
     this._lastPersistAt = 0;
     this._spreadCost = 0;
     this._depthSlippageCost = 0;
-    /** 首窗兜底买入（execution.firstWindowFallbackBuy）状态 */
-    this._fallbackDueAt = null;
-    this._fallbackAttempted = false;
+    /** 周期性兜底建仓（execution.fallbackBuyEachWindow）的下次检查时间 */
+    this._fallbackNextAt = null;
     /** @type {((marketId:string)=>Promise<any>)|null} */
     this.resolutionProvider = cfg.resolutionProvider ?? null;
   }

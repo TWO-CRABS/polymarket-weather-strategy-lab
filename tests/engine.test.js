@@ -44,6 +44,7 @@ import {
   simulateBuy,
   simulateSell,
 } from "../server/engine/execution.js";
+import { planFallbackOrders } from "../server/engine/runTrading.js";
 import { Portfolio } from "../server/engine/portfolio.js";
 import {
   computeMetrics,
@@ -864,4 +865,45 @@ test("resampleEquity interpolates on the fixed grid; Sharpe needs enough samples
   const noisy = Array.from({ length: 31 }, (_, i) => 1000 + (i % 2 === 0 ? i * 2 : -i * 1.5));
   const sharpe = sharpeFromEquity(noisy, 5_000);
   assert.ok(Number.isFinite(sharpe), `expected finite sharpe, got ${sharpe}`);
+});
+
+test("periodic fallback plan: rank-1 YES + rank-3 NO over tradable candidates", () => {
+  const mk = (id, prob, extra = {}) => ({
+    id,
+    city: "Test",
+    bracket: id,
+    impliedProbability: prob,
+    spread: 0.01,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: Math.max(0.001, prob - 0.01), ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+    ...extra,
+  });
+  const run = {
+    marketIds: ["m1", "m2", "m3", "m4", "m5"],
+    markets: new Map([
+      ["m1", mk("m1", 0.8)],
+      ["m2", mk("m2", 0.5)],
+      ["m3", mk("m3", 0.3)],
+      ["m4", mk("m4", 0.2, { closed: true })],
+      ["m5", mk("m5", 0.7, { acceptingOrders: false })],
+    ]),
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+  };
+  const legs = planFallbackOrders(run);
+  assert.deepEqual(
+    legs.map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`),
+    ["1:YES:m1", "3:NO:m3"],
+    "closed / not-accepting markets are excluded before ranking",
+  );
+  // Fewer than 3 tradable candidates => only the rank-1 YES leg.
+  const onlyTwo = { ...run, marketIds: ["m1", "m2"] };
+  assert.deepEqual(
+    planFallbackOrders(onlyTwo).map((leg) => `${leg.rank}:${leg.outcome}`),
+    ["1:YES"],
+  );
 });

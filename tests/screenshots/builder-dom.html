@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">18:53:17</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">19:04:22</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -271,11 +271,11 @@
       <input class="input num" type="number" id="f-execution-slippageBufferBps" data-path="execution.slippageBufferBps" data-kind="number" data-min="0" data-max="1000" data-step="1" min="0" max="1000" step="1" value="0" inputmode="decimal">
       <span class="field-help">允许超出买一价的最大比例</span>
     </div><div class="field switch-field">
-        <label class="switch-row" for="f-execution-firstWindowFallbackBuy">
-          <span class="field-label">首窗无成交兜底买入</span>
-          <span class="switch"><input type="checkbox" id="f-execution-firstWindowFallbackBuy" data-path="execution.firstWindowFallbackBuy" data-kind="toggle"><i aria-hidden="true"></i></span>
+        <label class="switch-row" for="f-execution-fallbackBuyEachWindow">
+          <span class="field-label">每周期空仓兜底建仓</span>
+          <span class="switch"><input type="checkbox" id="f-execution-fallbackBuyEachWindow" data-path="execution.fallbackBuyEachWindow" data-kind="toggle"><i aria-hidden="true"></i></span>
         </label>
-        <p class="hint"><button type="button" class="help-dot" data-tip="全局兜底：策略启动后先空转一个观察窗口（signal.windowSec）；到期时如果还没有任何成交，就自动买入当前概率最高的可交易 YES（按名义额/仓位/风控正常下单），整个运行只执行一次。适合避免策略一直空仓。" aria-label="说明：全局兜底：策略启动后先空转一个观察窗口（signal.windowSec）；到期时如果还没有任何成交，就自动买入当前概率最高的可交易 YES（按名义额/仓位/风控正常下单），整个运行只执行一次。适合避免策略一直空仓。">?</button>启动后等满一个观察窗口仍无任何成交时，自动买入当前概率最高的 YES（只执行一次，仍受价格带/仓位/现金约束）</p>
+        <p class="hint"><button type="button" class="help-dot" data-tip="周期性兜底：每个观察窗口（signal.windowSec）结束时检查一次；如果当前没有任何持仓（买过又卖掉也算空仓），自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO。始终空仓则每个周期都会重新建这两笔仓；已有持仓时该周期跳过。仍受价格带/点差/仓位/现金/风控约束。" aria-label="说明：周期性兜底：每个观察窗口（signal.windowSec）结束时检查一次；如果当前没有任何持仓（买过又卖掉也算空仓），自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO。始终空仓则每个周期都会重新建这两笔仓；已有持仓时该周期跳过。仍受价格带/点差/仓位/现金/风控约束。">?</button>每个观察窗口到期时若当前空仓，自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO（仍受价格带/仓位/现金约束）</p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-exit">
       <header class="panel-head">

@@ -62,7 +62,7 @@
     "maxPositionsPerMarket": 1,          // 1..10，同一括号市场并发持仓上限
     "fillModel": "book_walk",            // 仅 book_walk：逐档吃对手盘
     "slippageBufferBps": 0,              // 0..1000，价格保护 buffer（100=1%）
-    "firstWindowFallbackBuy": false      // 全局兜底：首窗无成交时买入最高概率 YES（只执行一次）
+    "fallbackBuyEachWindow": false       // 每个观测窗口周期空仓时：买第 1 高 YES + 第 3 高 NO
   },
   "exit": {
     "takeProfitPct": 50,                 // 1..1000，费用后净收益率阈值
@@ -252,13 +252,15 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 
 > 被拒订单：不成交、不改账本，仅记录 Trade（`status=rejected`）与日志，供前端解释“为什么没成交”。
 
-### 3.5 首窗无成交兜底买入（全局开关 `execution.firstWindowFallbackBuy`）
+### 3.5 周期性空仓兜底建仓（全局开关 `execution.fallbackBuyEachWindow`）
 
-- **触发时机**：运行第一个 tick 记录 `dueAt = now + signal.windowSec × 1000`；当 `now ≥ dueAt` 且**整个运行尚无任何成交**（`filledTradeCount=0`，被拒单不算）时触发。
-- **动作**：从本运行订阅的市场中，挑选**可交易且 YES 隐含概率最高**的候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice` / 点差 > `universe.maxSpread`），按概率降序最多尝试 5 个，执行一次 **BUY YES**。
-- **执行约束**：与正常入场完全一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；不绕过风控。
-- **只执行一次**：成功或全部候选被拒后 `_fallbackAttempted=true`，后续不再重复；成交的 `Trade.reason = "fallback_entry"`（前端显示「首窗兜底买入」），不产生 Signal 记录（`signalsCount` 不变）。
-- **时间基准**：`now` 为行情时间（live=当前时钟，replay=历史数据时间），因此回放模式下同样按数据窗口计算，不受回放倍速影响。
+- **触发时机**：从运行第一个 tick 起，每满一个观察窗口（`signal.windowSec`）检查一次（`_fallbackNextAt` 按行情时间推进；live=时钟、replay=历史数据时间）。
+- **触发条件**：检查时刻**当前没有任何持仓**（`portfolio.positions.size = 0`）；已买入后又全部卖掉也算空仓，会在下一个周期再次触发。已有持仓时该周期跳过。
+- **动作**：从本运行订阅市场中构造可交易候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice` / 点差 > `universe.maxSpread`），按 **YES 隐含概率降序**：
+  - **第 1 高**候选 → `BUY YES`
+  - **第 3 高**候选 → `BUY NO`（候选不足 3 个时只做第 1 笔）
+- **执行约束**：两笔都走正常入场链路——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；不绕过风控。任一腿被拒会记录 `status=rejected` 的 Trade。
+- **记录**：成交的 `Trade.reason = "fallback_entry"`（前端显示「兜底建仓」），不产生 Signal（`signalsCount` 不变）。
 - **关闭**（默认 `false`）时行为与旧版完全一致。
 
 ## 4. 退出规则

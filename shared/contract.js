@@ -190,8 +190,8 @@ export const DEFAULT_STRATEGY = Object.freeze({
     maxPositionsPerMarket: 1,
     fillModel: "book_walk",
     slippageBufferBps: 0,
-    /** 全局兜底：启动后等满一个观察窗口仍无任何成交时，自动买入概率最高的 YES（只执行一次）。 */
-    firstWindowFallbackBuy: false,
+    /** 周期性兜底：每个观察窗口到期时若空仓，买入概率第 1 高选项的 YES + 第 3 高选项的 NO。 */
+    fallbackBuyEachWindow: false,
   },
   exit: {
     takeProfitPct: 50,
@@ -286,8 +286,8 @@ export function normalizeStrategy(input = {}) {
     : [];
 
   // 布尔开关：兼容从 JSON 表单传入的 "true"/"false"
-  if (typeof merged.execution.firstWindowFallbackBuy !== "boolean") {
-    merged.execution.firstWindowFallbackBuy = Boolean(merged.execution.firstWindowFallbackBuy);
+  if (typeof merged.execution.fallbackBuyEachWindow !== "boolean") {
+    merged.execution.fallbackBuyEachWindow = Boolean(merged.execution.fallbackBuyEachWindow);
   }
 
   // sim.mode is validated by validateStrategy (invalid values must be rejected,
@@ -618,7 +618,7 @@ export const EXIT_REASON_LABELS = Object.freeze({
   resolution: "市场结算",
   manual: "手动平仓",
   risk_kill_switch: "风控熔断",
-  fallback_entry: "首窗兜底买入", // 入场原因：启动后首窗无成交，买入最高概率 YES
+  fallback_entry: "兜底建仓", // 入场原因：周期空仓兜底（第 1 高 YES / 第 3 高 NO）
   rejected: "订单被拒",
 });
 
