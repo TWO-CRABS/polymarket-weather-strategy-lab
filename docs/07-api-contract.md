@@ -34,7 +34,8 @@
   "description": "",
   "universe": {
     "cities": [],                    // [] = 全部城市；否则城市名数组，如 ["New York","London"]
-    "maxMarkets": 12,                // 1..40，按流动性选取
+    "maxMarkets": 12,                // 1..200，容量/关注市场数上限
+    "selectionMode": "per_market",   // per_market（按流动性取前 N 个）| per_event（按完整城市/日期事件整组选入）
     "minPrice": 0.02,                // YES 中间价下限
     "maxPrice": 0.98,                // YES 中间价上限
     "minLiquidityUsd": 500,

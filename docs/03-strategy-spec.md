@@ -33,7 +33,8 @@
   "description": "",                     // 0..2000 字符
   "universe": {
     "cities": [],                        // [] = 全部城市；否则城市名/slug 精确匹配
-    "maxMarkets": 12,                    // 1..40，按流动性降序取前 N 个括号市场
+    "maxMarkets": 12,                    // 1..200，容量上限
+    "selectionMode": "per_market",       // per_market（按流动性取前 N 个）| per_event（按城市/日期事件整组选入）
     "minPrice": 0.02,                    // 0.001..0.5，YES mid 下限（兼作信号/入场价格护栏）
     "maxPrice": 0.98,                    // 0.5..0.999，YES mid 上限
     "minLiquidityUsd": 500,              // 0..1e6；双边前 10 档 Σ(price×size)
@@ -263,6 +264,7 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 - **资金/仓位**：城市组按“组内最高概率”降序依次尝试；`maxPositions` 或现金不足时停止本次循环，剩余城市在后续周期继续（不会因为某个城市持仓而阻止其他城市建仓）。
 - **执行约束**：与正常入场一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；不绕过风控。被拒会记录 `status=rejected` 的 Trade。
 - **记录**：成交的 `Trade.reason = "fallback_entry"`（前端显示「兜底建仓」），不产生 Signal（`signalsCount` 不变）。
+- **推荐配置**：若希望每个城市都能算真实第 3 高，使用 `universe.selectionMode="per_event"`，并放宽价格带/点差/流动性（示例：`minPrice=0.02, maxPrice=0.98, maxSpread=0.05, minLiquidityUsd=200, maxMarkets=120..200`）。否则严格过滤会把每个城市 11 个括号筛到 1–3 个，第 3 高 NO 腿基本不触发（实测：严格过滤 40 组仅 9 组≥3 个候选；放宽后 48 组中 45 组≥3 个）。
 - **关闭**（默认 `false`）时行为与旧版完全一致。
 
 ## 4. 退出规则

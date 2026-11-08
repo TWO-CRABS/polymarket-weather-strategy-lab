@@ -135,6 +135,7 @@ test("out-of-range signal limits produce errors (docs/03 §1.1)", () => {
 
 test("out-of-range universe limits produce errors", () => {
   expectInvalid(patchUniverse({ maxMarkets: 0 }), "universe.maxMarkets");
+  expectInvalid(patchUniverse({ selectionMode: "per_city" }), "universe.selectionMode");
   expectInvalid(patchUniverse({ minPrice: 0.0001 }), "universe.minPrice");
   expectInvalid(patchUniverse({ minPrice: 0.6 }), "universe.minPrice");
   expectInvalid(patchUniverse({ maxPrice: 0.4 }), "universe.maxPrice");
@@ -218,6 +219,7 @@ test("degenerate-config warnings are non-blocking (docs/04 §5.10, AC-11)", () =
     [patchExit({ stopLossPct: 90 }), "止损"],
     [patchRisk({ maxDrawdownPct: 3, killSwitch: true }), "熔断"],
     [patchExecution({ sizingMode: "pct_equity", sizingValue: 60 }), "50%"],
+    [patchExecution({ fallbackBuyEachWindow: true }), "per_event"],
   ];
   for (const [patch, fragment] of cases) {
     const result = validateStrategy(patch);

@@ -48,6 +48,7 @@ const GROUP_DEFS = [
     fields: [
       { path: "universe.cities", kind: "cities", label: "城市（多选，不选 = 全部城市）" },
       { path: "universe.maxMarkets", label: "最大市场数", unit: "个", min: LIM.universe.maxMarkets[0], max: LIM.universe.maxMarkets[1], step: 1, help: "按流动性/成交额选取" },
+      { path: "universe.selectionMode", kind: "select", label: "选市场方式", options: [{ value: "per_market", label: "按单个市场（流动性优先）" }, { value: "per_event", label: "按完整城市事件（推荐兜底策略）" }], help: "per_event 保留每个城市/日期的完整温度括号，组内概率排名与第 3 高 NO 才有意义；maxMarkets 需足够容纳整组（每组约 6–11 个括号）" },
       { path: "universe.minPrice", label: "最低 YES 价格", unit: "USDC 0–1", min: LIM.universe.minPrice[0], max: LIM.universe.minPrice[1], step: 0.001, help: "0.02 = 2¢，过滤极端低价" },
       { path: "universe.maxPrice", label: "最高 YES 价格", unit: "USDC 0–1", min: LIM.universe.maxPrice[0], max: LIM.universe.maxPrice[1], step: 0.001, help: "0.98 = 98¢" },
       { path: "universe.minLiquidityUsd", label: "最小流动性", unit: "USD", min: LIM.universe.minLiquidityUsd[0], max: LIM.universe.minLiquidityUsd[1], step: 100 },
@@ -147,7 +148,8 @@ const GROUP_DEFS = [
 
 const FIELD_TIPS = {
   "universe.cities": "只在这些城市的最高温市场里交易；不勾选 = 全部城市。城市越少可选市场越少，可能长时间没有信号。",
-  "universe.maxMarkets": "从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡。",
+  "universe.maxMarkets": "从符合条件的温度市场中按流动性/成交量选前 N 个参与。10–20 个比较均衡；使用 per_event（完整城市事件）时每组约 6–11 个括号，建议 60–110 以覆盖 6–10 个城市。",
+  "universe.selectionMode": "per_market：按单个市场流动性取前 N 个（原行为，城市组可能不完整）；per_event：按城市/日期事件整组选入，保留完整温度括号，组内“概率第 1/第 3 高”才有意义。若开启“每周期空仓兜底建仓”，强烈建议 per_event，否则多数城市组不足 3 个候选，第 3 高 NO 腿不会触发。",
   "universe.minPrice": "只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。",
   "universe.maxPrice": "只交易 YES 中间价 ≤ 该值的市场（0.98 = 98¢）。过滤接近确定的极端高价括号。",
   "universe.minLiquidityUsd": "市场流动性低于该值不参与。数据源流动性可能偏高，建议同时用点差过滤。",

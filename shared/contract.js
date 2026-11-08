@@ -92,6 +92,8 @@ export const RUN_MODES = Object.freeze(["live", "replay"]);
 export const PRICE_FIELDS = Object.freeze(["mid", "last", "best_bid", "best_ask"]);
 export const DIRECTIONS = Object.freeze(["up", "down", "both"]);
 export const SIZING_MODES = Object.freeze(["fixed_stake", "pct_equity"]);
+/** 选市场方式：按单个市场（流动性优先）或按完整城市/日期事件（保留全部温度括号）。 */
+export const SELECTION_MODES = Object.freeze(["per_market", "per_event"]);
 export const FILL_MODELS = Object.freeze(["book_walk"]);
 export const OUTCOMES = Object.freeze(["YES", "NO"]);
 export const TRADE_SIDES = Object.freeze(["BUY", "SELL"]);
@@ -111,7 +113,7 @@ export const REJECT_REASONS = Object.freeze([
 /** Hard limits used by both server validation and frontend sliders. */
 export const LIMITS = Object.freeze({
   universe: {
-    maxMarkets: [1, 40],
+    maxMarkets: [1, 200],
     minPrice: [0.001, 0.5],
     maxPrice: [0.5, 0.999],
     minLiquidityUsd: [0, 1_000_000],
@@ -162,6 +164,8 @@ export const DEFAULT_STRATEGY = Object.freeze({
   universe: {
     cities: [],
     maxMarkets: 12,
+    /** per_market：按流动性取前 N 个市场（默认）；per_event：按城市/日期事件整组选入（保留完整温度括号）。 */
+    selectionMode: "per_market",
     minPrice: 0.02,
     maxPrice: 0.98,
     minLiquidityUsd: 500,
@@ -329,6 +333,7 @@ export function validateStrategy(input = {}) {
   if (!PRICE_FIELDS.includes(s.priceField)) err(`signal.priceField 非法: ${s.priceField}`);
   if (!DIRECTIONS.includes(s.direction)) err(`signal.direction 非法: ${s.direction}`);
   if (!SIZING_MODES.includes(e.sizingMode)) err(`execution.sizingMode 非法: ${e.sizingMode}`);
+  if (!SELECTION_MODES.includes(u.selectionMode)) err(`universe.selectionMode 非法: ${u.selectionMode}`);
   if (!Number.isFinite(u.maxMarkets) || u.maxMarkets < 1) err("universe.maxMarkets 必须 >= 1");
 
   inRange(u.minPrice, LIMITS.universe.minPrice, "universe.minPrice");
@@ -380,6 +385,11 @@ export function validateStrategy(input = {}) {
   if (e.sizingMode === "pct_equity" && e.sizingValue > 50) warn("单笔使用超过 50% 权益，回撤风险极高");
   if (e.sizingMode === "fixed_stake" && e.sizingValue > r.bankrollUsd) err("单笔固定金额不能大于初始资金");
   if (r.killSwitch && r.maxDrawdownPct < 5) warn("最大回撤熔断阈值过低（< 5%），策略可能刚开始就被停机");
+  if (e.fallbackBuyEachWindow && u.selectionMode !== "per_event") {
+    warn(
+      "兜底建仓按城市独立：当前为 per_market 选市场，城市组可能不足 3 个候选，第 3 高 NO 腿不会触发；建议 universe.selectionMode=per_event（按完整城市事件选市场）",
+    );
+  }
   if (sim.mode === "replay" && sim.replayLookbackMin < s.windowSec / 60) {
     err("回放窗口必须大于信号窗口，否则无法计算滚动收益");
   }

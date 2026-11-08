@@ -161,7 +161,41 @@ export class RunManager {
       });
     }
     candidates.sort(compareMarketsForSelection);
+    if (u.selectionMode === "per_event") {
+      return this._selectMarketsByEvent(candidates, Math.max(1, u.maxMarkets)).map((market) => clone(market));
+    }
     return candidates.slice(0, Math.max(1, u.maxMarkets)).map((market) => clone(market));
+  }
+
+  /**
+   * 按完整城市/日期事件选市场（per_event）：事件整组纳入（不拆分），
+   * 事件按组内总流动性降序；剩余容量装不下下一组时跳过，保持每组括号完整。
+   */
+  _selectMarketsByEvent(candidates, cap) {
+    const groups = new Map();
+    for (const market of candidates) {
+      const key = market.eventId
+        ? `event:${market.eventId}`
+        : `place:${market.city || "未知"}|${String(market.endDate || "").slice(0, 10)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(market);
+    }
+    const liquidityOf = (group) => group.reduce((sum, market) => sum + (Number(market.liquidityUsd) || 0), 0);
+    const sorted = [...groups.values()].sort(
+      (a, b) =>
+        liquidityOf(b) - liquidityOf(a) ||
+        (Number(b[0]?.impliedProbability) || 0) - (Number(a[0]?.impliedProbability) || 0),
+    );
+    const picked = [];
+    for (const group of sorted) {
+      if (picked.length + group.length > cap) continue; // 不拆分事件，装不下就跳过
+      picked.push(...group);
+    }
+    if (picked.length === 0) {
+      // 容量连一个事件都装不下：退回按单市场取前 cap 个，避免空 universe
+      return candidates.slice(0, cap);
+    }
+    return picked;
   }
 
   /* -------------------------------- create ------------------------------- */
