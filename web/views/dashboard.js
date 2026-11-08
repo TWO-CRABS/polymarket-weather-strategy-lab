@@ -335,6 +335,14 @@ export async function mount(root, ctx) {
 
   root.addEventListener("click", onRootClick);
   root.addEventListener("change", onRootChange);
+  root.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target instanceof Element ? event.target : null;
+    const elm = target ? target.closest("tr[data-market-id], .sig[data-market-id]") : null;
+    if (!elm) return;
+    event.preventDefault();
+    selectMarket(elm.dataset.marketId);
+  });
 
   /* -------------------- REST 快照 -------------------- */
 
@@ -968,7 +976,11 @@ export async function mount(root, ctx) {
     const yes = quoteOf(market, "YES");
     const no = quoteOf(market, "NO");
     const prob = num(market.impliedProbability) !== null ? market.impliedProbability : midOf(market, "YES");
-    el.selectedTitle.textContent = `${marketName(market)}${shortDate(market.endDate) ? ` · ${shortDate(market.endDate)}` : ""}`;
+    const titleText = `${marketName(market)}${shortDate(market.endDate) ? ` · ${shortDate(market.endDate)}` : ""}`;
+    const marketUrl = polymarketEventUrl(market);
+    el.selectedTitle.innerHTML = marketUrl
+      ? `<a class="mkt-link" href="${ui.escapeHtml(marketUrl)}" target="_blank" rel="noopener noreferrer" title="在 Polymarket 查看该事件">${ui.escapeHtml(titleText)}</a>`
+      : ui.escapeHtml(titleText);
     if (probBadge) probBadge.textContent = `概率 ${prob === null ? "—" : ui.fmtProb(prob)}`;
     el.selectedMeta.innerHTML = [
       `<span class="feed-chip">YES 买 ${ui.escapeHtml(priceText(yes.bid))} / 卖 ${ui.escapeHtml(priceText(yes.ask))} / 中 ${ui.escapeHtml(priceText(yes.mid))}</span>`,
@@ -1031,6 +1043,10 @@ export async function mount(root, ctx) {
     renderMarkets();
     renderSelectedMarket();
     renderMarketChart();
+    // 同步高亮成交/持仓/信号中同一市场，方便对照
+    renderTrades();
+    renderPositions();
+    renderSignals();
     loadMarketHistory(marketId);
   }
 
@@ -1049,9 +1065,17 @@ export async function mount(root, ctx) {
       const blocked = signal.status === "blocked" || signal.blocked === true;
       const cls = executed ? "executed" : blocked ? "blocked" : "";
       const direction = signal.direction === "down" ? -1 : 1;
-      return `<div class="sig ${cls}">
+      const market = signal.marketId ? state.markets.get(signal.marketId) : null;
+      const date = market ? shortDate(market.endDate) : "";
+      const url = polymarketEventUrl(market);
+      const cityText = ui.escapeHtml(signal.city || "");
+      const cityHtml = url
+        ? `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer" title="在 Polymarket 查看该事件">${cityText}</a>`
+        : cityText;
+      const selected = Boolean(state.selectedMarketId && signal.marketId === state.selectedMarketId);
+      return `<div class="sig ${cls}${selected ? " is-selected" : ""}" data-market-id="${ui.escapeHtml(signal.marketId || "")}" tabindex="0" role="button" aria-label="选择市场 ${ui.escapeHtml(signal.city || "")} ${ui.escapeHtml(signal.bracket || "")}">
         <div class="sig-head">
-          <span class="sig-title">${ui.directionBadge(signal.direction)} ${ui.escapeHtml(signal.city || "")} · ${ui.escapeHtml(signal.bracket || "")}</span>
+          <span class="sig-title">${ui.directionBadge(signal.direction)} ${cityHtml}${date ? ` · ${date}` : ""} · ${ui.escapeHtml(signal.bracket || "")}</span>
           <span class="sig-time">${ui.escapeHtml(ui.fmtTime(signal.ts))}</span>
         </div>
         <div class="sig-detail">
@@ -1080,12 +1104,22 @@ export async function mount(root, ctx) {
       const market = trade.marketId ? state.markets.get(trade.marketId) : null;
       const city = market ? cityLabel(market) : (trade.city || trade.marketId || "—");
       const bracket = market ? bracketLabel(market) : (trade.bracket || "");
+      const date = market ? shortDate(market.endDate) : "";
       const reason = ui.reasonLabel(trade.reason) || trade.reason || "—";
-      return { trade, market, city, bracket, marketLabel: bracket ? `${city} · ${bracket}` : city, reason };
+      return {
+        trade,
+        market,
+        city,
+        bracket,
+        date,
+        cityWithDate: date ? `${city} · ${date}` : city,
+        marketLabel: [city, bracket, date].filter(Boolean).join(" · "),
+        reason,
+      };
     });
     const groupValue = (row) => {
       switch (groupBy) {
-        case "city": return row.city;
+        case "city": return row.cityWithDate;
         case "market": return row.marketLabel;
         case "side": return row.trade.side === "SELL" ? "SELL（卖出）" : "BUY（买入）";
         case "outcome": return row.trade.outcome || "—";
@@ -1116,12 +1150,14 @@ export async function mount(root, ctx) {
       el.tradesBody.innerHTML = "";
       return;
     }
-    const renderRow = ({ trade, market, city, bracket, reason }) => {
+    const renderRow = ({ trade, market, city, bracket, date, reason }) => {
       const rejected = trade.status === "rejected";
       const pnl = num(trade.realizedPnl);
-      return `<tr class="${rejected ? "row-rejected" : ""}">
+      const selected = state.selectedMarketId && trade.marketId === state.selectedMarketId;
+      const bracketText = [bracket, date].filter(Boolean).join(" · ");
+      return `<tr class="${rejected ? "row-rejected" : ""}${selected ? " is-selected-row" : ""}" data-market-id="${ui.escapeHtml(trade.marketId || "")}" tabindex="0">
         <td class="num-col cell-dim">${ui.escapeHtml(ui.fmtTime(trade.ts))}</td>
-        <td>${marketLinkHtml(market, city, bracket)}</td>
+        <td>${marketLinkHtml(market, city, bracketText)}</td>
         <td><span class="side-badge ${trade.side === "SELL" ? "sell" : "buy"}">${ui.escapeHtml(trade.side || "—")}</span> ${ui.outcomeBadge(trade.outcome)}</td>
         <td class="num-col">${ui.escapeHtml(ui.fmtShares(trade.shares, 2))}</td>
         <td class="num-col">${ui.escapeHtml(priceText(trade.price))}</td>
@@ -1163,12 +1199,14 @@ export async function mount(root, ctx) {
       const market = position.marketId ? state.markets.get(position.marketId) : null;
       const city = market ? cityLabel(market) : (position.city || "—");
       const bracket = market ? bracketLabel(market) : (position.bracket || "");
+      const date = market ? shortDate(market.endDate) : "";
+      const selected = state.selectedMarketId && position.marketId === state.selectedMarketId;
       const mid = num(position.midPrice) !== null ? position.midPrice : (market ? midOf(market, position.outcome || "YES") : null);
       const implied = num(position.impliedProbability) !== null
         ? position.impliedProbability
         : (market ? midOf(market, position.outcome || "YES") : null);
-      return `<tr>
-        <td>${marketLinkHtml(market, city, bracket)}</td>
+      return `<tr class="${selected ? "is-selected-row" : ""}" data-market-id="${ui.escapeHtml(position.marketId || "")}" tabindex="0">
+        <td>${marketLinkHtml(market, city, [bracket, date].filter(Boolean).join(" · "))}</td>
         <td>${ui.outcomeBadge(position.outcome)}</td>
         <td class="num-col">${ui.escapeHtml(ui.fmtShares(position.shares, 2))}</td>
         <td class="num-col">${ui.escapeHtml(priceText(position.avgPrice))}</td>
@@ -1596,6 +1634,8 @@ export async function mount(root, ctx) {
     }
     const card = target.closest("[data-market-id]");
     if (card) {
+      // 官方链接优先：点市场/城市链接只打开 Polymarket，不改变选中市场
+      if (target.closest("a[href]")) return;
       selectMarket(card.dataset.marketId);
     }
   }

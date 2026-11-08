@@ -1655,3 +1655,11 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .trade-group-row td { background: var(--bg-2); color: var(--text-2); font-size: 10px; font-weight: 600; padding: 5px 8px !important; border-top: 1px solid var(--line); }
 .trade-group-label { color: var(--cyan-text); }
 .trade-group-count { margin-left: 8px; color: var(--text-3); font-weight: 500; }
+
+/* ---------- B21. 行/信号选中 + 日期 + 跳转 ---------- */
+.data-table tbody tr[data-market-id] { cursor: pointer; }
+.data-table tbody tr[data-market-id]:hover td { background: rgba(34, 211, 238, 0.05); }
+.data-table tbody tr.is-selected-row td { background: rgba(34, 211, 238, 0.10); box-shadow: inset 2px 0 0 var(--cyan); }
+.sig[data-market-id] { cursor: pointer; }
+.sig.is-selected { border-color: rgba(34, 211, 238, 0.55); background: rgba(34, 211, 238, 0.07); }
+#selectedTitle .mkt-link { color: inherit; }
