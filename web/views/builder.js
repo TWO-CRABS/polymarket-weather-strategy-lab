@@ -48,7 +48,7 @@ const GROUP_DEFS = [
     fields: [
       { path: "universe.cities", kind: "cities", label: "城市（多选，不选 = 全部城市）" },
       { path: "universe.maxMarkets", label: "最大市场数", unit: "个", min: LIM.universe.maxMarkets[0], max: LIM.universe.maxMarkets[1], step: 1, help: "按流动性/成交额选取" },
-      { path: "universe.selectionMode", kind: "select", label: "选市场方式", options: [{ value: "per_market", label: "按单个市场（流动性优先）" }, { value: "per_event", label: "按完整城市事件（推荐兜底策略）" }], help: "per_event 保留每个城市/日期的完整温度括号，组内概率排名与第 3 高 NO 才有意义；maxMarkets 需足够容纳整组（每组约 6–11 个括号）" },
+      { path: "universe.selectionMode", kind: "select", label: "选市场方式", options: [{ value: "per_market", label: "按单个市场（流动性优先）" }, { value: "per_event", label: "按完整城市事件（推荐兜底策略）" }], help: "per_event：事件内任一括号满足过滤，就整组纳入该城市/日期的全部可交易括号，保证城市内概率排名（第 1/第 3 高）真实；maxMarkets 按整组消耗（每组约 6–11 个）" },
       { path: "universe.minPrice", label: "最低 YES 价格", unit: "USDC 0–1", min: LIM.universe.minPrice[0], max: LIM.universe.minPrice[1], step: 0.001, help: "0.02 = 2¢，过滤极端低价" },
       { path: "universe.maxPrice", label: "最高 YES 价格", unit: "USDC 0–1", min: LIM.universe.maxPrice[0], max: LIM.universe.maxPrice[1], step: 0.001, help: "0.98 = 98¢" },
       { path: "universe.minLiquidityUsd", label: "最小流动性", unit: "USD", min: LIM.universe.minLiquidityUsd[0], max: LIM.universe.minLiquidityUsd[1], step: 100 },

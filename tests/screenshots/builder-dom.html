@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">20:57:59</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">22:05:24</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -145,7 +145,7 @@
         <select class="input" id="f-universe-selectionMode" data-path="universe.selectionMode" data-kind="select">
           <option value="per_market" selected="">按单个市场（流动性优先）</option><option value="per_event">按完整城市事件（推荐兜底策略）</option>
         </select>
-        <span class="field-help">per_event 保留每个城市/日期的完整温度括号，组内概率排名与第 3 高 NO 才有意义；maxMarkets 需足够容纳整组（每组约 6–11 个括号）</span>
+        <span class="field-help">per_event：事件内任一括号满足过滤，就整组纳入该城市/日期的全部可交易括号，保证城市内概率排名（第 1/第 3 高）真实；maxMarkets 按整组消耗（每组约 6–11 个）</span>
       </div><div class="field">
       <label class="field-label" for="f-universe-minPrice">最低 YES 价格 <span class="hint">USDC 0–1</span><button type="button" class="help-dot" data-tip="只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。" aria-label="说明：只交易 YES 中间价 ≥ 该值的市场（0.02 = 2¢）。过滤极端低价括号，避免 1 个 tick 就产生 ±100% 的假信号。">?</button></label>
       <input class="input num" type="number" id="f-universe-minPrice" data-path="universe.minPrice" data-kind="number" data-min="0.001" data-max="0.5" data-step="0.001" min="0.001" max="0.5" step="0.001" value="0.02" inputmode="decimal">

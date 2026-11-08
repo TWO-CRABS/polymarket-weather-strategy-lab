@@ -105,6 +105,21 @@ test("per_event keeps each city/date event complete and skips groups that do not
   assert.ok(one.every((market) => market.eventId === "evt-alpha"));
 });
 
+test("per_event includes every open bracket of an eligible event even if it fails per-market filters", () => {
+  const markets = buildMarkets();
+  const outOfBand = markets.find((market) => market.id === "a1");
+  outOfBand.impliedProbability = 0.99; // fails universe price band (maxPrice 0.98)
+
+  const manager = makeManager(markets);
+  const perEvent = manager.selectMarkets(makeConfig({ selectionMode: "per_event", maxMarkets: 9 }), "live");
+  assert.ok(perEvent.some((market) => market.id === "a1"), "per_event must keep the full event bracket set");
+  assert.equal(perEvent.filter((market) => market.eventId === "evt-alpha").length, 3);
+
+  // per_market keeps the legacy per-market filter: a1 is excluded.
+  const perMarket = manager.selectMarkets(makeConfig({ selectionMode: "per_market", maxMarkets: 9 }), "live");
+  assert.ok(!perMarket.some((market) => market.id === "a1"));
+});
+
 test("per_market keeps the legacy top-N-by-liquidity behavior (may split events)", () => {
   const manager = makeManager(buildMarkets());
   const picked = manager.selectMarkets(makeConfig({ selectionMode: "per_market", maxMarkets: 4 }), "live");

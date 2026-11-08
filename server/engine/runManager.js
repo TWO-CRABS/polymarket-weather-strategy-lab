@@ -134,49 +134,66 @@ export class RunManager {
     }
     const now = nowMs();
     const cities = (u.cities || []).map((c) => String(c));
-    const base = this.discovery.getCandidateMarkets().filter((market) => {
+    const withinTime = (market) => {
+      const cutoffMs = effectiveTradingEndMs(market);
+      if (!Number.isFinite(cutoffMs)) return false;
+      const ttrSec = (cutoffMs - now) / 1000;
+      return ttrSec >= u.minTimeToResolutionSec && ttrSec <= u.maxTimeToResolutionSec;
+    };
+    const allCandidates = this.discovery.getCandidateMarkets();
+    // 完整事件宇宙：只做“能不能交易”的硬过滤（closed/tokens/接单/城市/时间窗口），
+    // 不做价格带/流动性/点差过滤——per_event 需要完整括号来保证概率排名正确。
+    const openUniverse = allCandidates.filter((market) => {
       if (!market || market.closed) return false;
       if (!market.tokens?.yesTokenId || !market.tokens?.noTokenId) return false;
       if (u.onlyAcceptingOrders && !market.acceptingOrders) return false;
       if (!this._cityMatches(market, cities)) return false;
+      return withinTime(market);
+    });
+    // 策略可交易过滤（价格带/流动性/点差）：用于判断“事件是否值得关注”。
+    const base = openUniverse.filter((market) => {
       const mid = market.impliedProbability;
       if (!(mid >= u.minPrice && mid <= u.maxPrice)) return false;
       if (market.liquidityUsd < u.minLiquidityUsd) return false;
       if (market.spread > u.maxSpread) return false;
       return true;
     });
-    const timeFiltered = base.filter((market) => {
-      const cutoffMs = effectiveTradingEndMs(market);
-      if (!Number.isFinite(cutoffMs)) return false;
-      const ttrSec = (cutoffMs - now) / 1000;
-      return ttrSec >= u.minTimeToResolutionSec && ttrSec <= u.maxTimeToResolutionSec;
-    });
-    let candidates = timeFiltered;
+    let candidates = base;
     if (candidates.length === 0 && mode === "replay") {
       // Replay can use markets that recently closed/expired: historical prices
       // still exist, so the demo/repro path stays available overnight.
-      candidates = base.filter((market) => {
+      candidates = allCandidates.filter((market) => {
         const endMs = Date.parse(market.endDate);
         return Number.isFinite(endMs) ? endMs > now - 3 * 86400_000 : false;
       });
     }
     candidates.sort(compareMarketsForSelection);
     if (u.selectionMode === "per_event") {
-      return this._selectMarketsByEvent(candidates, Math.max(1, u.maxMarkets)).map((market) => clone(market));
+      const eligibleKeys = new Set(base.map((market) => this._eventKeyForMarket(market)));
+      const picked = this._selectFullEvents(eligibleKeys, openUniverse, Math.max(1, u.maxMarkets));
+      if (picked.length > 0) return picked.map((market) => clone(market));
     }
     return candidates.slice(0, Math.max(1, u.maxMarkets)).map((market) => clone(market));
   }
 
+  _eventKeyForMarket(market) {
+    return market.eventId
+      ? `event:${market.eventId}`
+      : `place:${market.city || "未知"}|${String(market.endDate || "").slice(0, 10)}`;
+  }
+
   /**
-   * 按完整城市/日期事件选市场（per_event）：事件整组纳入（不拆分），
-   * 事件按组内总流动性降序；剩余容量装不下下一组时跳过，保持每组括号完整。
+   * per_event：对每个“至少有一个括号满足策略过滤”的城市/日期事件，
+   * 纳入该事件的全部可交易括号（不再逐括号过滤价格带/点差/流动性），
+   * 保证兜底排名（第 1/第 3 高）是该城市真实排名。
+   * 事件按组内总流动性降序；容量不够时整组跳过。
    */
-  _selectMarketsByEvent(candidates, cap) {
+  _selectFullEvents(eligibleKeys, openUniverse, cap) {
+    if (eligibleKeys.size === 0) return [];
     const groups = new Map();
-    for (const market of candidates) {
-      const key = market.eventId
-        ? `event:${market.eventId}`
-        : `place:${market.city || "未知"}|${String(market.endDate || "").slice(0, 10)}`;
+    for (const market of openUniverse) {
+      const key = this._eventKeyForMarket(market);
+      if (!eligibleKeys.has(key)) continue;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(market);
     }
@@ -190,10 +207,6 @@ export class RunManager {
     for (const group of sorted) {
       if (picked.length + group.length > cap) continue; // 不拆分事件，装不下就跳过
       picked.push(...group);
-    }
-    if (picked.length === 0) {
-      // 容量连一个事件都装不下：退回按单市场取前 cap 个，避免空 universe
-      return candidates.slice(0, cap);
     }
     return picked;
   }
