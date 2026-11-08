@@ -904,6 +904,7 @@ test("periodic fallback plan: rank-1 YES + rank-3 NO over tradable candidates", 
       ["m4", mk("m4", 0.2, { closed: true })],
       ["m5", mk("m5", 0.7, { acceptingOrders: false })],
     ]),
+    portfolio: { positions: new Map() },
     config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
   };
   const legs = planFallbackOrders(run);
@@ -917,5 +918,51 @@ test("periodic fallback plan: rank-1 YES + rank-3 NO over tradable candidates", 
   assert.deepEqual(
     planFallbackOrders(onlyTwo).map((leg) => `${leg.rank}:${leg.outcome}`),
     ["1:YES"],
+  );
+});
+
+test("periodic fallback plan is independent per city/date event group", () => {
+  const mk = (id, prob, eventId) => ({
+    id,
+    city: id.startsWith("a") ? "Alpha" : "Beta",
+    bracket: id,
+    eventId,
+    impliedProbability: prob,
+    spread: 0.01,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+  });
+  const markets = new Map([
+    ["a1", mk("a1", 0.8, "evt-a")],
+    ["a2", mk("a2", 0.5, "evt-a")],
+    ["a3", mk("a3", 0.3, "evt-a")],
+    ["b1", mk("b1", 0.6, "evt-b")],
+    ["b2", mk("b2", 0.5, "evt-b")],
+    ["b3", mk("b3", 0.4, "evt-b")],
+  ]);
+  const run = {
+    marketIds: [...markets.keys()],
+    markets,
+    portfolio: { positions: new Map() },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+  };
+
+  const legs = planFallbackOrders(run);
+  assert.deepEqual(
+    legs.map((leg) => `${leg.market.city}:${leg.rank}:${leg.outcome}:${leg.market.id}`),
+    ["Alpha:1:YES:a1", "Alpha:3:NO:a3", "Beta:1:YES:b1", "Beta:3:NO:b3"],
+    "each city/date event gets its own rank-1 YES + rank-3 NO",
+  );
+
+  // Holding Alpha must NOT block Beta's fallback.
+  run.portfolio.positions = new Map([["a1-y", { marketId: "a1" }]]);
+  assert.deepEqual(
+    planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`),
+    ["1:YES:b1", "3:NO:b3"],
   );
 });

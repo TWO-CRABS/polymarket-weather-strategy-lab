@@ -88,7 +88,7 @@ const GROUP_DEFS = [
       { path: "execution.maxPositionsPerMarket", label: "单市场持仓上限", unit: "个", min: LIM.execution.maxPositionsPerMarket[0], max: LIM.execution.maxPositionsPerMarket[1], step: 1 },
       { path: "execution.fillModel", kind: "readonly", label: "撮合模型", valueLabel: "逐档吃单 book_walk" },
       { path: "execution.slippageBufferBps", label: "滑点保护", unit: "bps", min: LIM.execution.slippageBufferBps[0], max: LIM.execution.slippageBufferBps[1], step: 1, help: "允许超出买一价的最大比例" },
-      { path: "execution.fallbackBuyEachWindow", kind: "toggle", label: "每周期空仓兜底建仓", help: "每个观察窗口到期时若当前空仓，自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO（仍受价格带/仓位/现金约束）" },
+      { path: "execution.fallbackBuyEachWindow", kind: "toggle", label: "每周期空仓兜底建仓（按城市独立）", help: "每个城市/日期组独立：每满一个观察窗口，若该组空仓，买组内概率第 1 高 YES + 第 3 高 NO（不足 3 个只买第 1）；其他城市持仓不影响该城市，资金/仓位不足时剩余城市下周期继续" },
     ],
   },
   {
@@ -172,7 +172,7 @@ const FIELD_TIPS = {
   "execution.maxPositionsPerMarket": "同一个市场最多同时持有几笔仓位，防止过度集中。",
   "execution.fillModel": "逐档吃单（book_walk）：从最优卖价开始按盘口深度成交，计算加权平均成交价 VWAP。",
   "execution.slippageBufferBps": "允许成交价超出买一价的最大比例（bps，100 = 1%）。0 = 只吃最优一档；调大可吃更深流动性但成本更高。",
-  "execution.fallbackBuyEachWindow": "周期性兜底：每个观察窗口（signal.windowSec）结束时检查一次；如果当前没有任何持仓（买过又卖掉也算空仓），自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO。始终空仓则每个周期都会重新建这两笔仓；已有持仓时该周期跳过。仍受价格带/点差/仓位/现金/风控约束。",
+  "execution.fallbackBuyEachWindow": "按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对每个“当前没有持仓”的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。各城市互不影响：某个城市已有持仓只跳过该城市，其他城市照常建仓；买过又卖掉也算空仓，下个周期会再建。资金/仓位不足时剩余城市在后续周期继续。仍受价格带/点差/仓位/现金/风控约束。",
   "exit.takeProfitPct": "按含费成本计算的净收益率达到 +X% 时卖出止盈。",
   "exit.stopLossPct": "按含费成本计算的净亏损达到 −X% 时卖出止损。",
   "exit.maxHoldSec": "持仓超过该秒数强制平仓（3600 = 1 小时）。",

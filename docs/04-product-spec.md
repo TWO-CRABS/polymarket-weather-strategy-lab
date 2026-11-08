@@ -323,6 +323,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-18 | 市场 closed 但裁决未出时持仓保留并标记 `resolution_pending=true`，继续每 20s 轮询、不虚构成交；回放模式不做结算（结束时持仓按最后 mid 估值并标注 `openPositionsAtEnd`） |
 | AC-19 | **停止/重启后恢复结算**：live 运行被手动停止或服务重启后，只要 journal 中仍有未平仓持仓，系统从 journal 回放重建持仓并继续轮询官方裁决；兑付后补记 `reason=resolution` Trade 并更新现金/权益/指标，`pendingSettlements → 0`、`settledPositions` 递增（`tests/settlementRecovery.test.js`） |
 | AC-20 | 看板/历史对存在待结算或已结算的运行显示「待结算 N / 已结算 N」标识；停止后详情页仍能看到未结算持仓（从 journal 重建） |
+| AC-21 | 每周期兜底按**城市/日期事件组独立**：每个空仓城市组各自买「组内概率第 1 高 YES + 第 3 高 NO」，某城市已有持仓只跳过该城市、不阻止其他城市建仓；城市组按组内最高概率降序消费资金/仓位（`tests/engine.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

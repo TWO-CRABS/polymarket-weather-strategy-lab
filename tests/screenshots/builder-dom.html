@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">19:43:53</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">20:05:20</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -245,7 +245,7 @@
         
       </div></div><div class="slider-row" data-slider-path="execution.sizingValue">
         <div class="slider-head">
-          <label class="field-label" for="f-execution-sizingValue">单笔仓位 <span class="hint">USD / %</span><button type="button" class="help-dot" data-tip="每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。" aria-label="说明：每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。">?</button></label>
+          <label class="field-label" for="f-execution-sizingValue">单笔仓位 <span class="hint">USD / %</span><button type="button" class="help-dot" data-tip="每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。若设为 $1：因份额按 0.01 股取整，成交名义额可能略高于 $1（&lt;1¢，例如 95¢ 时 1.06 股 = $1.007），这是交易所最小额与份额精度共同决定的。" aria-label="说明：每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。若设为 $1：因份额按 0.01 股取整，成交名义额可能略高于 $1（&lt;1¢，例如 95¢ 时 1.06 股 = $1.007），这是交易所最小额与份额精度共同决定的。">?</button></label>
           <output class="range-val" id="f-execution-sizingValue-out" data-out-for="execution.sizingValue" for="f-execution-sizingValue">25</output>
         </div>
         <input class="range" type="range" id="f-execution-sizingValue" data-path="execution.sizingValue" data-kind="range" min="1" max="100000" step="1" value="25" style="--pct:0.024000240002400024%">
@@ -272,10 +272,10 @@
       <span class="field-help">允许超出买一价的最大比例</span>
     </div><div class="field switch-field">
         <label class="switch-row" for="f-execution-fallbackBuyEachWindow">
-          <span class="field-label">每周期空仓兜底建仓</span>
+          <span class="field-label">每周期空仓兜底建仓（按城市独立）</span>
           <span class="switch"><input type="checkbox" id="f-execution-fallbackBuyEachWindow" data-path="execution.fallbackBuyEachWindow" data-kind="toggle"><i aria-hidden="true"></i></span>
         </label>
-        <p class="hint"><button type="button" class="help-dot" data-tip="周期性兜底：每个观察窗口（signal.windowSec）结束时检查一次；如果当前没有任何持仓（买过又卖掉也算空仓），自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO。始终空仓则每个周期都会重新建这两笔仓；已有持仓时该周期跳过。仍受价格带/点差/仓位/现金/风控约束。" aria-label="说明：周期性兜底：每个观察窗口（signal.windowSec）结束时检查一次；如果当前没有任何持仓（买过又卖掉也算空仓），自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO。始终空仓则每个周期都会重新建这两笔仓；已有持仓时该周期跳过。仍受价格带/点差/仓位/现金/风控约束。">?</button>每个观察窗口到期时若当前空仓，自动买入概率第 1 高选项的 YES + 概率第 3 高选项的 NO（仍受价格带/仓位/现金约束）</p>
+        <p class="hint"><button type="button" class="help-dot" data-tip="按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对每个“当前没有持仓”的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。各城市互不影响：某个城市已有持仓只跳过该城市，其他城市照常建仓；买过又卖掉也算空仓，下个周期会再建。资金/仓位不足时剩余城市在后续周期继续。仍受价格带/点差/仓位/现金/风控约束。" aria-label="说明：按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对每个“当前没有持仓”的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。各城市互不影响：某个城市已有持仓只跳过该城市，其他城市照常建仓；买过又卖掉也算空仓，下个周期会再建。资金/仓位不足时剩余城市在后续周期继续。仍受价格带/点差/仓位/现金/风控约束。">?</button>每个城市/日期组独立：每满一个观察窗口，若该组空仓，买组内概率第 1 高 YES + 第 3 高 NO（不足 3 个只买第 1）；其他城市持仓不影响该城市，资金/仓位不足时剩余城市下周期继续</p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-exit">
       <header class="panel-head">

@@ -353,17 +353,23 @@ export async function tryEntry(run, signal, market, now, opts = {}) {
   return { ok: true, trade, fill };
 }
 
-/* ------------------- periodic fallback entries (global) ------------------- */
+/* -------------- periodic fallback entries (per city/date event) ------------ */
 
 /**
- * 全局兜底（execution.fallbackBuyEachWindow）：
- * 每个观察窗口周期（signal.windowSec）结束时检查一次；若当前没有任何持仓
- * （已买入后又卖掉也算空仓），建立两笔兜底仓：
- *   ① 概率第 1 高的候选 → BUY YES
- *   ② 概率第 3 高的候选 → BUY NO（可交易候选不足 3 个时只做第 1 笔）
- * 周期按行情时间推进（live=时钟，replay=历史时间）；仍走正常风控/仓位/手续费链路，
- * 不产生 Signal 记录。
+ * 周期兜底（execution.fallbackBuyEachWindow），**按城市/日期事件独立**：
+ * 每个观察窗口（signal.windowSec）检查一次；对每个“当前没有持仓”的事件组
+ * （negRisk 温度组，按 eventId 或 city+date 分组）：
+ *   ① 组内概率第 1 高 → BUY YES
+ *   ② 组内概率第 3 高 → BUY NO（组内可交易候选不足 3 个时只做第 1 笔）
+ * 各城市互不影响：某城市已有持仓只跳过该城市；资金/仓位上限不足时剩余城市
+ * 在后续周期继续尝试。周期按行情时间推进；仍走正常风控/仓位/手续费链路。
  */
+
+/** 城市/日期事件分组 key（优先 eventId，快照缺 eventId 时回退 city+endDate）。 */
+export function fallbackEventKey(market) {
+  if (market?.eventId) return `event:${market.eventId}`;
+  return `place:${market?.city || "未知"}|${String(market?.endDate || "").slice(0, 10)}`;
+}
 
 /** 可交易候选按 YES 隐含概率降序排列。 */
 export function collectFallbackCandidates(run) {
@@ -384,12 +390,46 @@ export function collectFallbackCandidates(run) {
   return candidates;
 }
 
-/** 兜底订单计划：第 1 高 → YES；第 3 高 → NO。 */
+/** 按城市/日期事件分组，组内按概率降序；组间按组内最高概率降序（稳定、可复现）。 */
+export function groupFallbackCandidates(run) {
+  const groups = new Map();
+  for (const candidate of collectFallbackCandidates(run)) {
+    const key = fallbackEventKey(candidate.market);
+    if (!groups.has(key)) groups.set(key, { key, candidates: [], marketIds: new Set() });
+    const group = groups.get(key);
+    group.candidates.push(candidate);
+    group.marketIds.add(candidate.market.id);
+  }
+  const list = [...groups.values()].map((group) => ({
+    ...group,
+    candidates: group.candidates.sort((a, b) => b.prob - a.prob),
+  }));
+  list.sort((a, b) => b.candidates[0].prob - a.candidates[0].prob || a.key.localeCompare(b.key));
+  return list;
+}
+
+function eventHasOpenPosition(run, marketIds) {
+  for (const position of run.portfolio.positions.values()) {
+    if (marketIds.has(position.marketId)) return true;
+  }
+  return false;
+}
+
+/**
+ * 各城市独立兜底计划：只对“没有任何持仓”的事件组生成 legs。
+ * @returns {Array<{market:any, outcome:"YES"|"NO", rank:number, eventKey:string}>}
+ */
 export function planFallbackOrders(run) {
-  const candidates = collectFallbackCandidates(run);
   const legs = [];
-  if (candidates[0]) legs.push({ market: candidates[0].market, outcome: "YES", rank: 1 });
-  if (candidates[2]) legs.push({ market: candidates[2].market, outcome: "NO", rank: 3 });
+  for (const group of groupFallbackCandidates(run)) {
+    if (eventHasOpenPosition(run, group.marketIds)) continue;
+    if (group.candidates[0]) {
+      legs.push({ market: group.candidates[0].market, outcome: "YES", rank: 1, eventKey: group.key });
+    }
+    if (group.candidates[2]) {
+      legs.push({ market: group.candidates[2].market, outcome: "NO", rank: 3, eventKey: group.key });
+    }
+  }
   return legs;
 }
 
@@ -405,16 +445,23 @@ export async function maybePeriodicFallback(run, now) {
   if (now < run._fallbackNextAt) return { checked: false };
   // 每个窗口最多检查一次；按 now 重新对齐，避免长缺口后连续补发
   run._fallbackNextAt = now + windowMs;
-  if (run.portfolio.positions.size > 0) {
-    return { checked: true, skipped: "already_holding" };
-  }
+
   const legs = planFallbackOrders(run);
-  if (!legs.length) {
-    run.sse.log("warn", "周期兜底建仓跳过：没有可交易候选", run.id);
-    return { checked: true, skipped: "no_candidate" };
-  }
+  if (!legs.length) return { checked: true, skipped: "no_leg" };
+
   const results = [];
+  let stoppedReason = null;
+  const maxPositions = Number(execution.maxPositions) || 5;
   for (const leg of legs) {
+    // 风险约束优先：仓位/现金不足时停止本次循环，剩余城市下个周期继续
+    if (run.portfolio.positions.size >= maxPositions) {
+      stoppedReason = "max_positions";
+      break;
+    }
+    if (!(computeBudget(run, leg.market) > 0)) {
+      stoppedReason = "insufficient_cash";
+      break;
+    }
     const { market, outcome, rank } = leg;
     const quote = outcome === "YES" ? market.quotes.YES : market.quotes.NO;
     const signal = {
@@ -436,18 +483,18 @@ export async function maybePeriodicFallback(run, now) {
       reason: "fallback_entry",
     };
     const result = await tryEntry(run, signal, market, now, { reason: "fallback_entry" });
-    results.push({ ...result, outcome, rank, marketId: market.id });
+    results.push({ ...result, outcome, rank, marketId: market.id, eventKey: leg.eventKey });
     if (result.ok) {
       run.sse.log(
         "info",
-        `周期兜底建仓：概率第 ${rank} 高 → ${outcome === "YES" ? "买 YES" : "买 NO"} ${market.city} ${market.bracket} ${result.trade.shares} 股 @ ${result.trade.price}`,
+        `周期兜底建仓（${market.city} ${market.bracket}）：概率第 ${rank} 高 → ${outcome === "YES" ? "买 YES" : "买 NO"} ${result.trade.shares} 股 @ ${result.trade.price}`,
         run.id,
       );
     } else {
-      run.sse.log("warn", `周期兜底建仓第 ${rank} 高（${outcome}）未成交：${result.reason}`, run.id);
+      run.sse.log("warn", `周期兜底建仓（${market.city}）第 ${rank} 高（${outcome}）未成交：${result.reason}`, run.id);
     }
   }
-  return { checked: true, legs: results };
+  return { checked: true, legs: results, stoppedReason };
 }
 
 

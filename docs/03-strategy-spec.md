@@ -252,14 +252,16 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 
 > 被拒订单：不成交、不改账本，仅记录 Trade（`status=rejected`）与日志，供前端解释“为什么没成交”。
 
-### 3.5 周期性空仓兜底建仓（全局开关 `execution.fallbackBuyEachWindow`）
+### 3.5 周期性兜底建仓（按城市/日期独立；开关 `execution.fallbackBuyEachWindow`）
 
+- **分组**：温度市场按 **城市 + 日期（negRisk 事件组）** 独立处理——快照有 `eventId` 用 `eventId`，否则用 `city + endDate` 分组。
 - **触发时机**：从运行第一个 tick 起，每满一个观察窗口（`signal.windowSec`）检查一次（`_fallbackNextAt` 按行情时间推进；live=时钟、replay=历史数据时间）。
-- **触发条件**：检查时刻**当前没有任何持仓**（`portfolio.positions.size = 0`）；已买入后又全部卖掉也算空仓，会在下一个周期再次触发。已有持仓时该周期跳过。
-- **动作**：从本运行订阅市场中构造可交易候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice` / 点差 > `universe.maxSpread`），按 **YES 隐含概率降序**：
-  - **第 1 高**候选 → `BUY YES`
-  - **第 3 高**候选 → `BUY NO`（候选不足 3 个时只做第 1 笔）
-- **执行约束**：两笔都走正常入场链路——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；不绕过风控。任一腿被拒会记录 `status=rejected` 的 Trade。
+- **触发条件（每组独立）**：该城市/日期组**当前没有持仓**（买过又全部卖掉也算空仓）；**其他城市有持仓不影响本城市**，已持仓的组本周期跳过。
+- **动作**：对本组可交易候选（过滤：closed / 非 acceptingOrders / 无 YES 卖价 / 概率超出 `universe.minPrice..maxPrice` / 点差 > `universe.maxSpread`）按 **YES 隐含概率降序**：
+  - **第 1 高** → `BUY YES`
+  - **第 3 高** → `BUY NO`（组内候选不足 3 个时只做第 1 笔）
+- **资金/仓位**：城市组按“组内最高概率”降序依次尝试；`maxPositions` 或现金不足时停止本次循环，剩余城市在后续周期继续（不会因为某个城市持仓而阻止其他城市建仓）。
+- **执行约束**：与正常入场一致——`sizingValue` 名义额、`maxPositionUsd`、`maxPositions`/`maxPositionsPerMarket`、现金 ≥ 名义额+手续费、价格保护、逐档成交、官方 taker 费；不绕过风控。被拒会记录 `status=rejected` 的 Trade。
 - **记录**：成交的 `Trade.reason = "fallback_entry"`（前端显示「兜底建仓」），不产生 Signal（`signalsCount` 不变）。
 - **关闭**（默认 `false`）时行为与旧版完全一致。
 
