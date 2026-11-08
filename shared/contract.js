@@ -37,6 +37,19 @@ export const FEES = Object.freeze({
 });
 
 /**
+ * Official order constraints (verified from Polymarket CLOB docs + production integrators):
+ * - CLOB `/book` `min_order_size` = minimum shares accepted for any order (market or limit): 5.
+ * - A market BUY is denominated in USD and must be at least $1 notional.
+ * Both apply, so the effective minimum notional for a BUY is max($1, minOrderShares × price).
+ * (docs/02 notes the official docs' "5 shares vs 5 USDC" wording ambiguity; the CLOB
+ * `min_order_size` is shares and the $1 floor is the market-order value minimum.)
+ */
+export const ORDER_RULES = Object.freeze({
+  minOrderValueUsd: 1,
+  minOrderShares: 5,
+});
+
+/**
  * Official taker fee in USDC for a weather-market fill.
  * Official formula: fee = C x feeRate x p x (1 - p), rounded to 5 decimals.
  * @param {number} shares number of shares (contracts) filled

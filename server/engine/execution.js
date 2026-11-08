@@ -8,8 +8,9 @@
  * Price protection: buyLimit = ceilToTick(min(0.999, bestAsk×(1+bps/1e4))),
  *                   sellLimit = floorToTick(max(0.001, bestBid×(1−bps/1e4))).
  * Orders below the market minimum (default 5 shares) are rejected whole.
+ * Market BUYs additionally require notional >= $1 (ORDER_RULES.minOrderValueUsd).
  */
-import { FEES, calcTakerFee, roundTo } from "../../shared/contract.js";
+import { FEES, ORDER_RULES, calcTakerFee, roundTo } from "../../shared/contract.js";
 import { toNum } from "../util.js";
 
 export function ceilToTick(price, tickSize) {
@@ -60,7 +61,7 @@ function rejected(reason, extra = {}) {
 /**
  * Simulate a FAK BUY (marketable) against asks.
  * @param {{book:any, budgetUsd:number, feeRate?:number, slippageBufferBps?:number,
- *          tickSize?:number, minOrderShares?:number}} args
+ *          tickSize?:number, minOrderShares?:number, minOrderValueUsd?:number}} args
  * @returns {FillResult}
  */
 export function simulateBuy(args) {
@@ -70,7 +71,8 @@ export function simulateBuy(args) {
     feeRate = FEES.takerFeeRate,
     slippageBufferBps = 0,
     tickSize = book?.tickSize || 0.001,
-    minOrderShares = book?.minOrderSize || 5,
+    minOrderShares = book?.minOrderSize || ORDER_RULES.minOrderShares,
+    minOrderValueUsd = ORDER_RULES.minOrderValueUsd,
   } = args;
   if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) return rejected("insufficient_cash");
   const asks = Array.isArray(book?.asks) ? book.asks : [];
@@ -137,6 +139,10 @@ export function simulateBuy(args) {
   }
   if (notional + fee > budgetUsd + 1e-9) return rejected("insufficient_cash", { limitPrice });
   if (filled < minOrderShares - 1e-9) return rejected("below_min_order", { limitPrice });
+  // Market BUY minimum value: the USD notional must be at least $1 (separate from
+  // the 5-share CLOB minimum). Below 20¢ the $1 floor binds; above it the share
+  // minimum dominates.
+  if (notional + 1e-9 < minOrderValueUsd) return rejected("below_min_order", { limitPrice });
 
   price = roundTo(notional / filled, 6);
   fee = calcTakerFee(filled, price, feeRate);

@@ -458,13 +458,22 @@ test("BUY budget exhaustion yields a partial fill and fee fits the budget", () =
   assert.ok(result.notional + result.fee <= 6 + 1e-9);
 });
 
-test("BUY rejects below the 5-share minimum / without liquidity / with no cash", () => {
+test("BUY rejects below the 5-share minimum / $1 market-buy value / without liquidity / with no cash", () => {
   assert.equal(simulateBuy({ book: ORDER_BOOK_THIN, budgetUsd: 100 }).rejectReason, "below_min_order");
   assert.equal(simulateBuy({ book: ORDER_BOOK_THIN, budgetUsd: 100 }).shares, 0);
   assert.equal(simulateBuy({ book: makeOrderBook({}), budgetUsd: 100 }).rejectReason, "no_liquidity");
   assert.equal(simulateBuy({ book: ORDER_BOOK_BIDS_ONLY, budgetUsd: 100 }).rejectReason, "no_liquidity");
   assert.equal(simulateBuy({ book: ORDER_BOOK_DOCS_WALK, budgetUsd: 0 }).rejectReason, "insufficient_cash");
   assert.equal(simulateBuy({ book: ORDER_BOOK_DOCS_WALK, budgetUsd: -5 }).rejectReason, "insufficient_cash");
+
+  // Market BUY $1 minimum notional (Felix/Polymarket): 5 shares at 10¢ = $0.50 => rejected.
+  const cheap = makeOrderBook({ asks: [{ price: 0.1, size: 100 }] });
+  assert.equal(simulateBuy({ book: cheap, budgetUsd: 0.55 }).rejectReason, "below_min_order");
+  // 11 shares at 10¢ = $1.10 notional => accepted.
+  const dollarOk = simulateBuy({ book: cheap, budgetUsd: 1.15 });
+  assert.equal(dollarOk.ok, true);
+  assert.ok(dollarOk.notional >= 1 - 1e-9, "notional must meet the $1 floor");
+  assert.ok(dollarOk.shares >= 5);
 });
 
 test("BUY fee always equals calcTakerFee(shares, vwap) — AC-03", () => {

@@ -20,7 +20,7 @@
 ### 1.3 “验证”的准确含义
 - **对象**：用户组合出来的规则型策略（`StrategyConfig`），不是人的盘感，也不是对天气的预测能力。
 - **数据**：Polymarket 官方公开只读接口（Gamma 元数据、CLOB 盘口/中间价、Data API 历史分钟价用于 replay），不造行情、不补假成交。
-- **撮合**：市价单按**真实订单簿逐档吃单**（`fillModel: "book_walk"`），tick 0.001、最小 5 shares、允许部分成交、点差与深度滑点真实发生。
+- **撮合**：市价单按**真实订单簿逐档吃单**（`fillModel: "book_walk"`），tick 0.001、最小 5 shares（市价 BUY 另需名义额 ≥ $1）、允许部分成交、点差与深度滑点真实发生。
 - **成本**：官方 taker 费（Weather `feeSchedule.rate = 0.05`，`takerOnly: true`）逐笔计入现金；maker 返佣不适用于我们的 taker 单。
 - **产出**：一次可复现的运行 = 策略快照 + 数据窗口 + 逐笔成交（含费用/滑点）+ 持仓快照 + 权益曲线 + 指标 + 成本归因。
 - **判定**：只回答“在含费口径下是否有统计意义上的正期望”，**不承诺未来盈利，也不构成投资建议**。
@@ -287,7 +287,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 ### 6.6 边界与异常口径
 | 场景 | 口径 |
 |---|---|
-| 现金不足 / 低于最小 5 shares | 拒单（`insufficient_cash`/`below_min_order`），不产生成交、不扣费，仅计入拒单统计与 SSE `trade.status=rejected` |
+| 现金不足 / 低于最小 5 shares / 市价买入名义额 < $1 | 拒单（`insufficient_cash`/`below_min_order`），不产生成交、不扣费，仅计入拒单统计与 SSE `trade.status=rejected` |
 | 部分成交 | 以实际 `shares` 记账与收费；剩余量作废并记录；不足 5 shares 的残余拒单 |
 | 盘口空/单边/交叉 | 拒单 `no_liquidity`/`spread_too_wide`；持仓按最后 mid 估值，不产生“幽灵成交” |
 | 市场 `stale`/停牌/`closed` | 禁止新开仓；已开仓按最后 mid 估值，等待结算兑付 |
@@ -312,7 +312,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-09 | 对比 2–4 个 run：同表展示 `totalReturnPct/feesPaid/maxDrawdownPct/winRate/profitFactor/turnoverUsd`，权益曲线可叠加，口径标注含费 |
 | AC-10 | 概率展示：`spread ≤ 0.10` 用 mid、`> 0.10` 用 last；NO 用 NO 盘口 mid；括号概率和校验显示 Σ 与偏离提示 |
 | AC-11 | 校验器：当 `minProfitableMovePct > moveThresholdPct` 返回对应 warning；合法配置返回 `valid=true` 且 `normalized` 回填默认值 |
-| AC-12 | `minOrderShares=5`、`tickSize=0.001` 被强制执行；低于 5 shares 的成交只可出现为 `rejected` |
+| AC-12 | `minOrderShares=5`、`tickSize=0.001` 被强制执行；市价 BUY 名义额 ≥ `$1` 被强制执行；低于任一门槛的成交只可出现为 `rejected` |
 | AC-13 | 静态检查：无钱包/私钥/签名/下单代码路径；所有上游请求为公开只读（GET/WS 订阅），无鉴权头 |
 | AC-14 | 报告与 UI 页脚均含免责声明（§8）；界面无“保证盈利/稳赚”类文案 |
 | AC-15 | 指标边界：无亏损时 `profitFactor=null`（显示“—”）、样本 < 30 时 `sharpe=null`、无持仓时 `unrealizedPnl=0`，不得输出 `Infinity`/`NaN` |

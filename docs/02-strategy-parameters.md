@@ -62,7 +62,7 @@
 | `spread_abs` | `bestAsk − bestBid`（YES 侧） | `S4` 末位差 / `S5 /spread` | `0.001..0.05`；默认 `≤ 0.03`，推荐 `≤ 0.02` | 温度盘口实测常见 `0.014 ~ 0.036`，相当于 3.5%–35% 的报价宽度 |
 | `spread_ratio` | `spread_abs / implied_probability` | 派生 | 实测 `1.4% ~ 35%`；门槛 `≤ 5%` | 相对点差才是真成本；低价括号点差很小但费用占比极高（§5） |
 | `tick_size` | 最小价格变动 | `S4 tick_size` / `S2 orderPriceMinTickSize` / `S5 /tick-size` | `0.001`（温度市场恒定，实测） | `+20%` 在 `p=0.001` 处只有 `0.0002 < 1 tick`，**不可表达**（§7） |
-| `min_order_shares` | 最小下单股数 | `S4 min_order_size` = `"5"`；`S2 orderMinSize` = `5` | `5` 股 | 文档对"5 股 vs 5 USDC"有歧义（`market-details` 写 USDC、`place-orders` 写 shares）；以 `/book min_order_size` 为准，并按 `03` §3.3 同时校验名义额 |
+| `min_order_shares` | 最小下单股数 | `S4 min_order_size` = `"5"`；`S2 orderMinSize` = `5` | `5` 股 | 官方文档对"5 股 vs 5 USDC"有歧义；已核实：CLOB `min_order_size`=5 股适用于所有订单，另市价 **BUY 名义额 ≥ $1**（Felix/Turbine 生产集成确认）。有效下限 = `max($1, 5×价格) + 手续费` |
 | `price_tick_ratio` | `implied_probability / tick_size`（该价位有多少个 tick 的"分辨率"） | 派生 | `1..999`；筛选 `≥ 20`（即 `p ≥ 0.02`） | 低价处 1 tick = 巨大百分比；这个比值是判断"百分比信号是否可交易"的最快指标 |
 | `accepting_orders` | `active && !closed && acceptingOrders && enableOrderBook` | `S2`/`S3` 同名字段 | `true` | 盘口可能在 `endDate` 前挂起；不接单时中途无法平仓 |
 
