@@ -1293,23 +1293,9 @@ export async function mount(root, ctx) {
         default: return "";
       }
     };
-    // 拒绝交易每“市场 + 方向”只保留最新一条；成交/部分成交/结算记录不合并。
-    const rejectedKey = (trade) => `${trade.marketId || ""}|${trade.side || ""}|${trade.outcome || ""}`;
-    const latestRejected = new Map();
-    for (const row of decorated) {
-      if (row.trade.status !== "rejected") continue;
-      const key = rejectedKey(row.trade);
-      const previous = latestRejected.get(key);
-      if (!previous || (Number(row.trade.ts) || 0) > (Number(previous.trade.ts) || 0)) {
-        latestRejected.set(key, row);
-      }
-    }
-    const displayRows = decorated.filter(
-      (row) => row.trade.status !== "rejected" || latestRejected.get(rejectedKey(row.trade)) === row,
-    );
-    const rejectedTotal = decorated.filter((row) => row.trade.status === "rejected").length;
-    const hiddenRejected = Math.max(0, rejectedTotal - latestRejected.size);
-    const values = [...new Set(displayRows.map(groupValue).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+    // 先按当前筛选得到行集合，再对拒绝交易按“市场 + 方向”只保留最新一条，
+    // 最后交给分组/渲染；成交、部分成交、结算记录不合并。
+    const values = [...new Set(decorated.map(groupValue).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
     if (groupBy === "none") state.tradeFilter = "all";
     else if (state.tradeFilter !== "all" && !values.includes(state.tradeFilter)) state.tradeFilter = "all";
     if (el.tradeFilter) {
@@ -1320,14 +1306,27 @@ export async function mount(root, ctx) {
       el.tradeFilter.value = state.tradeFilter;
       el.tradeFilter.disabled = groupBy === "none";
     }
-    const visible = displayRows.filter((row) => state.tradeFilter === "all" || groupValue(row) === state.tradeFilter);
+    const filteredRows = decorated.filter((row) => state.tradeFilter === "all" || groupValue(row) === state.tradeFilter);
+    const rejectedKey = (trade) => `${trade.marketId || ""}|${trade.side || ""}|${trade.outcome || ""}`;
+    const latestRejected = new Map();
+    for (const row of filteredRows) {
+      if (row.trade.status !== "rejected") continue;
+      const key = rejectedKey(row.trade);
+      const previous = latestRejected.get(key);
+      if (!previous || (Number(row.trade.ts) || 0) > (Number(previous.trade.ts) || 0)) {
+        latestRejected.set(key, row);
+      }
+    }
+    const visible = filteredRows.filter(
+      (row) => row.trade.status !== "rejected" || latestRejected.get(rejectedKey(row.trade)) === row,
+    );
+    const rejectedTotal = filteredRows.filter((row) => row.trade.status === "rejected").length;
+    const hiddenRejected = Math.max(0, rejectedTotal - latestRejected.size);
     const limited = groupBy === "none" ? visible.slice(0, MAX_TRADES) : visible;
     if (el.tradeBadge) {
-      el.tradeBadge.textContent = state.tradeFilter === "all"
-        ? `${displayRows.length} 笔`
-        : `${visible.length}/${displayRows.length} 笔`;
+      el.tradeBadge.textContent = `${visible.length} 笔`;
       el.tradeBadge.title = hiddenRejected > 0
-        ? `拒绝交易已按“市场 + 方向”合并：隐藏 ${hiddenRejected} 条较旧记录，只显示最新一条`
+        ? `当前筛选下拒绝交易已按“市场 + 方向”合并：隐藏 ${hiddenRejected} 条较旧记录，只显示最新一条`
         : "";
     }
     if (el.tradesEmpty) el.tradesEmpty.hidden = limited.length > 0;
