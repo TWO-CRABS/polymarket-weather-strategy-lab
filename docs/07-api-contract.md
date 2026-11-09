@@ -92,7 +92,7 @@
 - 滚动收益：`ret = (p_now / p_ref - 1) × 100`，`p_ref` = `now - windowSec` 时刻（容差内）的 `priceField` 价格；需有足够样本，否则不产生信号。
 - 触发条件：`ret >= moveThresholdPct`（up）或 `ret <= -moveThresholdPct`（down），且 `|p_now - p_ref| >= minAbsMove`，且连续 `confirmationTicks` 个 tick 满足。
 - 去重：同市场同方向 `cooldownSec` 内不重复触发；每市场最多 `maxSignalsPerMarket` 次。
-- 下单约束（市价单）：**BUY 名义额 ≥ $1，无股数下限**；**SELL（退出）≥ 5 股**（交易所对 <5 股仓位不可卖出）。5 股是限价单规则，本系统不模拟限价单。`sizingValue`/`maxPositionUsd` 按**订单名义额**计，官方 taker 手续费从账户现金单独扣除（现金须 ≥ 名义额 + 手续费）。低于门槛记 `below_min_order` 拒单。
+- 下单约束（市价单）：**BUY 名义额 ≥ $1，无股数下限**；**SELL（退出）没有 5 股下限**（官方 UI 可卖出 1.1 份）。5 股是限价单规则，本系统不模拟限价单。`sizingValue`/`maxPositionUsd` 按**订单名义额**计，官方 taker 手续费从账户现金单独扣除（现金须 ≥ 名义额 + 手续费）。低于门槛记 `below_min_order` 拒单。
 - 周期兜底（`execution.fallbackBuyEachWindow`，默认 false）：每满一个 `signal.windowSec` 检查一次；若当时**没有任何持仓**（买过又卖掉也算空仓），买入**概率第 1 高**选项的 YES + **概率第 3 高**选项的 NO（候选不足 3 个只做第 1 笔），按正常名义额/价格带/点差/仓位/现金/风控执行；每个周期独立触发，已有持仓的周期跳过。Trade.reason = `fallback_entry`，不产生 Signal。时间基准为行情时间（live=时钟，replay=历史时间）。
 - 校验接口返回 `{valid, errors[], warnings[], normalized}`；`warnings` 用于提示“低价区间 ±20% 被费用吞噬”等退化配置，不阻止运行。
 

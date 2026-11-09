@@ -553,8 +553,23 @@ test("SELL walks bids descending, fee is deducted from proceeds", () => {
   assert.deepEqual(walked.bookLevels, [{ price: 0.48, size: 10 }, { price: 0.46, size: 15 }]);
 });
 
-test("SELL rejects below the minimum, empty books and bad share counts", () => {
-  assert.equal(simulateSell({ book: ORDER_BOOK_THIN, shares: 10 }).rejectReason, "below_min_order");
+test("SELL has no 5-share floor (market sell of a 1.1-share position is valid)", () => {
+  // Market SELL is not a limit order: the 5-share min_order_size does not apply.
+  const thin = simulateSell({ book: ORDER_BOOK_THIN, shares: 10 });
+  assert.equal(thin.ok, true);
+  assert.equal(thin.shares, 3);
+  assert.equal(thin.status, "partial");
+  assert.equal(thin.notional, 1.14);
+
+  // Official UI example: sell 1.1 shares into a 92¢ bid.
+  const smallBook = makeOrderBook({ bids: [{ price: 0.92, size: 10 }] });
+  const small = simulateSell({ book: smallBook, shares: 1.1 });
+  assert.equal(small.ok, true);
+  assert.equal(small.shares, 1.1);
+  assert.equal(small.price, 0.92);
+  assert.equal(small.notional, 1.012);
+  assert.equal(small.status, "filled");
+
   assert.equal(simulateSell({ book: ORDER_BOOK_DOCS_WALK, shares: 0 }).rejectReason, "below_min_order");
   assert.equal(simulateSell({ book: makeOrderBook({}), shares: 10 }).rejectReason, "no_liquidity");
   assert.equal(simulateSell({ book: ORDER_BOOK_ASKS_ONLY, shares: 10 }).rejectReason, "no_liquidity");

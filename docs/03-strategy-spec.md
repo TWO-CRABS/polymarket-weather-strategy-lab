@@ -2,7 +2,7 @@
 
 > 版本：v1.0（可实施）｜Owner：策略专家 B（strategist-signal）
 > 字段名唯一来源：`shared/contract.js` v1.0.0 + `docs/07-api-contract.md` §2；成本/P&L 口径与 `docs/04-product-spec.md` 对齐；参数含义与 `docs/02-strategy-parameters.md` 互查。
-> 适用市场：Polymarket「Highest temperature in <City> on <Date>?」事件下的 negRisk 括号市场，每个 °C 一个二元市场；`outcomes[0]=Yes/UP`、`outcomes[1]=No/DOWN`，tick=0.001，`min_order_size`=5 股，weather taker 费率 0.05。
+> 适用市场：Polymarket「Highest temperature in <City> on <Date>?」事件下的 negRisk 括号市场，每个 °C 一个二元市场；`outcomes[0]=Yes/UP`、`outcomes[1]=No/DOWN`，tick=0.001，`min_order_size`=5 股（限价单；市价 SELL 无此下限），weather taker 费率 0.05。
 > 本文是信号/成交/退出/账本/风控/边界语义的权威定义；实现必须逐条通过 §10 验收清单。
 
 ---
@@ -229,8 +229,8 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 - `status`：吃到的深度/预算耗尽且未被保护价截断 ⇒ `filled`；因保护价或深度不足提前停止 ⇒ `partial`（允许部分成交，剩余量撤销）。
 - **最小下单量（按订单类型区分）**：本系统只下**市价单**——
   ① 市价 **BUY：名义金额 ≥ $1**，**无股数下限**（Polymarket UI 提示「盘口买入需高于 1 美元」；1.4 股的 $1 单合法）；份额按 0.01 取整可能让 $1 预算落在 $1 稍下方（如 1.05×0.95=0.9975），模拟器会**补 1 个最小份额**使名义额达到 $1（预算语义不变，容差 ≤1 个 lot；现金不足时才拒绝 `below_min_order`）；
-  ② 市价 **SELL（退出）：≥ `marketSellMinShares` = 5 股**（交易所对 <5 股仓位不可卖出）；
-  ③ 5 股 `min_order_size` 是**限价单**规则（本系统不模拟限价单）。
+  ② 市价 **SELL（退出）：无 5 股下限**；持仓任意正股数（0.01 股精度）都可对 bids 卖出（官方 UI 实测 1.1 份 @92¢ 成功）；
+  ③ 5 股 `min_order_size` 是**限价单**规则（本系统只模拟市价单，不执行该下限）。
   任一不满足 ⇒ `below_min_order`，不产生成交。买入另需账户现金 ≥ 名义额 + 手续费（手续费从现金单独扣）。
 - 卖出平仓同规则（走 bids 降序、`sellLimit`、费用从收入扣除）；部分平仓按比例结转 costBasis（§5.1）。
 
@@ -243,7 +243,7 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 | 点差 > maxSpread（下单时校验；正常信号 requireSpreadOk 时也会跳过） | `spread_too_wide` |
 | 流动性 < minLiquidityUsd（下单时校验） | `liquidity_too_low` |
 | 目标侧盘口空 / 无档位在保护价内 / 可成交为 0 | `no_liquidity` |
-| 市价 BUY 名义额 < $1（无股数下限）或市价 SELL <5 股 | `below_min_order` |
+| 市价 BUY 名义额 < $1（市价 SELL 无最小股数；仅股数 ≤0 或盘口无买价被拒） | `below_min_order` |
 | 预算不足 / 现金不足 | `insufficient_cash` |
 | 全局持仓数 ≥ maxPositions | `max_positions` |
 | 同市场持仓数 ≥ maxPositionsPerMarket | `max_positions_per_market` |
@@ -551,7 +551,7 @@ function markToMarket(now) {
 8. **价格字段**：`last` 在从未成交（占位 0.5/空 side）时不产生信号；单边盘口下 mid 无效。
 9. **映射**：UP 单走 YES asks、DOWN 单走 NO asks；不得用 `1-yesMid` 造 NO 成交价。
 10. **逐档 VWAP**：asks `[0.50×10, 0.52×20]`、预算 $20 ⇒ 依次吃档，VWAP/notional/fee 与手算一致；部分成交 `status=partial` 且剩余撤销。
-11. **最小单**：市价 BUY 名义额 <$1（无股数下限）或市价 SELL <5 股 ⇒ `below_min_order`，不产生成交；限价单 5 股规则不适用。
+11. **最小单**：市价 BUY 名义额 <$1（无股数下限）⇒ `below_min_order`；市价 SELL 无 5 股下限，只要股数 >0 且有 bids 即可成交；限价单 5 股规则不适用。
 12. **费用**：100 股 @0.50 ⇒ `calcTakerFee=1.25000`；费用一律按成交 VWAP 用 `calcTakerFee()` 计算、`<0.00001` 记 0；BUY 现金支出=notional+fee，SELL 现金收入=notional-fee。
 13. **费用后盈亏**：示例 B `costBasis=24.99774`，bid=0.40 时 `retLiqPct≈52.6%`，`takeProfitPct=50` 触发 `take_profit`。
 14. **退出优先级**：同时满足 SL/TP/maxHold ⇒ 先 `stop_loss`；`holdToResolution=false` 时 TP/SL/maxHold/反向均生效；`true` 时只在结算 `resolution` 兑付。

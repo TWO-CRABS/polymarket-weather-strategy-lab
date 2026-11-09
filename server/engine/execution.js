@@ -11,7 +11,8 @@
  *                   sellLimit = floorToTick(max(0.001, bestBid×(1−bps/1e4))).
  * MARKET BUY minimum: $1 notional (NO share minimum — the 5-share minimum applies
  * to limit orders; a market BUY of 1.4 shares is valid on Polymarket).
- * MARKET SELL minimum: 5 shares (under-5-share positions cannot be sold).
+ * MARKET SELL minimum: none — any positive share count can hit the best bid
+ * (official UI sells 1.1-share positions); the 5-share floor is limit-order-only.
  */
 import { FEES, ORDER_RULES, calcTakerFee, roundTo } from "../../shared/contract.js";
 import { toNum } from "../util.js";
@@ -194,7 +195,7 @@ export function simulateBuy(args) {
 /**
  * Simulate a FAK SELL (marketable) against bids.
  * @param {{book:any, shares:number, feeRate?:number, slippageBufferBps?:number,
- *          tickSize?:number, minOrderShares?:number}} args
+ *          tickSize?:number}} args
  * @returns {FillResult}
  */
 export function simulateSell(args) {
@@ -204,7 +205,6 @@ export function simulateSell(args) {
     feeRate = FEES.takerFeeRate,
     slippageBufferBps = 0,
     tickSize = book?.tickSize || 0.001,
-    minOrderShares = book?.minOrderSize || ORDER_RULES.marketSellMinShares,
   } = args;
   if (!Number.isFinite(shares) || shares <= 0) return rejected("below_min_order");
   const bids = Array.isArray(book?.bids) ? book.bids : [];
@@ -235,7 +235,6 @@ export function simulateSell(args) {
   }
 
   if (filled <= 0) return rejected("no_liquidity", { limitPrice });
-  if (filled < minOrderShares - 1e-9) return rejected("below_min_order", { limitPrice });
 
   const price = roundTo(notional / filled, 6);
   const fee = calcTakerFee(filled, price, feeRate);

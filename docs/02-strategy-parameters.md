@@ -62,7 +62,7 @@
 | `spread_abs` | `bestAsk − bestBid`（YES 侧） | `S4` 末位差 / `S5 /spread` | `0.001..0.05`；默认 `≤ 0.03`，推荐 `≤ 0.02` | 温度盘口实测常见 `0.014 ~ 0.036`，相当于 3.5%–35% 的报价宽度 |
 | `spread_ratio` | `spread_abs / implied_probability` | 派生 | 实测 `1.4% ~ 35%`；门槛 `≤ 5%` | 相对点差才是真成本；低价括号点差很小但费用占比极高（§5） |
 | `tick_size` | 最小价格变动 | `S4 tick_size` / `S2 orderPriceMinTickSize` / `S5 /tick-size` | `0.001`（温度市场恒定，实测） | `+20%` 在 `p=0.001` 处只有 `0.0002 < 1 tick`，**不可表达**（§7） |
-| `min_order_shares` | 最小下单股数 | `S4 min_order_size` = `"5"`；`S2 orderMinSize` = `5` | `5` 股（限价/卖出） | **市价买入（BUY）无股数下限，只需名义额 ≥ $1**（Polymarket UI 提示「盘口买入需高于 1 美元」）；5 股是**限价单**规则，同时也是**市价卖出**下限（<5 股仓位无法卖出）。`shared/contract.js` 的 `ORDER_RULES`：`marketBuyMinUsd=1`、`marketSellMinShares=5`、`limitMinShares=5` |
+| `min_order_shares` | 最小下单股数（限价单） | `S4 min_order_size` = `"5"`；`S2 orderMinSize` = `5` | `5` 股（仅限价单） | **市价 BUY 无股数下限，只需名义额 ≥ $1**（Polymarket UI 提示「盘口买入需高于 1 美元」）；**市价 SELL 也没有 5 股下限**，官方 UI 可卖出 1.1 份（实测 1.1 份 @92¢ 成功）。5 股是**限价单**规则，本系统只模拟市价单，因此不执行该下限。`ORDER_RULES`：`marketBuyMinUsd=1`、`limitMinShares=5` |
 | `price_tick_ratio` | `implied_probability / tick_size`（该价位有多少个 tick 的"分辨率"） | 派生 | `1..999`；筛选 `≥ 20`（即 `p ≥ 0.02`） | 低价处 1 tick = 巨大百分比；这个比值是判断"百分比信号是否可交易"的最快指标 |
 | `accepting_orders` | `active && !closed && acceptingOrders && enableOrderBook` | `S2`/`S3` 同名字段 | `true` | 盘口可能在 `endDate` 前挂起；不接单时中途无法平仓 |
 
@@ -143,8 +143,8 @@ fee  = round5(filled × 0.05 × VWAP × (1 − VWAP))     # <0.00001 记 0
 | `depth_at_k_ticks` | 距最优价 `k` 个 tick 内的可成交量 | `S4` | `k=5` 统计 | 订单额超过该深度 → 实际成交价劣于预期 |
 | `fill_prob` | 快照下 `= 1`（深度与接单状态满足）；跨 tick 的"报价存活率"另计为 `quote_survival_prob` | `03` §3.3 | 模拟器用确定性 `0/1` | 现实中的失败来自"价格在 1 个 tick 内被撤走"（延迟竞赛），不是深度不足 |
 | `quote_survival_prob` | `P(best_ask 在 Δt 内不变)`，建议由 WS `book`/`best_bid_ask` 序列估计（Δt=1s/5s） | WS `market` 频道 | 温度市场实测偏态：活跃括号 `0.5~0.9`，冷括号 `≈1`（无人动） | 存活率低的括号 = 你会追到"幻影报价"；存活率≈1 的冷括号 = 没有对手 |
-| `partial_fill_ratio` | `filled / requested` | 撮合输出 | `0..1`；`status=partial` | 部分成交后剩余撤销（FAK）；`filled < 5 股` 整单拒绝（`below_min_order`） |
-| `min_fill_shares` | 最小成交换手 | `S4 min_order_size` | `5` 股 | 注意 5 股在 `p=0.001` 时名义额仅 `$0.005`，此时"最小单"几乎免费——但 fee=`5×0.05×0.001×0.999=0.00025` 仍大于 5dp 门槛 `0.00001`，照收 |
+| `partial_fill_ratio` | `filled / requested` | 撮合输出 | `0..1`；`status=partial` | 部分成交后剩余撤销（FAK）；市价 SELL 无 5 股下限，部分成交按实际 `filled` 记账 |
+| `min_fill_shares` | 最小成交换手（限价单） | `S4 min_order_size` | `5` 股（仅限价单） | 市价 SELL 无此门槛；1.1 股也可直接对 bids 成交。 |
 | `order_budget_usd` | 单笔预算（含费）：`min(sizingValue, cash, maxPositionUsd − marketCost)` | 契约 `execution.*` | `20~50 USD` | 预算必须 ≥ `5 × price × (1+fee)` 才可能成交 |
 | `gas_cost_usd` | 恒为 `0`（温度市场链下撮合） | — | `0` | **不要在成本模型里加 gas**；加了会系统性低估收益率 |
 | `latency_ms` | 从看到快照到订单到达撮合的延迟 | 实测/标定 | `100~2000 ms`（回放可配） | 1 分钟窗口策略里，2s 延迟就可能错过整段脉冲；回放须支持该参数 |

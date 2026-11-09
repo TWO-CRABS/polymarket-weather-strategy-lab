@@ -281,7 +281,7 @@ export async function mount(root, ctx) {
     no_liquidity: "目标侧盘口没有可成交档位。",
     spread_too_wide: "点差超过 universe.maxSpread。",
     liquidity_too_low: "市场流动性低于 universe.minLiquidityUsd。",
-    below_min_order: "低于最小下单量（BUY 名义额 < $1，或 SELL < 5 股）。",
+    below_min_order: "低于最小下单量（市价 BUY 名义额 < $1；市价 SELL 无 5 股下限）。",
     insufficient_cash: "账户现金不足以覆盖名义额 + 手续费。",
     max_positions: "达到 execution.maxPositions 全局持仓上限。",
     max_positions_per_market: "达到单市场持仓上限。",

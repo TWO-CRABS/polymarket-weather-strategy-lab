@@ -154,7 +154,6 @@ export async function executeExit(run, position, market, reason, now) {
     feeRate: feeRate(run, market),
     slippageBufferBps: run.config.execution.slippageBufferBps,
     tickSize: market.tickSize,
-    minOrderShares: market.minOrderShares,
   });
   if (!fill.ok) {
     recordExitRejection(run, position, market, reason, fill.rejectReason, now);

@@ -37,22 +37,18 @@ export const FEES = Object.freeze({
 });
 
 /**
- * Official order constraints (confirmed 2026-11-08):
+ * Official order constraints:
  * - MARKET orders are amount-denominated on the BUY side: minimum **$1 notional**,
  *   NO share minimum (Polymarket UI: "盘口买入需高于 1 美元" / "market buy must be over $1").
- * - LIMIT orders require the CLOB `min_order_size`, normally **5 shares**.
- * - SELL orders are share-denominated; a position below 5 shares cannot be sold
- *   (exchange 5-share floor), so market SELL/exit requires >= 5 shares.
- * The built-in simulator only places market (taker/FAK) orders, so it enforces
- * `$1` on BUY and `5 shares` on SELL. (Some third-party SDKs report the limit-order
- * share rule leaking onto market orders — see nautilus_trader#3874 — that is a bug;
- * the official/UI rule is used here.)
+ * - MARKET SELL orders are share-denominated but have **NO 5-share minimum**:
+ *   official UI allows selling a 1.1-share position against the best bid.
+ * - LIMIT orders require the CLOB `min_order_size`, normally **5 shares**;
+ *   the simulator only places market (taker/FAK) orders, so it does not enforce
+ *   this limit-order share floor.
  */
 export const ORDER_RULES = Object.freeze({
   /** Market BUY: minimum notional in USD (no share minimum). */
   marketBuyMinUsd: 1,
-  /** Market SELL / exit: minimum shares (under-5-share positions are unsellable). */
-  marketSellMinShares: 5,
   /** Limit orders: CLOB min_order_size in shares (not simulated here). */
   limitMinShares: 5,
 });
