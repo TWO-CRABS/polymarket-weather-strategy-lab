@@ -261,6 +261,35 @@ export async function mount(root, ctx) {
   let historyController = null;
   let historySeq = 0;
   let stopBusy = false;
+  let tradeTipEl = null;
+  let tradeTipTarget = null;
+  const TRADE_STATUS_LABELS = { filled: "已成交", partial: "部分成交", rejected: "已拒绝" };
+  const TRADE_REASON_NOTES = {
+    signal: "价格动量信号触发入场。",
+    fallback_entry: "每周期兜底建仓：城市事件内按 YES 概率第 1 高买 YES、第 3 高买 NO；被价格带/流动性/点差拒绝时不会顺延。",
+    take_profit: "达到止盈阈值后卖出。",
+    stop_loss: "达到止损阈值后卖出。",
+    max_hold: "超过最大持有时间后卖出。",
+    opposite_signal: "出现反向信号后退出。",
+    hold_to_resolution: "持有到官方裁决后按结果兑付。",
+    resolution: "市场按官方裁决兑付：payout × 股数，结算不收费。",
+    manual: "手动平仓。",
+    risk_kill_switch: "风控熔断后退出。",
+    rejected: "下单前风控未通过，没有产生真实成交。",
+  };
+  const REJECT_REASON_NOTES = {
+    no_liquidity: "目标侧盘口没有可成交档位。",
+    spread_too_wide: "点差超过 universe.maxSpread。",
+    liquidity_too_low: "市场流动性低于 universe.minLiquidityUsd。",
+    below_min_order: "低于最小下单量（BUY 名义额 < $1，或 SELL < 5 股）。",
+    insufficient_cash: "账户现金不足以覆盖名义额 + 手续费。",
+    max_positions: "达到 execution.maxPositions 全局持仓上限。",
+    max_positions_per_market: "达到单市场持仓上限。",
+    market_not_accepting_orders: "市场暂停或停止接单。",
+    stale_market: "行情已过期。",
+    risk_blocked: "价格带、距交易截止时间、回撤、日亏或熔断等前置风控未通过；具体看当前价格、TTR 与 run 配置。",
+    unknown: "未识别的原因，请结合日志排查。",
+  };
 
   /* -------------------- 外壳 -------------------- */
 
@@ -335,6 +364,12 @@ export async function mount(root, ctx) {
 
   root.addEventListener("click", onRootClick);
   root.addEventListener("change", onRootChange);
+  root.addEventListener("mouseover", onTradeTipOver);
+  root.addEventListener("mousemove", onTradeTipMove);
+  root.addEventListener("mouseout", onTradeTipOut);
+  root.addEventListener("focusin", onTradeTipFocus);
+  root.addEventListener("focusout", onTradeTipBlur);
+  window.addEventListener("scroll", hideTradeTip, true);
   root.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const target = event.target instanceof Element ? event.target : null;
@@ -1097,7 +1132,136 @@ export async function mount(root, ctx) {
 
   /* -------------------- 成交明细 -------------------- */
 
+  /** 成交明细“原因”悬浮详情：跟随鼠标显示，移出即隐藏。 */
+  function ensureTradeTip() {
+    if (tradeTipEl) return tradeTipEl;
+    tradeTipEl = document.createElement("div");
+    tradeTipEl.className = "trade-tip";
+    tradeTipEl.id = "tradeTip";
+    tradeTipEl.setAttribute("role", "tooltip");
+    tradeTipEl.hidden = true;
+    document.body.appendChild(tradeTipEl);
+    return tradeTipEl;
+  }
+
+  function hideTradeTip() {
+    if (!tradeTipEl) return;
+    tradeTipEl.hidden = true;
+    tradeTipTarget = null;
+  }
+
+  function positionTradeTip(event) {
+    if (!tradeTipEl || !tradeTipTarget) return;
+    const rect = tradeTipEl.getBoundingClientRect();
+    const margin = 14;
+    let x;
+    let y;
+    if (event && (event.clientX || event.clientY)) {
+      x = event.clientX + margin;
+      y = event.clientY + margin;
+    } else {
+      const targetRect = tradeTipTarget.getBoundingClientRect();
+      x = targetRect.left;
+      y = targetRect.bottom + 8;
+    }
+    if (x + rect.width > window.innerWidth - 8) x = Math.max(8, x - rect.width - margin * 2);
+    if (y + rect.height > window.innerHeight - 8) y = Math.max(8, y - rect.height - margin * 2);
+    tradeTipEl.style.left = `${Math.max(8, x)}px`;
+    tradeTipEl.style.top = `${Math.max(8, y)}px`;
+  }
+
+  function showTradeTip(target, event) {
+    if (!target) {
+      hideTradeTip();
+      return;
+    }
+    const text = target.dataset.tradeTip || "";
+    if (!text) {
+      hideTradeTip();
+      return;
+    }
+    const tip = ensureTradeTip();
+    tip.textContent = text;
+    tip.hidden = false;
+    tradeTipTarget = target;
+    positionTradeTip(event);
+  }
+
+  function tradeTipTriggerFrom(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    return target ? target.closest("[data-trade-tip]") : null;
+  }
+
+  function onTradeTipOver(event) {
+    const target = tradeTipTriggerFrom(event);
+    if (!target) {
+      hideTradeTip();
+      return;
+    }
+    if (target === tradeTipTarget && tradeTipEl && !tradeTipEl.hidden) return;
+    showTradeTip(target, event);
+  }
+
+  function onTradeTipMove(event) {
+    if (!tradeTipTarget || !tradeTipEl || tradeTipEl.hidden) return;
+    positionTradeTip(event);
+  }
+
+  function onTradeTipOut(event) {
+    if (!tradeTipTarget) return;
+    if (event.relatedTarget instanceof Node && tradeTipTarget.contains(event.relatedTarget)) return;
+    hideTradeTip();
+  }
+
+  function onTradeTipFocus(event) {
+    const target = tradeTipTriggerFrom(event);
+    if (!target) return;
+    showTradeTip(target, null);
+  }
+
+  function onTradeTipBlur(event) {
+    if (!tradeTipTarget) return;
+    if (event.relatedTarget instanceof Node && tradeTipTarget.contains(event.relatedTarget)) return;
+    hideTradeTip();
+  }
+
+  function buildTradeTip({ trade, market, city, bracket, date, reason }) {
+    const status = TRADE_STATUS_LABELS[trade.status] || trade.status || "—";
+    const lines = [`${reason} · ${status}`];
+    if (trade.reason) lines.push(`触发来源：${reason}（${trade.reason}）`);
+    if (trade.status === "rejected" && trade.rejectReason) {
+      lines.push(`拒绝原因：${ui.rejectReasonLabel(trade.rejectReason)}（${trade.rejectReason}）`);
+    }
+    lines.push(`市场：${[city, bracket, date].filter(Boolean).join(" · ") || "—"}`);
+    lines.push(`方向：${trade.side || "—"}${trade.outcome ? ` ${trade.outcome}` : ""}`);
+    lines.push(`数量：${ui.fmtShares(trade.shares, 2)} 股 · 成交价：${priceText(trade.price)}`);
+    lines.push(`名义：${ui.fmtMoney(num(trade.notional), 2)} · 手续费：${feeText(trade.fee)}`);
+    const slippage = num(trade.slippageCost);
+    if (slippage !== null && slippage > 0) lines.push(`滑点：${ui.fmtMoney(slippage, 2)}`);
+    const pnl = num(trade.realizedPnl);
+    if (pnl !== null && pnl !== 0) lines.push(`已实现盈亏：${ui.fmtMoney(pnl, 4)}`);
+    if (market) {
+      const snapshot = [];
+      const mid = num(market.impliedProbability);
+      const yes = quoteOf(market, "YES");
+      const spread = num(market.spread);
+      const liquidity = num(market.liquidityUsd);
+      if (mid !== null) snapshot.push(`YES ${ui.fmtProb(mid)}`);
+      if (num(yes.ask) !== null) snapshot.push(`ask ${priceText(yes.ask)}`);
+      if (spread !== null) snapshot.push(`点差 ${ui.fmtCents(spread, 1)}`);
+      if (liquidity !== null) snapshot.push(`流动性 ${ui.fmtMoney(liquidity)}`);
+      if (snapshot.length) lines.push(`市场快照：${snapshot.join(" · ")}`);
+    }
+    lines.push(`时间：${ui.fmtTime(trade.ts)} · 状态：${status}`);
+    const note = trade.status === "rejected"
+      ? (REJECT_REASON_NOTES[trade.rejectReason] || REJECT_REASON_NOTES.unknown)
+      : TRADE_REASON_NOTES[trade.reason];
+    if (note) lines.push("", `说明：${note}`);
+    return lines.join("\n");
+  }
+
   function renderTrades() {
+    hideTradeTip();
     if (!el.tradesBody) return;
     const groupBy = TRADE_GROUP_OPTIONS.some((option) => option.value === state.tradeGroupBy)
       ? state.tradeGroupBy
@@ -1157,6 +1321,7 @@ export async function mount(root, ctx) {
       const pnl = num(trade.realizedPnl);
       const selected = state.selectedMarketId && trade.marketId === state.selectedMarketId;
       const bracketText = [bracket, date].filter(Boolean).join(" · ");
+      const tipAttr = ui.escapeHtml(buildTradeTip({ trade, market, city, bracket, date, reason })).replace(/\n/g, "&#10;");
       return `<tr class="${rejected ? "row-rejected" : ""}${selected ? " is-selected-row" : ""}" data-market-id="${ui.escapeHtml(trade.marketId || "")}" tabindex="0">
         <td class="num-col cell-dim">${ui.escapeHtml(ui.fmtTime(trade.ts))}</td>
         <td>${marketLinkHtml(market, city, bracketText)}</td>
@@ -1167,7 +1332,7 @@ export async function mount(root, ctx) {
         <td class="num-col cell-amber">${ui.escapeHtml(feeText(trade.fee))}</td>
         <td class="num-col cell-dim">${ui.escapeHtml(ui.fmtMoney(num(trade.slippageCost) || 0, 2))}</td>
         <td class="num-col">${trade.side === "SELL" && pnl !== null ? ui.pnlSpan(pnl, { money: true, digits: 4 }) : '<span class="muted">—</span>'}</td>
-        <td class="trade-reason"><b>${ui.escapeHtml(reason)}</b>${rejected && trade.rejectReason ? `<br><span class="down">${ui.escapeHtml(ui.rejectReasonLabel(trade.rejectReason))}</span>` : ""}</td>
+        <td class="trade-reason"><span class="trade-reason-trigger" tabindex="0" data-trade-tip="${tipAttr}"><b>${ui.escapeHtml(reason)}</b>${rejected && trade.rejectReason ? `<span class="down">${ui.escapeHtml(ui.rejectReasonLabel(trade.rejectReason))}</span>` : ""}</span></td>
         <td>${ui.tradeStatusBadge(trade.status)}</td>
       </tr>`;
     };
@@ -1684,6 +1849,17 @@ export async function mount(root, ctx) {
     state.destroyed = true;
     root.removeEventListener("click", onRootClick);
     root.removeEventListener("change", onRootChange);
+    root.removeEventListener("mouseover", onTradeTipOver);
+    root.removeEventListener("mousemove", onTradeTipMove);
+    root.removeEventListener("mouseout", onTradeTipOut);
+    root.removeEventListener("focusin", onTradeTipFocus);
+    root.removeEventListener("focusout", onTradeTipBlur);
+    window.removeEventListener("scroll", hideTradeTip, true);
+    if (tradeTipEl) {
+      tradeTipEl.remove();
+      tradeTipEl = null;
+    }
+    tradeTipTarget = null;
     if (stream) {
       stream.close();
       stream = null;

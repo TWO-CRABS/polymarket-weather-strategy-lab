@@ -1667,3 +1667,36 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 /* ---------- B22. 城市多选快捷操作 ---------- */
 .city-actions { display: flex; gap: 6px; margin-top: 6px; }
 .city-actions .btn-xs { height: 24px; padding: 0 8px; font-size: 10px; }
+
+/* ---------- B23. 成交明细原因悬浮详情 ---------- */
+.trade-reason-trigger {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 100%;
+  border-bottom: 1px dotted var(--line-strong);
+  cursor: help;
+}
+.trade-reason-trigger:hover,
+.trade-reason-trigger:focus-visible {
+  border-bottom-color: var(--cyan);
+  outline: none;
+}
+.trade-tip {
+  position: fixed;
+  z-index: 3000;
+  max-width: min(380px, calc(100vw - 16px));
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text-2);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  font-size: var(--fs-11);
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  white-space: pre-line;
+  word-break: break-word;
+  pointer-events: none;
+}
+.trade-tip[hidden] { display: none; }
