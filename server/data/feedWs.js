@@ -22,11 +22,49 @@ const STATUS = Object.freeze({
   DEGRADED: "degraded",
 });
 
+/**
+ * Group tracked markets into WS subscription batches by city.
+ * Default: about 20 cities per WebSocket subscription.
+ * @param {Iterable<any>} markets
+ * @param {Map<string,any>|Set<string>|Iterable<string>} tokens tracked token ids
+ * @param {number} citiesPerConnection
+ * @returns {Array<{cities:string[], tokens:string[]}>}
+ */
+export function buildWsBatches(markets, tokens, citiesPerConnection = 20) {
+  const tracked = tokens instanceof Map ? new Set(tokens.keys()) : new Set(tokens || []);
+  const cityMarkets = new Map();
+  for (const market of markets || []) {
+    if (!market?.id || !market.tokens?.yesTokenId) continue;
+    const city = String(market.city || market.eventTitle || market.id);
+    if (!cityMarkets.has(city)) cityMarkets.set(city, []);
+    cityMarkets.get(city).push(market);
+  }
+  const cities = [...cityMarkets.keys()].sort((a, b) => a.localeCompare(b));
+  const size = Math.max(1, Math.floor(Number(citiesPerConnection)) || 20);
+  const batches = [];
+  for (let i = 0; i < cities.length; i += size) {
+    const chunk = cities.slice(i, i + size);
+    const assets = [];
+    const seen = new Set();
+    for (const city of chunk) {
+      for (const market of cityMarkets.get(city)) {
+        for (const token of [market.tokens.yesTokenId, market.tokens.noTokenId]) {
+          if (!token || !tracked.has(token) || seen.has(token)) continue;
+          seen.add(token);
+          assets.push(token);
+        }
+      }
+    }
+    if (assets.length > 0) batches.push({ cities: chunk, tokens: assets });
+  }
+  return batches;
+}
+
 export class WsAdapter {
   /**
    * @param {import("./feed.js").Feed} feed parent feed (owns tokens/books/status)
    * @param {{url:string, reconnectSchedule:number[], pingMs:number,
-   *   reconcileMs:number, log?:Function}} opts
+   *   reconcileMs:number, citiesPerConnection?:number, log?:Function}} opts
    */
   constructor(feed, opts) {
     this.feed = feed;
@@ -34,14 +72,11 @@ export class WsAdapter {
     this.reconnectSchedule = opts.reconnectSchedule ?? [1000, 2000, 5000, 15_000, 30_000];
     this.pingMs = opts.pingMs ?? 10_000;
     this.reconcileMs = opts.reconcileMs ?? 2500;
+    this.citiesPerConnection = Math.max(1, Math.floor(Number(opts.citiesPerConnection)) || 20);
     this.log = opts.log ?? (() => {});
-    this.ws = null;
-    this.connected = false;
-    this.failures = 0;
-    this.reconnectIndex = 0;
     this.disabled = false;
-    this._reconnectTimer = null;
-    this._pingTimer = null;
+    /** @type {Map<number, WsChannel>} */
+    this.channels = new Map();
     this._reconcileTimer = null;
     this._pendingRefresh = new Set();
     this._pendingRefreshTimer = null;
@@ -49,126 +84,80 @@ export class WsAdapter {
 
   start() {
     if (this.disabled) return;
-    this._connect();
+    this._syncChannels();
+    this._startReconcile();
   }
 
   stop() {
     this.disabled = true;
-    this._stopTimers();
-    if (this.ws) {
-      try {
-        this.ws.close();
-      } catch {
-        /* ignore */
-      }
-    }
-    this.ws = null;
-    this.connected = false;
-    this.feed._wsConnected = false;
-  }
-
-  /** Re-send the subscription after the tracked token set changes. */
-  resubscribe() {
-    if (!this.connected || !this.ws) return;
-    const assets = [...this.feed.tokens.keys()];
-    try {
-      this.ws.send(JSON.stringify({ type: "market", assets_ids: assets }));
-    } catch {
-      /* reconnect handles it */
-    }
-  }
-
-  /* ------------------------------ connection ----------------------------- */
-
-  _connect() {
-    if (this.disabled || !this.feed._running || this.ws) return;
-    let ws;
-    try {
-      ws = new WebSocket(this.url);
-    } catch (err) {
-      this._onFailure(`websocket init failed: ${err.message}`);
-      return;
-    }
-    this.ws = ws;
-    ws.onopen = () => {
-      this.connected = true;
-      this.failures = 0;
-      this.reconnectIndex = 0;
-      this.feed._wsConnected = true;
-      const assets = [...this.feed.tokens.keys()];
-      this.log("info", `ws market feed connected (${assets.length} assets)`);
-      if (assets.length > 0) {
-        try {
-          ws.send(JSON.stringify({ type: "market", assets_ids: assets }));
-        } catch (err) {
-          this.log("warn", `ws subscribe failed: ${err.message}`);
-        }
-      }
-      this._startPing(ws);
-      this._startReconcile();
-      this.feed._setStatus(STATUS.LIVE);
-    };
-    ws.onmessage = (event) => {
-      try {
-        this._handleMessage(event.data);
-      } catch (err) {
-        this.log("warn", `ws message ignored: ${err.message}`);
-      }
-    };
-    ws.onerror = () => this._onFailure("websocket error");
-    ws.onclose = () => this._onFailure(this.connected ? "websocket closed" : "websocket closed before open");
-  }
-
-  _onFailure(reason) {
-    this.failures += 1;
-    const wasConnected = this.connected;
-    this.connected = false;
-    this.ws = null;
-    this._stopTimers();
-    this.feed._wsConnected = false;
-    this.feed.lastError = reason;
-    if (wasConnected) this.log("warn", `ws market feed lost: ${reason}`);
-    this.feed._setStatus(this.feed.lastUpdate > 0 ? STATUS.DEGRADED : STATUS.CONNECTING);
-    if (this.failures >= 6 && this.feed.mode === "ws") {
-      this.disabled = true;
-      this.log("warn", "ws unavailable after repeated failures; using REST polling only");
-      return;
-    }
-    if (!this.feed._running || !this.feed._allowWs) return;
-    const delay = this.reconnectSchedule[Math.min(this.reconnectIndex, this.reconnectSchedule.length - 1)];
-    this.reconnectIndex += 1;
-    this._reconnectTimer = setTimeout(() => this._connect(), delay);
-    if (typeof this._reconnectTimer.unref === "function") this._reconnectTimer.unref();
-  }
-
-  _stopTimers() {
-    if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
-    if (this._pingTimer) clearInterval(this._pingTimer);
+    for (const channel of this.channels.values()) channel.stop();
+    this.channels.clear();
     if (this._reconcileTimer) clearInterval(this._reconcileTimer);
-    this._reconnectTimer = null;
-    this._pingTimer = null;
+    if (this._pendingRefreshTimer) clearTimeout(this._pendingRefreshTimer);
     this._reconcileTimer = null;
+    this._pendingRefreshTimer = null;
+    this.feed._wsConnected = false;
   }
 
-  _startPing(ws) {
-    if (this._pingTimer) clearInterval(this._pingTimer);
-    this._pingTimer = setInterval(() => {
-      if (!this.connected) return;
-      try {
-        ws.send("PING");
-      } catch {
-        /* reconnect handles it */
+  /** Rebuild/sync subscription batches after the tracked token set changes. */
+  resubscribe() {
+    if (this.disabled) return;
+    this._syncChannels();
+    this._startReconcile();
+  }
+
+  _buildBatches() {
+    return buildWsBatches(this.feed.markets.values(), this.feed.tokens, this.citiesPerConnection);
+  }
+
+  _syncChannels() {
+    const plans = this._buildBatches();
+    const wanted = new Set(plans.map((_plan, index) => index));
+    for (const [index, channel] of [...this.channels]) {
+      if (wanted.has(index)) continue;
+      channel.stop();
+      this.channels.delete(index);
+      this.log("info", `ws batch #${index + 1} closed (no longer needed)`);
+    }
+    plans.forEach((plan, index) => {
+      const signature = plan.tokens.join("|");
+      const existing = this.channels.get(index);
+      if (!existing) {
+        const channel = new WsChannel(this, index, plan);
+        this.channels.set(index, channel);
+        if (this.feed._running) channel.connect();
+        return;
       }
-    }, this.pingMs);
-    if (typeof this._pingTimer.unref === "function") this._pingTimer.unref();
+      if (existing.signature === signature) return;
+      existing.update(plan);
+      existing.disabled = false;
+      if (existing.connected) {
+        existing.sendSubscription();
+        this.log(
+          "info",
+          `ws batch #${index + 1} resubscribed (${plan.cities.length} cities / ${plan.tokens.length} assets)`,
+        );
+      } else if (this.feed._running) {
+        existing.connect();
+      }
+    });
+    this._updateWsStatus();
   }
 
   _startReconcile() {
-    if (this._reconcileTimer) clearInterval(this._reconcileTimer);
+    if (this._reconcileTimer || !this.feed._running) return;
     this._reconcileTimer = setInterval(() => {
       this.feed._pollOnce(true).catch(() => {});
     }, this.reconcileMs);
     if (typeof this._reconcileTimer.unref === "function") this._reconcileTimer.unref();
+  }
+
+  _updateWsStatus() {
+    const connected = [...this.channels.values()].some((channel) => channel.connected);
+    this.feed._wsConnected = connected;
+    if (!this.feed._running) return;
+    if (connected) this.feed._setStatus(STATUS.LIVE);
+    else this.feed._setStatus(this.feed.lastUpdate > 0 ? STATUS.DEGRADED : STATUS.CONNECTING);
   }
 
   /* -------------------------------- frames ------------------------------- */
@@ -315,6 +304,132 @@ export class WsAdapter {
       }
     }, 120);
     if (typeof this._pendingRefreshTimer.unref === "function") this._pendingRefreshTimer.unref();
+  }
+}
+
+/** One WebSocket connection responsible for one city batch. */
+class WsChannel {
+  constructor(adapter, index, plan) {
+    this.adapter = adapter;
+    this.index = index;
+    this.ws = null;
+    this.connected = false;
+    this.failures = 0;
+    this.reconnectIndex = 0;
+    this.disabled = false;
+    this._reconnectTimer = null;
+    this._pingTimer = null;
+    this.update(plan);
+  }
+
+  update(plan) {
+    this.tokens = plan.tokens;
+    this.cities = plan.cities;
+    this.signature = this.tokens.join("|");
+  }
+
+  connect() {
+    const adapter = this.adapter;
+    if (this.disabled || !adapter.feed._running || this.ws || this.tokens.length === 0) return;
+    let ws;
+    try {
+      ws = new WebSocket(adapter.url);
+    } catch (err) {
+      this._onFailure(`websocket init failed: ${err.message}`);
+      return;
+    }
+    this.ws = ws;
+    ws.onopen = () => {
+      if (this.ws !== ws) return;
+      this.connected = true;
+      this.failures = 0;
+      this.reconnectIndex = 0;
+      adapter.feed._wsConnected = true;
+      adapter._updateWsStatus();
+      adapter.log(
+        "info",
+        `ws batch #${this.index + 1} connected (${this.cities.length} cities / ${this.tokens.length} assets)`,
+      );
+      this.sendSubscription();
+      this._startPing();
+    };
+    ws.onmessage = (event) => {
+      try {
+        adapter._handleMessage(event.data);
+      } catch (err) {
+        adapter.log("warn", `ws message ignored: ${err.message}`);
+      }
+    };
+    ws.onerror = () => this._onFailure("websocket error");
+    ws.onclose = () => this._onFailure(this.connected ? "websocket closed" : "websocket closed before open");
+  }
+
+  sendSubscription() {
+    if (!this.connected || !this.ws) return;
+    try {
+      this.ws.send(JSON.stringify({ type: "market", assets_ids: this.tokens }));
+    } catch (err) {
+      this.adapter.log("warn", `ws batch #${this.index + 1} subscribe failed: ${err.message}`);
+    }
+  }
+
+  _onFailure(reason) {
+    const adapter = this.adapter;
+    this.failures += 1;
+    const wasConnected = this.connected;
+    this.connected = false;
+    this.ws = null;
+    this._stopPing();
+    adapter.feed.lastError = reason;
+    adapter._updateWsStatus();
+    if (wasConnected) adapter.log("warn", `ws batch #${this.index + 1} lost: ${reason}`);
+    if (this.failures >= 6 && adapter.feed.mode === "ws") {
+      this.disabled = true;
+      adapter.log("warn", `ws batch #${this.index + 1} disabled after repeated failures; REST polling covers it`);
+      return;
+    }
+    if (!adapter.feed._running || !adapter.feed._allowWs || this.disabled) return;
+    const delay = adapter.reconnectSchedule[Math.min(this.reconnectIndex, adapter.reconnectSchedule.length - 1)];
+    this.reconnectIndex += 1;
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      this.connect();
+    }, delay);
+    if (typeof this._reconnectTimer.unref === "function") this._reconnectTimer.unref();
+  }
+
+  _startPing() {
+    if (this._pingTimer) clearInterval(this._pingTimer);
+    this._pingTimer = setInterval(() => {
+      if (!this.connected || !this.ws) return;
+      try {
+        this.ws.send("PING");
+      } catch {
+        /* reconnect handles it */
+      }
+    }, this.adapter.pingMs);
+    if (typeof this._pingTimer.unref === "function") this._pingTimer.unref();
+  }
+
+  _stopPing() {
+    if (this._pingTimer) clearInterval(this._pingTimer);
+    if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+    this._pingTimer = null;
+    this._reconnectTimer = null;
+  }
+
+  stop() {
+    this.disabled = true;
+    this._stopPing();
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.ws = null;
+    this.connected = false;
   }
 }
 

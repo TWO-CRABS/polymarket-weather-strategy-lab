@@ -186,7 +186,7 @@
 ### 4.1 元信息 / 健康
 | Method | Path | 说明 | 响应 |
 |---|---|---|---|
-| GET | `/api/health` | 健康检查 | `{status:"ok", now, uptimeSec, feed:{status,marketsTracked,lastUpdate,latencyMs}, runs:{active,total}}` |
+| GET | `/api/health` | 健康检查 | `{status:"ok", now, uptimeSec, feed:{status,marketsTracked,lastUpdate,latencyMs,mode,wsBatches,wsConnectedBatches}, runs:{active,total}}` |
 | GET | `/api/meta` | 前端初始化元数据 | `{contractVersion, serverTime, universeDate, cities:[...当天有市场的城市], presets:[{id,label,description,config}], feeModel:{...FEES}, limits:{...LIMITS}, priceFields, directions}` |
 
 ### 4.2 市场

@@ -109,6 +109,8 @@ export function createApiHandler(deps) {
           lastUpdate: feedStatus.lastUpdate,
           latencyMs: feedStatus.latencyMs,
           mode: feedStatus.mode,
+          wsBatches: feedStatus.wsBatches,
+          wsConnectedBatches: feedStatus.wsConnectedBatches,
         },
         runs: { active: runs.activeCount, total: store.listRunRecords().length },
       });

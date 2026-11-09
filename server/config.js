@@ -63,6 +63,8 @@ export const config = Object.freeze({
   /** WS reconcile safety poll while the market websocket is healthy
    *  (kept below staleMs so quiet books are not flagged stale) */
   wsReconcileMs: numEnv("WS_RECONCILE_MS", 2500),
+  /** 每个 WebSocket 连接大约覆盖多少个城市（多连接分批订阅） */
+  wsCitiesPerConnection: numEnv("WS_CITIES_PER_CONNECTION", 20),
   wsUrl: "wss://ws-subscriptions-clob.polymarket.com/ws/market",
   wsPingMs: 10_000,
   wsReconnectSchedule: [1000, 2000, 5000, 15_000, 30_000],

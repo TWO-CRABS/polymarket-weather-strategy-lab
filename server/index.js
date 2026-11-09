@@ -149,6 +149,7 @@ async function main() {
     wsReconnectSchedule: config.wsReconnectSchedule,
     wsReconcileMs: config.wsReconcileMs,
     wsPingMs: config.wsPingMs,
+    wsCitiesPerConnection: config.wsCitiesPerConnection,
     log,
   });
   sse = new SseHub({

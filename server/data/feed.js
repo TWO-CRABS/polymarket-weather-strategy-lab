@@ -77,6 +77,7 @@ export class Feed {
     this.wsUrl = cfg.wsUrl ?? "wss://ws-subscriptions-clob.polymarket.com/ws/market";
     this.wsReconnectSchedule = cfg.wsReconnectSchedule ?? [1000, 2000, 5000, 15_000, 30_000];
     this.wsReconcileMs = cfg.wsReconcileMs ?? 5000;
+    this.wsCitiesPerConnection = Math.max(1, Math.floor(Number(cfg.wsCitiesPerConnection)) || 20);
     this.wsPingMs = cfg.wsPingMs ?? 10_000;
     this.log = cfg.log ?? (() => {});
 
@@ -132,6 +133,7 @@ export class Feed {
         reconnectSchedule: this.wsReconnectSchedule,
         pingMs: this.wsPingMs,
         reconcileMs: this.wsReconcileMs,
+        citiesPerConnection: this.wsCitiesPerConnection,
         log: this.log,
       });
       this._wsAdapter.start();
@@ -241,6 +243,10 @@ export class Feed {
       latencyMs: this.latencyMs,
       mode: this._wsConnected ? "ws" : "poll",
       tokens: this.tokens.size,
+      wsBatches: this._wsAdapter ? this._wsAdapter.channels.size : 0,
+      wsConnectedBatches: this._wsAdapter
+        ? [...this._wsAdapter.channels.values()].filter((channel) => channel.connected).length
+        : 0,
       ageMs: Number.isFinite(ageMs) ? Math.round(ageMs) : null,
       lastError: this.lastError,
     };
