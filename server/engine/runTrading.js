@@ -79,14 +79,62 @@ export function settleMarket(run, market, payoutPerShare, now) {
 
 /* ------------------------------ per market ------------------------------- */
 
+/**
+ * Record a non-tradable probability-shift observation. It never calls tryEntry
+ * and never affects maxSignalsPerMarket/cooldown of entry signals.
+ */
+export function recordObservationSignal(run, market, candidate, now) {
+  if (!candidate || run.config.signal.recordObservation === false) return null;
+  // Keep the p_ref>=1¢ hard floor: don't create noise from degenerate prices.
+  if (!(Number(candidate.fromPrice) >= 0.01)) return null;
+  const direction = candidate.direction === "down" ? "down" : "up";
+  const key = `${market.id}|${direction}`;
+  const cooldownMs = Math.max(10, Number(run.config.signal.cooldownSec) || 0) * 1000;
+  if (!run._observationLast) run._observationLast = new Map();
+  const last = run._observationLast.get(key) || 0;
+  if (now - last < cooldownMs) return null;
+
+  const outcome = direction === "up" ? "YES" : "NO";
+  const observation = {
+    id: newId("sig"),
+    ts: now,
+    runId: run.id,
+    marketId: market.id,
+    city: market.city,
+    bracket: market.bracket,
+    direction,
+    outcome,
+    tokenId: outcome === "YES" ? market.tokens.yesTokenId : market.tokens.noTokenId,
+    fromPrice: candidate.fromPrice,
+    toPrice: candidate.toPrice,
+    changePct: candidate.changePct,
+    absChange: candidate.absChange,
+    windowSec: candidate.windowSec,
+    priceField: candidate.priceField,
+    kind: "observation",
+    tradable: false,
+    blockReason: candidate.blockReason,
+    reason: candidate.blockReason,
+  };
+  run._observationLast.set(key, now);
+  run.signals.push(observation);
+  run.store.appendRecord(run.id, "signal", observation);
+  run.sse.broadcast("signal", { signal: observation }, run.id);
+  return observation;
+}
+
 export async function processMarkets(run, now) {
   for (const market of run.markets.values()) {
     if (!market || market.closed) continue;
     const yesBook = run.source?.getBook ? run.source.getBook(market.tokens.yesTokenId) : null;
     const hash = yesBook?.hash || "";
     const lastHash = run._lastBookHash.get(market.id);
+    const latest = run.source?.getLatest ? run.source.getLatest(market.tokens.yesTokenId) : null;
+    const sampleTs = Number(latest?.ts ?? market.updatedAt ?? 0) || 0;
+    if (!run._lastSampleTs) run._lastSampleTs = new Map();
+    const lastSampleTs = run._lastSampleTs.get(market.id) || 0;
     let signal = null;
-    if (!lastHash || lastHash !== hash) {
+    if (!lastHash || lastHash !== hash || (sampleTs > 0 && sampleTs !== lastSampleTs)) {
       const windowSec = Math.max(run.config.signal.windowSec * 2, run.config.signal.windowSec + 120);
       const series = run.source?.getHistory ? run.source.getHistory(market.tokens.yesTokenId, windowSec) : [];
       const result = evaluateSignal({
@@ -99,12 +147,15 @@ export async function processMarkets(run, now) {
       run.signalStates.set(market.id, result.state);
       signal = result.signal;
       if (hash) run._lastBookHash.set(market.id, hash);
+      if (sampleTs > 0) run._lastSampleTs.set(market.id, sampleTs);
       if (signal) {
         signal.id = newId("sig");
         signal.runId = run.id;
         run.signals.push(signal);
         run.store.appendRecord(run.id, "signal", signal);
         run.sse.broadcast("signal", { signal }, run.id);
+      } else if (result.candidate) {
+        recordObservationSignal(run, market, result.candidate, now);
       }
     }
 

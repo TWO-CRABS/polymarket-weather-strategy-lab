@@ -1700,3 +1700,11 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
   pointer-events: none;
 }
 .trade-tip[hidden] { display: none; }
+
+/* ---------- B24. 概率坍缩观察信号 ---------- */
+.signal-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.signal-head-actions .segmented { flex: 0 0 auto; }
+.signal-head-actions .seg { padding: 2px 7px; font-size: 10px; }
+.sig.observation { border-left-color: var(--amber); background: rgba(245, 183, 61, 0.045); }
+.sig.observation .sig-title { color: var(--text-2); }
+.sig-observation { color: var(--amber-text); font-weight: 600; }

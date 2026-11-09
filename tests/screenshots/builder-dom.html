@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">16:02:14</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">20:39:40</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -171,7 +171,7 @@
       <header class="panel-head">
         <span class="panel-step">02</span>
         <div class="panel-title"><h2 id="h-signal">信号规则</h2><p>滚动窗口动量：窗口内涨跌幅 ≥ 阈值触发；UP 买入 YES，DOWN 买入 NO。</p></div>
-        <span class="badge badge-ghost">9 项参数</span>
+        <span class="badge badge-ghost">10 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
         <label class="field-label" for="f-signal-priceField">参考价格字段<button type="button" class="help-dot" data-tip="用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。" aria-label="说明：用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。">?</button></label>
@@ -223,6 +223,12 @@
           <span class="switch"><input type="checkbox" id="f-signal-requireSpreadOk" data-path="signal.requireSpreadOk" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
         </label>
         <p class="hint"><button type="button" class="help-dot" data-tip="实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。" aria-label="说明：实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。">?</button>真实成交成本的一部分，建议保持开启</p>
+      </div><div class="field switch-field">
+        <label class="switch-row" for="f-signal-recordObservation">
+          <span class="field-label">记录价格带外观测信号</span>
+          <span class="switch"><input type="checkbox" id="f-signal-recordObservation" data-path="signal.recordObservation" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
+        </label>
+        <p class="hint"><button type="button" class="help-dot" data-tip="动量成立但最新价已在价格带外（或点差超限）时，不产生入场单，只在信号流记录一条“观察·不可交易”信号，便于分析概率坍缩。默认开启，不产生成交。" aria-label="说明：动量成立但最新价已在价格带外（或点差超限）时，不产生入场单，只在信号流记录一条“观察·不可交易”信号，便于分析概率坍缩。默认开启，不产生成交。">?</button>动量成立但价格带/点差不允许入场时，在信号流中标记为“观察·不可交易”，不会下单</p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-execution">
       <header class="panel-head">

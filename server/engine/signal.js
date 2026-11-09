@@ -143,26 +143,11 @@ export function evaluateSignal({ market, series, config, now, state }) {
     return { signal: null, state: next, reason: "window_not_ready" };
   }
 
-  // hard degeneracy guard + configured price band (docs/03 §2.3/§2.5)
-  if (pRef < Math.max(0.01, u.minPrice)) {
+  // Hard degeneracy floor: p_ref below 1¢ is not a meaningful momentum anchor.
+  if (pRef < 0.01) {
     next.streak.up = 0;
     next.streak.down = 0;
     return { signal: null, state: next, reason: "below_price_floor" };
-  }
-  if (pNow > Math.min(0.99, u.maxPrice)) {
-    next.streak.up = 0;
-    next.streak.down = 0;
-    return { signal: null, state: next, reason: "above_price_ceiling" };
-  }
-  if (pNow < u.minPrice || pRef > u.maxPrice) {
-    next.streak.up = 0;
-    next.streak.down = 0;
-    return { signal: null, state: next, reason: "outside_price_band" };
-  }
-  if (s.requireSpreadOk && Number.isFinite(market.spread) && market.spread > u.maxSpread) {
-    next.streak.up = 0;
-    next.streak.down = 0;
-    return { signal: null, state: next, reason: "spread_too_wide" };
   }
 
   const retPct = (pNow / pRef - 1) * 100;
@@ -184,6 +169,37 @@ export function evaluateSignal({ market, series, config, now, state }) {
   }
 
   const direction = up ? "up" : "down";
+  // Price band / spread 不再吞掉动量：把它作为 blockReason 返回给上层，
+  // 由 processMarkets 决定记录 observation（不产生交易）或忽略。
+  let blockReason = null;
+  if (pRef < Math.max(0.01, u.minPrice)) blockReason = "below_price_floor";
+  else if (pNow > Math.min(0.99, u.maxPrice)) blockReason = "above_price_ceiling";
+  else if (pNow < u.minPrice || pRef > u.maxPrice) blockReason = "outside_price_band";
+  else if (s.requireSpreadOk && Number.isFinite(market.spread) && market.spread > u.maxSpread) {
+    blockReason = "spread_too_wide";
+  }
+
+  if (blockReason) {
+    next.streak.up = 0;
+    next.streak.down = 0;
+    return {
+      signal: null,
+      state: next,
+      reason: blockReason,
+      candidate: {
+        direction,
+        outcome: direction === "up" ? "YES" : "NO",
+        fromPrice: Number(pRef.toFixed(6)),
+        toPrice: Number(pNow.toFixed(6)),
+        changePct: Number(retPct.toFixed(4)),
+        absChange: Number(absMove.toFixed(6)),
+        windowSec: s.windowSec,
+        priceField,
+        blockReason,
+      },
+    };
+  }
+
   next.streak[direction] += 1;
   if (!up) next.streak.up = 0;
   if (!down) next.streak.down = 0;
@@ -217,6 +233,8 @@ export function evaluateSignal({ market, series, config, now, state }) {
       absChange: Number(absMove.toFixed(6)),
       windowSec: s.windowSec,
       priceField,
+      kind: "entry",
+      tradable: true,
       reason: "signal",
     },
     state: next,

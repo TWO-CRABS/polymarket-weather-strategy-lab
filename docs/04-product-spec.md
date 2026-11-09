@@ -333,6 +333,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-28 | 每周期兜底的排名**只按城市组内 YES 隐含概率**（不因点差过滤改变名次，兜底执行不受 maxSpread 拦截；正常信号入场仍保留点差过滤）；实测深圳 26°C 57% 点差 6¢ 时仍应为第 1 高、25°C 为第 3 高 |
 | AC-29 | 最低/最高 YES、最小流动性、最大点差仅在下单时校验（新增 `liquidity_too_low` 拒绝原因）；被拒绝不改变市场发现与排名（`tests/engine.test.js`） |
 | AC-30 | 每日 UTC 00:00 自动滚动：活跃 marketIds 切换到新一天、旧市场关闭、旧仓位保留并继续结算、权益/成交连续，同一 run 不重启（`tests/rolling.test.js`） |
+| AC-31 | 动量成立但价格带/点差禁止入场时，默认记录 `kind="observation"` 的不可交易观察信号；不产生订单/手续费/成交，信号流可按入场/观察筛选（`tests/engine.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

@@ -44,7 +44,7 @@ import {
   simulateBuy,
   simulateSell,
 } from "../server/engine/execution.js";
-import { planFallbackOrders, preRiskChecks } from "../server/engine/runTrading.js";
+import { planFallbackOrders, preRiskChecks, recordObservationSignal, processMarkets } from "../server/engine/runTrading.js";
 import { Portfolio } from "../server/engine/portfolio.js";
 import {
   computeMetrics,
@@ -401,6 +401,111 @@ test("price band and spread guards run before the trigger (docs/03 §2.3)", () =
 /* ------------------------------------------------------------------------- */
 /* Execution (server/engine/execution.js)                                    */
 /* ------------------------------------------------------------------------- */
+
+test("price-band blocked momentum returns a non-tradable candidate (13C collapse case)", () => {
+  const config = configWith({
+    universe: { minPrice: 0.03, maxPrice: 0.97 },
+    signal: { windowSec: 10, moveThresholdPct: 10, minAbsMove: 0.5, direction: "both", confirmationTicks: 1 },
+  });
+  const series = buildSeries({ prices: [...Array.from({ length: 60 }, () => 0.895), 0.005] });
+  const now = FIXED_NOW + 60_000;
+  const result = evaluateSignal({
+    market: MARKET_TWO_SIDED,
+    series,
+    config,
+    now,
+    state: createSignalState(),
+  });
+  assert.equal(result.signal, null);
+  assert.equal(result.reason, "outside_price_band");
+  assert.ok(result.candidate);
+  assert.equal(result.candidate.direction, "down");
+  assert.equal(result.candidate.outcome, "NO");
+  assert.equal(result.candidate.fromPrice, 0.895);
+  assert.equal(result.candidate.toPrice, 0.005);
+  assert.equal(result.candidate.blockReason, "outside_price_band");
+});
+
+test("observation signal is recorded without entry and respects its own cooldown", () => {
+  const config = configWith({
+    universe: { minPrice: 0.03, maxPrice: 0.97 },
+    signal: { windowSec: 10, moveThresholdPct: 10, minAbsMove: 0.5, direction: "both", confirmationTicks: 1, cooldownSec: 10 },
+  });
+  const now = FIXED_NOW + 60_000;
+  const series = buildSeries({ prices: [...Array.from({ length: 60 }, () => 0.895), 0.005] });
+  const candidate = evaluateSignal({
+    market: MARKET_TWO_SIDED,
+    series,
+    config,
+    now,
+    state: createSignalState(),
+  }).candidate;
+  const appended = [];
+  const broadcast = [];
+  const run = {
+    id: "run_observation",
+    config,
+    signals: [],
+    _observationLast: new Map(),
+    store: { appendRecord(runId, type, value) { appended.push({ runId, type, value }); } },
+    sse: { broadcast(type, data, runId) { broadcast.push({ type, data, runId }); } },
+  };
+  const observation = recordObservationSignal(run, MARKET_TWO_SIDED, candidate, now);
+  assert.ok(observation);
+  assert.equal(observation.kind, "observation");
+  assert.equal(observation.tradable, false);
+  assert.equal(observation.blockReason, "outside_price_band");
+  assert.equal(run.signals.length, 1);
+  assert.equal(appended.length, 1);
+  assert.equal(broadcast[0].type, "signal");
+  // Same market/direction inside the cooldown must not duplicate.
+  assert.equal(recordObservationSignal(run, MARKET_TWO_SIDED, candidate, now + 5_000), null);
+  assert.equal(run.signals.length, 1);
+});
+
+test("sample timestamp changes trigger evaluation even when book hash is unchanged", async () => {
+  const config = configWith({
+    universe: { minPrice: 0.03, maxPrice: 0.97 },
+    signal: { windowSec: 10, moveThresholdPct: 10, minAbsMove: 0.5, direction: "both", confirmationTicks: 1, cooldownSec: 10 },
+  });
+  const market = {
+    ...MARKET_TWO_SIDED,
+    closed: false,
+    stale: false,
+    quotes: { YES: { bid: 0.894, ask: 0.896, mid: 0.895 }, NO: { bid: 0.104, ask: 0.106, mid: 0.105 } },
+  };
+  let historyCalls = 0;
+  const source = {
+    getBook: () => ({ hash: "same-hash", bids: [], asks: [] }),
+    getLatest: () => ({ ts: 1_000 + historyCalls, bid: 0, ask: 0, mid: 0.895, last: null }),
+    getHistory: () => {
+      historyCalls += 1;
+      return buildSeries({ prices: [...Array.from({ length: 60 }, () => 0.895), 0.005] });
+    },
+  };
+  const run = {
+    id: "run_sample_trigger",
+    config,
+    marketIds: [market.id],
+    markets: new Map([[market.id, market]]),
+    signalStates: new Map(),
+    signals: [],
+    _lastBookHash: new Map(),
+    _lastSampleTs: new Map(),
+    _observationLast: new Map(),
+    portfolio: { positionsForMarket: () => [], positions: new Map(), equity: () => 100, cash: 100 },
+    store: { appendRecord() {} },
+    sse: { broadcast() {} },
+    source,
+    _lastPersisted: 0,
+  };
+  await processMarkets(run, FIXED_NOW + 60_000);
+  const firstCalls = historyCalls;
+  await new Promise((resolve) => setImmediate(resolve));
+  source.getLatest = () => ({ ts: 2_000, bid: 0, ask: 0, mid: 0.895, last: null });
+  await processMarkets(run, FIXED_NOW + 61_000);
+  assert.equal(historyCalls, firstCalls + 1, "sample ts change must evaluate again");
+});
 
 test("ceilToTick / floorToTick / floorShares", () => {
   assert.equal(ceilToTick(0.3212, 0.001), 0.322);

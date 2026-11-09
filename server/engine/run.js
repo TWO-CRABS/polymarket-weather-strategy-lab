@@ -94,6 +94,10 @@ export class Run {
     this._ticking = false;
     this._tickErrors = 0;
     this._lastBookHash = new Map();
+    /** marketId -> latest YES quote sample ts; triggers evaluation after best_bid_ask too. */
+    this._lastSampleTs = new Map();
+    /** observationKey(marketId|direction) -> last observation ts (separate from entry cooldown). */
+    this._observationLast = new Map();
     this._settledMarkets = new Set();
     this._resolutionChecks = new Map();
     this._rejectedExitKeys = new Set();
@@ -115,6 +119,8 @@ export class Run {
   setMarkets(markets) {
     this.markets = new Map(markets.filter(Boolean).map((market) => [market.id, market]));
     this.marketIds = [...this.markets.keys()];
+    this._lastSampleTs.clear();
+    this._observationLast.clear();
     for (const marketId of this.marketIds) {
       if (!this.signalStates.has(marketId)) this.signalStates.set(marketId, createSignalState());
     }
@@ -138,6 +144,8 @@ export class Run {
     }
     this.universeDate = dateKey;
     this._lastBookHash.clear();
+    this._lastSampleTs.clear();
+    this._observationLast.clear();
     this._fallbackNextAt = null;
     this._rejectedExitKeys.clear();
     this.broadcastMarkets();
@@ -536,8 +544,7 @@ export class Run {
 
   record() {
     const summary = this.view();
-    return {
-      id: this.id,
+    return {      id: this.id,
       strategyId: this.strategyId,
       strategyName: this.strategyName,
       mode: this.mode,
@@ -550,7 +557,8 @@ export class Run {
       cash: summary.cash,
       positionsValue: summary.positionsValue,
       metrics: summary.metrics,
-      signalsCount: this.signals.length,
+      signalsCount: this.signals.filter((signal) => signal.kind !== "observation").length,
+      observationsCount: this.signals.filter((signal) => signal.kind === "observation").length,
       marketsTracked: this.marketIds.length,
       universeDate: this.universeDate,
       marketIds: [...this.marketIds],
@@ -597,7 +605,8 @@ export class Run {
       positionsValue: roundTo(this.portfolio.positionsValue(), 5),
       ...this._settlementCounts(),
       metrics,
-      signalsCount: this.signals.length,
+      signalsCount: this.signals.filter((signal) => signal.kind !== "observation").length,
+      observationsCount: this.signals.filter((signal) => signal.kind === "observation").length,
       marketsTracked: this.marketIds.length,
       universeDate: this.universeDate,
       marketIds: [...this.marketIds],

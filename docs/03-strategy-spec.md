@@ -50,7 +50,8 @@
     "confirmationTicks": 1,              // 1..30，连续满足的 tick 数
     "cooldownSec": 300,                  // 0..86400，同市场同方向冷却
     "maxSignalsPerMarket": 5,            // 1..100，每市场整轮运行最多入场信号数
-    "requireSpreadOk": true              // true 时 spread 超限不产生信号
+    "requireSpreadOk": true,             // true 时 spread 超限不产生入场信号
+    "recordObservation": true            // 价格带外动量记录为不可交易观察信号
   },
   "execution": {
     "orderType": "market",               // 仅 market（FAK：吃可吃档位，剩余撤销）
@@ -145,11 +146,11 @@ absMove  = p_now.price - p_ref.price
 ### 2.3 触发、确认、冷却、去重
 
 1. **方向**：`UP`：`retPct ≥ +moveThresholdPct` 且 `absMove ≥ minAbsMove` 且 `direction∈{up,both}`；`DOWN`：`retPct ≤ -moveThresholdPct` 且 `absMove ≤ -minAbsMove` 且 `direction∈{down,both}`。边界含等号（恰好 20.0% 触发）。
-2. **护栏（先于方向判定）**：`p_ref.price ≥ 0.01`、`p_now.price ≤ 0.99`（硬编码退化护栏，见 §2.5）；两者都 ∈ `[universe.minPrice, universe.maxPrice]`；`requireSpreadOk=true` 时 `spreadYES ≤ universe.maxSpread`；行情新鲜度 `now - p_now.ts ≤ max(3×tickIntervalMs, 5000)` ms。
-3. **确认**：每个方向维护连续命中计数，满足条件 `+1`，不满足（含无样本）清零；计数 ≥ `confirmationTicks` 才生成信号。生成后清零并要求“失效一次后重新武装”，避免持续行情每 tick 重复触发。
-4. **冷却**：键为 `(marketId, direction)`；某方向**入场成交**后 `cooldownSec` 内不再生成该方向信号；另一方向独立计时（但受 §2.4 同 tick 反转限制）。
-5. **上限**：按市场累计**已生成的入场信号**数，达到 `maxSignalsPerMarket` 后该市场不再产生新信号。
-6. **去重**：同一 tick 每市场最多 1 个信号；book hash 未变不评估；乱序/重复样本丢弃；`last` 无新成交不追加样本，因此不会重复计数。
+2. **护栏（先于方向判定）**：`p_ref.price ≥ 0.01`、`p_now.price ≤ 0.99`（硬编码退化护栏，见 §2.5）；行情新鲜度 `now - p_now.ts ≤ max(3×tickIntervalMs, 5000)` ms。**入场信号**还要求两者都 ∈ `[universe.minPrice, universe.maxPrice]`，且 `requireSpreadOk=true` 时 `spreadYES ≤ universe.maxSpread`；若不满足但动量成立，可按 §2.6 记录观察信号（`signal.recordObservation`）。
+3. **确认**：每个方向维护连续命中计数，满足条件 `+1`，不满足（含无样本）清零；计数 ≥ `confirmationTicks` 才生成**入场**信号。生成后清零并要求“失效一次后重新武装”，避免持续行情每 tick 重复触发。观察信号不受入场确认/冷却/次数上限约束，但有独立冷却（至少 10 秒）。
+4. **冷却**：键为 `(marketId, direction)`；某方向**入场成交**后 `cooldownSec` 内不再生成该方向入场信号；另一方向独立计时（但受 §2.4 同 tick 反转限制）。
+5. **上限**：按市场累计**已生成的入场信号**数，达到 `maxSignalsPerMarket` 后该市场不再产生新入场信号；观察信号不计入。
+6. **去重**：同一 tick 每市场最多 1 个入场信号；book hash 未变且最新样本时间戳未变不评估；乱序/重复样本丢弃；`last` 无新成交不追加样本，因此不会重复计数。WS `best_bid_ask` 更新最新样本时间戳时可触发评估。
 
 ### 2.4 UP/DOWN → YES/NO 映射与订单方向
 
@@ -185,6 +186,17 @@ t=0s `mid=0.200`，t=60s `mid=0.240` ⇒ `retPct=(0.240/0.200-1)×100=+20.00`、
 `shares=floor(25/0.245,2)=102.04`；`notional=round(102.04×0.245,5)=24.9998`；
 `fee=calcTakerFee(102.04,0.245)=round5(0.94374)=0.94374`；**账户现金扣除** `costBasis=24.9998+0.94374=25.94354`（`cashDelta=-25.94354`，即账户需 ≥ $25.94354；手续费不占名义额预算）。
 止盈：YES bestBid=0.40 时 `exitFee=round5(102.04×0.05×0.40×0.60)=1.22448`，`netProceeds=40.816-1.22448=39.59152`，费用后净收益率 `=52.6% ≥ 50%` ⇒ 触发 `take_profit`（注意不是裸价 0.245→0.40 的 63%）。
+
+### 2.7 不可交易观察信号（probability-shift observation）
+
+- 动量成立但入场价格带/点差不允许时，若 `signal.recordObservation=true`，生成 `kind="observation"` 信号：
+  - `tradable=false`；
+  - `blockReason` 为 `outside_price_band` / `below_price_floor` / `above_price_ceiling` / `spread_too_wide`；
+  - `reason` 与 `blockReason` 相同，用于解释为什么没有入场。
+- 观察信号只进入信号流/journal，不调用 `tryEntry`，不产生 Trade、不扣费、不影响 `signalsCount` 和 `maxSignalsPerMarket`。
+- 观察信号有独立冷却：同 `(marketId, direction)` 至少间隔 `max(10, signal.cooldownSec)` 秒。
+- `RunSummary` 分别返回 `signalsCount`（入场信号）与 `observationsCount`（观察信号）；旧记录默认 0。
+- 例：13°C YES 从 89.5¢ 跌到 0.5¢，`minPrice=0.03` 时会产生 DOWN 观察信号（`below_price_floor`），但不会买入接近 99.5¢ 的 NO。
 
 ## 3. 执行模型（market order / book walk）
 

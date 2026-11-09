@@ -132,7 +132,10 @@
 `Quote = { bid, ask, mid, last }`，均为 number（可能为 0 或 null 表示缺失）。价格上下限按市场 tick 对齐。
 
 ### 3.2 Signal
-`{ id, ts, runId, marketId, city, bracket, direction: "up"|"down", outcome: "YES"|"NO", tokenId, fromPrice, toPrice, changePct, absChange, windowSec, priceField, reason }`
+`{ id, ts, runId, marketId, city, bracket, direction: "up"|"down", outcome: "YES"|"NO", tokenId, fromPrice, toPrice, changePct, absChange, windowSec, priceField, kind: "entry"|"observation", tradable, blockReason?, reason }`
+
+- `kind="entry"`：正常入场信号，`tradable=true`；
+- `kind="observation"`：动量成立但价格带/点差不允许入场，`tradable=false`，`blockReason` 说明原因；不会关联 Trade。
 
 ### 3.3 Trade
 | 字段 | 说明 |
@@ -172,7 +175,7 @@
 - `maxDrawdownPct = max((peak − equity)/peak) × 100`
 
 ### 3.7 RunSummary
-`{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, marketsTracked, marketIds, universeDate, pendingSettlements, settledPositions, feedStatus }`
+`{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, observationsCount, marketsTracked, marketIds, universeDate, pendingSettlements, settledPositions, feedStatus }`
 `strategyId` 为已保存策略 id，使用内联 strategy 启动时为 `null`。
 `marketIds` 为当前活跃（当天）Gamma market id 数组；`universeDate` 为当前活跃市场的 UTC 观察日（`YYYY-MM-DD`）；历史旧市场仍保留用于持仓结算。
 `pendingSettlements` 为“市场已停止交易/已关闭、但官方裁决尚未出的持仓数”；`settledPositions` 为官方裁决已兑付的笔数。两者用于看板/历史的「待结算 / 已结算」标识；停止或服务重启后，live 运行若仍有持仓会继续轮询官方裁决并自动补记（replay 不结算）。

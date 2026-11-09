@@ -174,6 +174,8 @@ export const DEFAULT_STRATEGY = Object.freeze({
     cooldownSec: 300,
     maxSignalsPerMarket: 5,
     requireSpreadOk: true,
+    /** 动量成立但价格带/点差不允许入场时，记录不可交易的观察信号 */
+    recordObservation: true,
   },
   execution: {
     orderType: "market",
@@ -287,6 +289,10 @@ export function normalizeStrategy(input = {}) {
   // 布尔开关：兼容从 JSON 表单传入的 "true"/"false"
   if (typeof merged.execution.fallbackBuyEachWindow !== "boolean") {
     merged.execution.fallbackBuyEachWindow = Boolean(merged.execution.fallbackBuyEachWindow);
+  }
+  if (typeof merged.signal.recordObservation !== "boolean") {
+    const raw = merged.signal.recordObservation;
+    merged.signal.recordObservation = raw === "false" || raw === 0 ? false : Boolean(raw ?? true);
   }
 
   // sim.mode is validated by validateStrategy (invalid values must be rejected,

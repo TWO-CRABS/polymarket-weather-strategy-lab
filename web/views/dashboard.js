@@ -248,6 +248,7 @@ export async function mount(root, ctx) {
     equityRange: 0,
     tradeGroupBy: "none",
     tradeFilter: "all",
+    signalFilter: "all",
     error: null,
     destroyed: false,
     lastTickAt: Date.now(),
@@ -574,7 +575,14 @@ export async function mount(root, ctx) {
                 <h2 id="h-signals">信号流</h2>
                 <p>方向 · 市场 · 变动 · 时间</p>
               </div>
-              <span class="badge badge-ghost" id="signalCountBadge">0 条</span>
+              <div class="signal-head-actions">
+                <div class="segmented segmented-sm signal-filter" role="group" aria-label="信号类型">
+                  <button type="button" class="seg is-active" data-signal-filter="all">全部</button>
+                  <button type="button" class="seg" data-signal-filter="entry">入场</button>
+                  <button type="button" class="seg" data-signal-filter="observation">观察</button>
+                </div>
+                <span class="badge badge-ghost" id="signalCountBadge">0 条</span>
+              </div>
             </header>
             <div class="signal-feed" id="signalFeed" aria-live="off"></div>
           </section>
@@ -1089,18 +1097,38 @@ export async function mount(root, ctx) {
 
   /* -------------------- 信号流 -------------------- */
 
+  const SIGNAL_BLOCK_LABELS = {
+    outside_price_band: "价格带外",
+    below_price_floor: "低于价格带下限",
+    above_price_ceiling: "高于价格带上限",
+    spread_too_wide: "点差过宽",
+  };
+
   function renderSignals() {
     if (!el.signalFeed) return;
-    const signals = state.signals.slice(0, 60);
-    if (el.signalBadge) el.signalBadge.textContent = `${state.signals.length} 条`;
+    const allSignals = state.signals;
+    const signals = allSignals
+      .filter((signal) => {
+        const kind = signal.kind === "observation" ? "observation" : "entry";
+        return state.signalFilter === "all" || kind === state.signalFilter;
+      })
+      .slice(0, 60);
+    if (el.signalBadge) {
+      el.signalBadge.textContent = state.signalFilter === "all"
+        ? `${allSignals.length} 条`
+        : `${signals.length}/${allSignals.length} 条`;
+    }
     if (!signals.length) {
-      el.signalFeed.innerHTML = '<div class="sig-empty">暂无信号 · 等待价格动量触发</div>';
+      el.signalFeed.innerHTML = state.signalFilter === "observation"
+        ? '<div class="sig-empty">暂无观察信号 · 价格带外的动量会记录在这里</div>'
+        : '<div class="sig-empty">暂无信号 · 等待价格动量触发</div>';
       return;
     }
     el.signalFeed.innerHTML = signals.map((signal) => {
+      const observation = signal.kind === "observation" || signal.tradable === false;
       const executed = signal.executed === true || signal.status === "executed";
-      const blocked = signal.status === "blocked" || signal.blocked === true;
-      const cls = executed ? "executed" : blocked ? "blocked" : "";
+      const blocked = !observation && (signal.status === "blocked" || signal.blocked === true);
+      const cls = [observation ? "observation" : "", executed ? "executed" : "", blocked ? "blocked" : ""].filter(Boolean).join(" ");
       const direction = signal.direction === "down" ? -1 : 1;
       const market = signal.marketId ? state.markets.get(signal.marketId) : null;
       const date = market ? shortDate(market.endDate) : "";
@@ -1110,7 +1138,10 @@ export async function mount(root, ctx) {
         ? `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer" title="在 Polymarket 查看该事件">${cityText}</a>`
         : cityText;
       const selected = Boolean(state.selectedMarketId && signal.marketId === state.selectedMarketId);
-      return `<div class="sig ${cls}${selected ? " is-selected" : ""}" data-market-id="${ui.escapeHtml(signal.marketId || "")}" tabindex="0" role="button" aria-label="选择市场 ${ui.escapeHtml(signal.city || "")} ${ui.escapeHtml(signal.bracket || "")}">
+      const blockLabel = observation
+        ? (SIGNAL_BLOCK_LABELS[signal.blockReason || signal.reason] || signal.blockReason || signal.reason || "不可交易")
+        : null;
+      return `<div class="sig ${cls}${selected ? " is-selected" : ""}" data-market-id="${ui.escapeHtml(signal.marketId || "")}" data-signal-kind="${observation ? "observation" : "entry"}" tabindex="0" role="button" aria-label="选择市场 ${ui.escapeHtml(signal.city || "")} ${ui.escapeHtml(signal.bracket || "")}">
         <div class="sig-head">
           <span class="sig-title">${ui.directionBadge(signal.direction)} ${cityHtml}${date ? ` · ${date}` : ""} · ${ui.escapeHtml(signal.bracket || "")}</span>
           <span class="sig-time">${ui.escapeHtml(ui.fmtTime(signal.ts))}</span>
@@ -1123,7 +1154,7 @@ export async function mount(root, ctx) {
           <span>窗口 ${ui.escapeHtml(String(signal.windowSec || "—"))}s</span>
         </div>
         <div class="sig-foot">
-          <span class="sig-reason">${ui.escapeHtml(ui.reasonLabel(signal.reason || "signal"))} · ${ui.escapeHtml(signal.priceField || "mid")}</span>
+          <span class="sig-reason">${observation ? `<b class="sig-observation">观察 · 不可交易</b> · ${ui.escapeHtml(blockLabel)}` : `${ui.escapeHtml(ui.reasonLabel(signal.reason || "signal"))} · ${ui.escapeHtml(signal.priceField || "mid")}`}</span>
           <span>${ui.outcomeBadge(signal.outcome || (signal.direction === "down" ? "NO" : "YES"))}</span>
         </div>
       </div>`;
@@ -1800,6 +1831,15 @@ export async function mount(root, ctx) {
     }
     if (target.closest("#btnRefresh")) {
       instance.refresh();
+      return;
+    }
+    const signalFilter = target.closest("[data-signal-filter]");
+    if (signalFilter) {
+      state.signalFilter = signalFilter.dataset.signalFilter;
+      root.querySelectorAll("[data-signal-filter]").forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.signalFilter === state.signalFilter);
+      });
+      renderSignals();
       return;
     }
     const rangeBtn = target.closest("[data-range]");

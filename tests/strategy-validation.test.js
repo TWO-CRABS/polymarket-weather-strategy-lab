@@ -90,6 +90,12 @@ test("removed universe fields are dropped for backward compatibility", () => {
   assert.ok(!("selectionMode" in normalized.universe), "selectionMode must be ignored/removed");
 });
 
+test("signal.recordObservation defaults true and preserves explicit false", () => {
+  assert.equal(normalizeStrategy({}).signal.recordObservation, true);
+  assert.equal(normalizeStrategy({ signal: { recordObservation: false } }).signal.recordObservation, false);
+  assert.equal(normalizeStrategy({ signal: { recordObservation: "false" } }).signal.recordObservation, false);
+});
+
 test("normalizeStrategy trims city list and keeps it an array", () => {
   const normalized = normalizeStrategy({
     universe: { cities: [" New York ", "London", "", "  "] },

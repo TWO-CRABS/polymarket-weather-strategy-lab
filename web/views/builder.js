@@ -71,6 +71,7 @@ const GROUP_DEFS = [
       { path: "signal.cooldownSec", label: "同市场冷却", unit: "秒", min: LIM.signal.cooldownSec[0], max: LIM.signal.cooldownSec[1], step: 10 },
       { path: "signal.maxSignalsPerMarket", label: "单市场最大信号数", unit: "次", min: LIM.signal.maxSignalsPerMarket[0], max: LIM.signal.maxSignalsPerMarket[1], step: 1 },
       { path: "signal.requireSpreadOk", kind: "toggle", label: "点差超限时跳过信号", help: "真实成交成本的一部分，建议保持开启" },
+      { path: "signal.recordObservation", kind: "toggle", label: "记录价格带外观测信号", help: "动量成立但价格带/点差不允许入场时，在信号流中标记为“观察·不可交易”，不会下单" },
     ],
   },
   {
@@ -162,6 +163,7 @@ const FIELD_TIPS = {
   "signal.cooldownSec": "同一市场触发一次后，多少秒内不再开新仓。",
   "signal.maxSignalsPerMarket": "整个运行期间该市场最多触发几次信号。",
   "signal.requireSpreadOk": "实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。",
+  "signal.recordObservation": "动量成立但最新价已在价格带外（或点差超限）时，不产生入场单，只在信号流记录一条“观察·不可交易”信号，便于分析概率坍缩。默认开启，不产生成交。",
   "execution.orderType": "系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。",
   "execution.sizingMode": "固定名义金额：每次固定下单多少 USD 名义额；按权益百分比：每次用当前总权益的百分之几。",
   "execution.sizingValue": "每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。若设为 $1：因份额按 0.01 股取整，成交名义额可能略高于 $1（<1¢，例如 95¢ 时 1.06 股 = $1.007），这是交易所最小额与份额精度共同决定的。",
