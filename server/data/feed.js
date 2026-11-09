@@ -24,6 +24,9 @@ const STATUS = Object.freeze({
   OFFLINE: "offline",
 });
 
+/** CLOB /books hard limit is 500 token ids per request. */
+const POLL_BOOK_CHUNK = 500;
+
 function quoteFromBook(book, previous, marker) {
   const bid = book && book.bestBid > 0 ? book.bestBid : previous ? previous.bid : 0;
   const ask = book && book.bestAsk > 0 ? book.bestAsk : previous ? previous.ask : 0;
@@ -265,13 +268,17 @@ export class Feed {
     try {
       const tokenIds = [...this.tokens.keys()];
       let received = 0;
-      for (let i = 0; i < tokenIds.length; i += 200) {
-        const batch = tokenIds.slice(i, i + 200);
+      for (let i = 0; i < tokenIds.length; i += POLL_BOOK_CHUNK) {
+        const batch = tokenIds.slice(i, i + POLL_BOOK_CHUNK);
         let books;
         try {
           // hot path: one batch request, no per-token fallback (never stall),
           // short timeout so a slow upstream cannot freeze the feed loop
-          books = await this.clob.getBooks(batch, { chunkSize: 200, fallback: false, timeoutMs: 6000 });
+          books = await this.clob.getBooks(batch, {
+            chunkSize: POLL_BOOK_CHUNK,
+            fallback: false,
+            timeoutMs: 6000,
+          });
         } catch (err) {
           this._consecutiveErrors += 1;
           this.lastError = err.message;
