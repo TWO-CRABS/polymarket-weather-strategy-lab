@@ -115,7 +115,6 @@ export async function mount(root, ctx) {
     loading: true,
     error: null,
     selected: new Set(),
-    toDelete: new Set(),
     detailId: (ctx.params && ctx.params.id) || null,
     detailData: null,
     detailLoading: false,
@@ -187,7 +186,7 @@ export async function mount(root, ctx) {
       <div id="historyError"></div>
 
       <div class="compare-bar" id="compareBar" hidden>
-        <span>已选择 <strong id="compareCount">0</strong> 条运行（最多 ${MAX_COMPARE} 条）</span>
+        <span>已选择 <strong id="compareCount">0</strong> 条运行（勾选 2 条可对比，也可批量删除）</span>
         <button type="button" class="btn btn-primary btn-sm" id="btnDoCompare" disabled>生成对比</button>
         <button type="button" class="btn btn-ghost btn-sm" id="btnClearCompare">清空选择</button>
       </div>
@@ -212,8 +211,7 @@ export async function mount(root, ctx) {
             <caption class="sr-only">历史模拟运行列表：可勾选两条进行对比，或批量选择删除</caption>
             <thead>
               <tr>
-                <th scope="col" class="check-col"><span class="sr-only">批量选择</span></th>
-                <th scope="col" class="check-col"><span class="sr-only">选择对比</span></th>
+                <th scope="col" class="check-col"><span class="sr-only">选择运行（对比/批量删除）</span></th>
                 <th scope="col">Run ID / 策略</th>
                 <th scope="col">模式</th>
                 <th scope="col">状态</th>
@@ -278,7 +276,7 @@ export async function mount(root, ctx) {
   }
 
   function renderLoading() {
-    if (el.runsBody) el.runsBody.innerHTML = `<tr><td colspan="12">${ui.skeletonLines(4)}</td></tr>`;
+    if (el.runsBody) el.runsBody.innerHTML = `<tr><td colspan="11">${ui.skeletonLines(4)}</td></tr>`;
   }
 
   function renderError() {
@@ -318,7 +316,6 @@ export async function mount(root, ctx) {
     el.runsBody.innerHTML = state.runs.map((run) => {
       const metrics = run.metrics || {};
       const selected = state.selected.has(run.id);
-      const marked = state.toDelete.has(run.id);
       const active = ["running", "starting", "paused", "stopping"].includes(run.status);
       const pendingSettlements = num(run.pendingSettlements) || 0;
       const settledPositions = num(run.settledPositions) || 0;
@@ -328,9 +325,8 @@ export async function mount(root, ctx) {
           ? `<span class="badge badge-ghost" title="官方裁决已兑付（结算不收费）">已结算 ${settledPositions}</span>`
           : "";
       const started = num(run.startedAt);
-      return `<tr data-run-id="${ui.escapeHtml(run.id)}" class="${selected ? "is-selected" : ""}${marked ? " is-marked" : ""}" tabindex="0" aria-label="运行 ${ui.escapeHtml(run.id)}，${ui.escapeHtml(run.strategyName || "")}">
-        <td class="check-col"><input type="checkbox" class="batch-toggle" data-batch-id="${ui.escapeHtml(run.id)}" ${marked ? "checked" : ""} aria-label="选择运行 ${ui.escapeHtml(run.id)} 批量删除"></td>
-        <td class="check-col"><input type="checkbox" class="compare-toggle" data-compare-id="${ui.escapeHtml(run.id)}" ${selected ? "checked" : ""} aria-label="选择运行 ${ui.escapeHtml(run.id)} 参与对比"></td>
+      return `<tr data-run-id="${ui.escapeHtml(run.id)}" class="${selected ? "is-selected" : ""}" tabindex="0" aria-label="运行 ${ui.escapeHtml(run.id)}，${ui.escapeHtml(run.strategyName || "")}">
+        <td class="check-col"><input type="checkbox" class="run-toggle" data-run-id="${ui.escapeHtml(run.id)}" ${selected ? "checked" : ""} aria-label="选择运行 ${ui.escapeHtml(run.id)}（对比或批量删除）"></td>
         <td><span class="mkt-name"><b>${ui.escapeHtml(run.strategyName || "未命名策略")}</b><span>${ui.escapeHtml(run.id)}</span></span></td>
         <td>${ui.modeBadge(run.mode)}</td>
         <td>${ui.runStatusBadge(run.status)} ${settleBadge}</td>
@@ -360,21 +356,36 @@ export async function mount(root, ctx) {
     const count = state.selected.size;
     el.compareBar.hidden = count === 0;
     if (el.compareCount) el.compareCount.textContent = String(count);
-    if (el.btnCompare) el.btnCompare.disabled = count !== MAX_COMPARE;
-    if (el.btnCompare) el.btnCompare.textContent = count === MAX_COMPARE ? "生成对比" : `生成对比（还差 ${MAX_COMPARE - count} 条）`;
+    if (el.btnCompare) {
+      el.btnCompare.disabled = count !== MAX_COMPARE;
+      el.btnCompare.textContent = count === MAX_COMPARE
+        ? "生成对比"
+        : count > MAX_COMPARE
+          ? `生成对比（需恰好 ${MAX_COMPARE} 条）`
+          : `生成对比（还差 ${MAX_COMPARE - count} 条）`;
+    }
   }
 
-  function toggleCompare(id, checked) {
+  /**
+   * 统一选择：一个复选框同时服务“对比”和“批量删除”。
+   * 行内复选框允许多选（用于批量删除）；“加入对比”按钮仍限制最多 2 条。
+   */
+  function toggleCompare(id, checked, opts = {}) {
     if (checked) {
-      if (state.selected.size >= MAX_COMPARE) {
-        ui.toast(`最多只能选择 ${MAX_COMPARE} 条运行进行对比`, { type: "warn", timeout: 2400 });
+      if (opts.compareOnly && state.selected.size >= MAX_COMPARE && !state.selected.has(id)) {
+        ui.toast(`对比最多选择 ${MAX_COMPARE} 条运行；批量删除可继续多选`, { type: "warn", timeout: 2600 });
         return false;
       }
       state.selected.add(id);
     } else {
       state.selected.delete(id);
     }
+    if (state.selected.size !== MAX_COMPARE) {
+      state.compareData = null;
+      if (el.comparePanel) el.comparePanel.hidden = true;
+    }
     updateCompareBar();
+    updateBatchBar();
     renderTable();
     // docs/05 §4.3：选中 2 条即自动展开对比面板
     if (state.selected.size === MAX_COMPARE) {
@@ -387,10 +398,10 @@ export async function mount(root, ctx) {
 
   function updateBatchBar() {
     if (!el.batchBar) return;
-    for (const id of [...state.toDelete]) {
-      if (!state.runs.some((run) => run.id === id)) state.toDelete.delete(id);
+    for (const id of [...state.selected]) {
+      if (!state.runs.some((run) => run.id === id)) state.selected.delete(id);
     }
-    const count = state.toDelete.size;
+    const count = state.selected.size;
     if (el.batchCount) el.batchCount.textContent = String(count);
     if (el.btnDeleteSelected) el.btnDeleteSelected.disabled = count === 0;
     if (el.chkSelectAll) {
@@ -398,12 +409,6 @@ export async function mount(root, ctx) {
       el.chkSelectAll.indeterminate = count > 0 && count < state.runs.length;
     }
     el.batchBar.hidden = state.runs.length === 0;
-  }
-
-  function toggleBatch(id, checked) {
-    if (checked) state.toDelete.add(id);
-    else state.toDelete.delete(id);
-    updateBatchBar();
   }
 
   async function deleteRuns(ids) {
@@ -425,7 +430,6 @@ export async function mount(root, ctx) {
         type: failed ? "warn" : "info",
       });
       for (const id of list) {
-        state.toDelete.delete(id);
         state.selected.delete(id);
       }
       if (state.detailId && list.includes(state.detailId)) {
@@ -696,13 +700,13 @@ export async function mount(root, ctx) {
       return;
     }
     if (target.closest("#btnDeleteSelected")) {
-      deleteRuns([...state.toDelete]);
+      deleteRuns([...state.selected]);
       return;
     }
     const compareAdd = target.closest("[data-compare-id]");
     if (compareAdd && !target.closest("input[type=checkbox]")) {
       const id = compareAdd.dataset.compareId;
-      toggleCompare(id, !state.selected.has(id));
+      toggleCompare(id, !state.selected.has(id), { compareOnly: true });
       return;
     }
     if (target.closest("#btnCloseDetail")) {
@@ -747,21 +751,16 @@ export async function mount(root, ctx) {
     const target = event.target;
     if (!(target instanceof Element)) return;
     if (target.id === "chkSelectAll") {
-      state.toDelete.clear();
-      if (target.checked) for (const run of state.runs) state.toDelete.add(run.id);
+      state.selected.clear();
+      if (target.checked) for (const run of state.runs) state.selected.add(run.id);
+      state.compareData = null;
+      if (el.comparePanel) el.comparePanel.hidden = true;
       renderTable();
       return;
     }
-    const batch = target.closest("input.batch-toggle");
-    if (batch) {
-      toggleBatch(batch.dataset.batchId, batch.checked);
-      batch.closest("tr")?.classList.toggle("is-marked", batch.checked);
-      return;
-    }
-    const checkbox = target.closest("input.compare-toggle");
+    const checkbox = target.closest("input.run-toggle");
     if (!checkbox) return;
-    const id = checkbox.dataset.compareId;
-    const ok = toggleCompare(id, checkbox.checked);
+    const ok = toggleCompare(checkbox.dataset.runId, checkbox.checked);
     if (!ok) checkbox.checked = false;
   }
 
