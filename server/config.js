@@ -55,6 +55,8 @@ export const config = Object.freeze({
   replayFixture: process.env.REPLAY_FIXTURE ? path.resolve(process.env.REPLAY_FIXTURE) : null,
   /** a market snapshot older than this is flagged `stale` */
   staleMs: numEnv("STALE_MS", Math.max(3 * POLL_MS, 5000)),
+  /** watchdog: force-reset a stuck REST poll after this many ms */
+  pollTimeoutMs: numEnv("POLL_TIMEOUT_MS", 30_000),
   /** per-token ring buffer length in minutes (rolling signals + sparkline) */
   ringBufferMinutes: numEnv("RING_MINUTES", 15),
   /** upstream request budget (requests per second, aggregate) */

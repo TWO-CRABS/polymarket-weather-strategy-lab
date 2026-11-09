@@ -73,6 +73,7 @@ export class Feed {
   constructor(cfg) {
     this.clob = cfg.clob;
     this.pollMs = cfg.pollMs ?? 1000;
+    this.pollTimeoutMs = cfg.pollTimeoutMs ?? 30_000;
     this.staleMs = cfg.staleMs ?? Math.max(3 * this.pollMs, 5000);
     this.mode =
       cfg.mode === "ws" || cfg.mode === "poll" || cfg.mode === "off" || cfg.mode === "auto" ? cfg.mode : "auto";
@@ -103,6 +104,8 @@ export class Feed {
     this._running = false;
     this._pollTimer = null;
     this._polling = false;
+    this._pollStartedAt = 0;
+    this._pollId = 0;
     this._lastSignature = new Map();
 
     this._wsConnected = false;
@@ -144,7 +147,19 @@ export class Feed {
     // A fixed-rate poll loop (never chain-scheduled) so one slow batch cannot
     // stall the whole feed; overlapping polls are skipped.
     this._pollTimer = setInterval(() => {
-      if (this._polling) return;
+      if (this._polling) {
+        const hung = this._pollStartedAt > 0 && nowMs() - this._pollStartedAt > this.pollTimeoutMs;
+        if (!hung) return;
+        // A stalled upstream request must not freeze the REST baseline forever.
+        this.log(
+          "warn",
+          `feed poll watchdog: previous poll exceeded ${this.pollTimeoutMs}ms; forcing reset`,
+        );
+        this._pollId += 1;
+        this._polling = false;
+        this._pollStartedAt = 0;
+        if (typeof this.clob.resetLimiter === "function") this.clob.resetLimiter();
+      }
       this._pollOnce().catch((err) => this.log("warn", `feed poll crashed: ${err.message}`));
     }, this.pollMs);
     if (typeof this._pollTimer.unref === "function") this._pollTimer.unref();
@@ -265,6 +280,8 @@ export class Feed {
     }
     this._polling = true;
     const started = nowMs();
+    const pollId = (this._pollId += 1);
+    this._pollStartedAt = started;
     try {
       const tokenIds = [...this.tokens.keys()];
       let received = 0;
@@ -308,7 +325,10 @@ export class Feed {
       void force;
       this._refreshStaleness();
     } finally {
-      this._polling = false;
+      if (this._pollId === pollId) {
+        this._polling = false;
+        this._pollStartedAt = 0;
+      }
     }
   }
 

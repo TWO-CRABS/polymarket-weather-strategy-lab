@@ -104,11 +104,17 @@ export class ClobClient {
    */
   constructor(opts = {}) {
     const maxRps = opts.maxRps && opts.maxRps > 0 ? opts.maxRps : 2;
+    this.maxRps = maxRps;
     this.timeoutMs = opts.timeoutMs ?? 8000;
     this.log = opts.log ?? (() => {});
     this.limiter = new RateLimiter(Math.ceil(1000 / maxRps));
     this.clobBase = "https://clob.polymarket.com";
     this.dataBase = "https://data-api.polymarket.com";
+  }
+
+  /** Recover from a wedged request chain (feed poll watchdog). */
+  resetLimiter() {
+    this.limiter = new RateLimiter(Math.ceil(1000 / this.maxRps));
   }
 
   /** Throttled JSON request helper. */

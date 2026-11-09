@@ -80,6 +80,7 @@ node server/index.js
 | `FEED_MODE` | `auto` | `auto` / `ws` / `poll` 行情通道 |
 | `POLL_MS` | `1000` | 轮询间隔（毫秒） |
 | `WS_CITIES_PER_CONNECTION` | `20` | 每个 CLOB WebSocket 连接约覆盖的城市数（多连接分批订阅） |
+| `POLL_TIMEOUT_MS` | `30000` | REST 轮询卡死 watchdog：超过该时长强制重置轮询 |
 | `DATA_DIR` | `./data` | 策略与运行记录持久化目录 |
 
 ### 使用流程

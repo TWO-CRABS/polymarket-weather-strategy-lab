@@ -143,6 +143,7 @@ async function main() {
     clob,
     pollMs: config.pollMs,
     staleMs: config.staleMs,
+    pollTimeoutMs: config.pollTimeoutMs,
     mode: config.feedMode,
     ringMinutes: config.ringBufferMinutes,
     wsUrl: config.wsUrl,
