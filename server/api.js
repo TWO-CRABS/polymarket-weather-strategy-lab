@@ -230,7 +230,14 @@ export function createApiHandler(deps) {
         return true;
       }
       if (sub === "trades" && method === "GET") {
-        const { items, total } = await runs.getTrades(runId, { limit: parseLimit(url, 500), offset: parseOffset(url) });
+        const order = url.searchParams.get("order") === "desc" ? "desc" : "asc";
+        const includePositionEntries = url.searchParams.get("includePositionEntries") === "true";
+        const { items, total } = await runs.getTrades(runId, {
+          limit: parseLimit(url, 500),
+          offset: parseOffset(url),
+          order,
+          includePositionEntries,
+        });
         sendJson(res, 200, { trades: items, total });
         return true;
       }

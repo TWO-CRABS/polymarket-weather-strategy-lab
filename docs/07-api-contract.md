@@ -219,7 +219,7 @@
 | GET | `/api/runs/:id` | 运行详情（`costBreakdown` 为可选附加字段，向后兼容） | `{run: RunSummary, config: StrategyConfig, metrics: Metrics, positions:[Position], costBreakdown?: {feesPaid, spreadCost, depthSlippageCost, totalFriction}}` |
 | POST | `/api/runs/:id/stop` | 停止（幂等） | `{run: RunSummary}` |
 | DELETE | `/api/runs/:id` | 删除运行记录 | `204` |
-| GET | `/api/runs/:id/trades` | `limit?`(默认500) `offset?` | `{trades:[Trade], total}` |
+| GET | `/api/runs/:id/trades` | `limit?`(默认500) `offset?` `order?=asc\|desc` `includePositionEntries?=true` | `{trades:[Trade], total}`；看板使用 `order=desc&includePositionEntries=true`，保证最新成交可见且当前持仓的入场成交不会被 500 条窗口挤掉 |
 | GET | `/api/runs/:id/equity` | `limit?` | `{points:[EquityPoint], total}` |
 | GET | `/api/runs/:id/signals` | `limit?` | `{signals:[Signal], total}` |
 | GET | `/api/runs/:id/positions` | 当前持仓 | `{positions:[Position], positionsValue, cash, equity}` |

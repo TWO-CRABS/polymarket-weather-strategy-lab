@@ -449,9 +449,39 @@ export class RunManager {
   async getTrades(id, opts = {}) {
     const run = this.active.get(id);
     if (run) return run.getTrades(opts);
-    if (!this.store.getRunRecord(id)) throw new AppError(404, "RUN_NOT_FOUND", `运行不存在: ${id}`);
-    const result = await this.store.readRecords(id, { type: "trade", limit: opts.limit ?? 500, offset: opts.offset ?? 0 });
-    return { items: result.items, total: result.total };
+    const record = this.store.getRunRecord(id);
+    if (!record) throw new AppError(404, "RUN_NOT_FOUND", `运行不存在: ${id}`);
+    const result = await this.store.readRecords(id, { type: "trade", limit: Number.MAX_SAFE_INTEGER, offset: 0 });
+    const items = Array.isArray(result.items) ? result.items : [];
+    const order = opts.order === "desc" ? "desc" : "asc";
+    const ordered = order === "desc" ? [...items].reverse() : [...items];
+    const offset = Math.max(0, Math.floor(Number(opts.offset) || 0));
+    const limit = Math.max(1, Math.floor(Number(opts.limit) || 500));
+    const page = ordered.slice(offset, offset + limit);
+    if (opts.includePositionEntries) {
+      try {
+        const portfolio = rehydratePortfolio(record.initialCapital ?? 0, items);
+        const seen = new Set(page.map((trade) => trade.id));
+        for (const position of portfolio.positions.values()) {
+          let entry = null;
+          for (let i = items.length - 1; i >= 0; i -= 1) {
+            const trade = items[i];
+            if (!trade || trade.status === "rejected" || trade.side !== "BUY") continue;
+            if (trade.tokenId !== position.tokenId || trade.marketId !== position.marketId) continue;
+            if (Number(trade.ts) > Number(position.entryTs) + 1000) continue;
+            entry = trade;
+            break;
+          }
+          if (entry && !seen.has(entry.id)) {
+            seen.add(entry.id);
+            page.push(entry);
+          }
+        }
+      } catch {
+        /* terminal runs with corrupt/partial journals still return the page */
+      }
+    }
+    return { items: page, total: items.length };
   }
 
   async getSignals(id, opts = {}) {

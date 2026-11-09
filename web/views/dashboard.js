@@ -407,14 +407,14 @@ export async function mount(root, ctx) {
       ctx.rememberRun(state.runId);
 
       const [tradesRes, equityRes, signalsRes, marketsRes] = await Promise.allSettled([
-        api.getJSON(`/api/runs/${encodeURIComponent(runId)}/trades?limit=${MAX_TRADES}`),
+        api.getJSON(`/api/runs/${encodeURIComponent(runId)}/trades?limit=${MAX_TRADES}&order=desc&includePositionEntries=true`),
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/equity?limit=${MAX_EQUITY}`),
         api.getJSON(`/api/runs/${encodeURIComponent(runId)}/signals?limit=200`),
         api.getJSON(`/api/runs/${encodeURIComponent(state.runId)}/markets`),
       ]);
 
       if (tradesRes.status === "fulfilled" && tradesRes.value) {
-        state.trades = Array.isArray(tradesRes.value.trades) ? tradesRes.value.trades : state.trades;
+        state.trades = normalizeTrades(Array.isArray(tradesRes.value.trades) ? tradesRes.value.trades : state.trades);
       }
       if (equityRes.status === "fulfilled" && equityRes.value) {
         const points = Array.isArray(equityRes.value.points) ? equityRes.value.points : [];
@@ -1291,6 +1291,69 @@ export async function mount(root, ctx) {
     return lines.join("\n");
   }
 
+  function tradeDirectionKey(trade) {
+    return `${trade.marketId || ""}|${trade.side || ""}|${trade.outcome || ""}`;
+  }
+
+  /** BUY entry for an open position; never evict these from the 500-row window. */
+  function isPositionEntryTrade(trade) {
+    if (!trade || trade.side !== "BUY" || trade.status === "rejected") return false;
+    return state.positions.some(
+      (position) => position.marketId === trade.marketId && position.tokenId === trade.tokenId,
+    );
+  }
+
+  function trimTrades(list) {
+    list.sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0));
+    const protectedIds = new Set(list.filter(isPositionEntryTrade).map((trade) => trade.id));
+    while (list.length > MAX_TRADES) {
+      let removeAt = -1;
+      for (let i = list.length - 1; i >= 0; i -= 1) {
+        if (!protectedIds.has(list[i].id)) {
+          removeAt = i;
+          break;
+        }
+      }
+      if (removeAt < 0) break;
+      list.splice(removeAt, 1);
+    }
+    return list;
+  }
+
+  /**
+   * Snapshot / SSE ingestion:
+   * - newest first
+   * - rejected trades collapsed to the latest per market+direction
+   * - open-position entry trades protected from the row cap
+   */
+  function normalizeTrades(rawTrades) {
+    const byId = new Map();
+    const rejectedSeen = new Set();
+    const sorted = [...(Array.isArray(rawTrades) ? rawTrades : [])].sort(
+      (a, b) => (Number(b?.ts) || 0) - (Number(a?.ts) || 0),
+    );
+    for (const trade of sorted) {
+      if (!trade || !trade.id) continue;
+      if (trade.status === "rejected") {
+        const key = tradeDirectionKey(trade);
+        if (rejectedSeen.has(key)) continue;
+        rejectedSeen.add(key);
+      }
+      byId.set(trade.id, trade);
+    }
+    return trimTrades([...byId.values()]);
+  }
+
+  function addTrade(trade) {
+    if (!trade || !trade.id) return;
+    let list = state.trades;
+    if (trade.status === "rejected") {
+      const key = tradeDirectionKey(trade);
+      list = list.filter((row) => !(row.status === "rejected" && tradeDirectionKey(row) === key));
+    }
+    state.trades = normalizeTrades([trade, ...list]);
+  }
+
   function renderTrades() {
     hideTradeTip();
     if (!el.tradesBody) return;
@@ -1353,7 +1416,9 @@ export async function mount(root, ctx) {
     );
     const rejectedTotal = filteredRows.filter((row) => row.trade.status === "rejected").length;
     const hiddenRejected = Math.max(0, rejectedTotal - latestRejected.size);
-    const limited = groupBy === "none" ? visible.slice(0, MAX_TRADES) : visible;
+    const limited = groupBy === "none"
+      ? visible.slice(0, MAX_TRADES + visible.filter(isPositionEntryTrade).length)
+      : visible;
     if (el.tradeBadge) {
       el.tradeBadge.textContent = `${visible.length} 笔`;
       el.tradeBadge.title = hiddenRejected > 0
@@ -1630,20 +1695,21 @@ export async function mount(root, ctx) {
       case "trade": {
         const trade = data.trade;
         if (!trade || !matchesRun(trade)) return;
-        state.trades.unshift(trade);
-        while (state.trades.length > MAX_TRADES) state.trades.pop();
+        addTrade(trade);
         renderTrades();
         renderCosts();
         if (data.position) {
           const index = state.positions.findIndex((item) => item.marketId === data.position.marketId && item.tokenId === data.position.tokenId);
           if (index >= 0) state.positions[index] = data.position;
           else if ((num(data.position.shares) || 0) > 0) state.positions.push(data.position);
+          state.trades = trimTrades(state.trades);
           renderPositions();
         }
         return;
       }
       case "positions":
         state.positions = Array.isArray(data.positions) ? data.positions : [];
+        state.trades = trimTrades(state.trades);
         renderPositions();
         return;
       case "equity": {

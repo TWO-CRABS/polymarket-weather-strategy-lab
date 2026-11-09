@@ -645,8 +645,37 @@ export class Run {
     return { items: this.signals.slice(offset, offset + limit), total: this.signals.length };
   }
 
-  getTrades({ limit = 500, offset = 0 } = {}) {
-    return { items: this.trades.slice(offset, offset + limit), total: this.trades.length };
+  getTrades({ limit = 500, offset = 0, order = "asc", includePositionEntries = false } = {}) {
+    const total = this.trades.length;
+    const safeLimit = Math.max(1, Math.floor(Number(limit) || 500));
+    const safeOffset = Math.max(0, Math.floor(Number(offset) || 0));
+    let items;
+    if (order === "desc") {
+      const end = Math.max(0, total - safeOffset);
+      const start = Math.max(0, end - safeLimit);
+      items = this.trades.slice(start, end).reverse();
+    } else {
+      items = this.trades.slice(safeOffset, safeOffset + safeLimit);
+    }
+    if (includePositionEntries) {
+      const seen = new Set(items.map((trade) => trade.id));
+      for (const position of this.portfolio.positions.values()) {
+        let entry = null;
+        for (let i = this.trades.length - 1; i >= 0; i -= 1) {
+          const trade = this.trades[i];
+          if (!trade || trade.status === "rejected" || trade.side !== "BUY") continue;
+          if (trade.tokenId !== position.tokenId || trade.marketId !== position.marketId) continue;
+          if (Number(trade.ts) > Number(position.entryTs) + 1000) continue;
+          entry = trade;
+          break;
+        }
+        if (entry && !seen.has(entry.id)) {
+          seen.add(entry.id);
+          items.push(entry);
+        }
+      }
+    }
+    return { items, total };
   }
 
   getEquity({ limit = 500, offset = 0 } = {}) {

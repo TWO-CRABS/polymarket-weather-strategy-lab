@@ -334,6 +334,17 @@ test("replay run lifecycle: create -> running/ended -> trades/equity/signals/pos
   assert.equal(paged.json.trades.length, 1);
   assert.equal(paged.json.total, 3);
 
+  // newest-first + position-entry inclusion are supported for the dashboard
+  const newest = await server.http.get(
+    `/api/runs/${encodeURIComponent(summary.id)}/trades?limit=3&order=desc&includePositionEntries=true`,
+  );
+  assert.equal(newest.status, 200);
+  assert.equal(newest.json.trades.length, 3);
+  assert.ok(
+    newest.json.trades.every((trade, index, list) => index === 0 || Number(list[index - 1].ts) >= Number(trade.ts)),
+    "order=desc must return newest first",
+  );
+
   // equity
   const equity = await server.http.get(`/api/runs/${encodeURIComponent(summary.id)}/equity`);
   assert.equal(equity.status, 200);
