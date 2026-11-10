@@ -581,7 +581,12 @@ export function planFallbackOrders(run) {
   };
   for (const group of groupFallbackCandidates(run)) {
     const rank1 = group.candidates[0];
+    const rank2 = group.candidates[1];
     const rank3 = group.candidates[2];
+    const rawGapPct = Number(run.config.execution?.fallbackMinTopGapPct);
+    const minGapPct = Math.max(0, Math.min(100, Number.isFinite(rawGapPct) ? rawGapPct : 40));
+    const topGapPct = rank1 ? (rank1.prob - (rank2?.prob ?? 0)) * 100 : 0;
+    const yesGapOk = Boolean(rank1) && topGapPct >= minGapPct - 1e-9;
 
     // 每窗口重新排名：pending 只有在原目标仍是当前 rank-1 YES / rank-3 NO
     // 时才继续重试；排名变化后丢弃旧目标，避免买了已经过时的括号。
@@ -589,7 +594,7 @@ export function planFallbackOrders(run) {
       if (pending.eventKey !== group.key) continue;
       const market = run.markets?.get?.(pending.marketId);
       const stillCurrentLeg =
-        (pending.outcome === "YES" && rank1?.market.id === pending.marketId) ||
+        (pending.outcome === "YES" && rank1?.market.id === pending.marketId && yesGapOk) ||
         (pending.outcome === "NO" && rank3?.market.id === pending.marketId);
       if (!market || market.closed || market.acceptingOrders === false || marketHasOpenPosition(run, pending.marketId) || !stillCurrentLeg) {
         run._fallbackPending.delete(fallbackPendingKey(pending.eventKey, pending.marketId, pending.outcome));
@@ -611,7 +616,8 @@ export function planFallbackOrders(run) {
       continue;
     }
 
-    if (!marketHasOpenPosition(run, rank1.market.id)) {
+    // 只对 YES leg 增加“第一高 - 第二高 ≥ 40 个百分点”的门槛；NO leg 不受影响。
+    if (yesGapOk && !marketHasOpenPosition(run, rank1.market.id)) {
       pushLeg({ market: rank1.market, outcome: "YES", rank: 1, eventKey: group.key });
     }
     // 第 3 高只有存在 NO 卖盘时才生成 NO leg。

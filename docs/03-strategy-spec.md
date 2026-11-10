@@ -62,7 +62,8 @@
     "maxPositionsPerMarket": 1,          // 1..10，同一括号市场并发持仓上限
     "fillModel": "book_walk",            // 仅 book_walk：逐档吃对手盘
     "slippageBufferBps": 0,              // 0..1000，价格保护 buffer（100=1%）
-    "fallbackBuyEachWindow": false       // 每个观测窗口周期空仓时：买第 1 高 YES + 第 3 高 NO
+    "fallbackBuyEachWindow": false,      // 每个观测窗口周期空仓时：买第 1 高 YES + 第 3 高 NO
+    "fallbackMinTopGapPct": 40           // 兜底 YES 要求 rank1-rank2 概率差 ≥ 40 个百分点
   },
   "exit": {
     "takeProfitPct": 50,                 // 1..1000，费用后净收益率阈值
@@ -272,7 +273,8 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 - **失败 leg 重试（每窗口重新排名）**：每个窗口都按当前概率重新计算 rank-1/rank-3。pending 失败 leg 只有在**原目标仍是当前 rank-1 YES / rank-3 NO** 时才继续重试；如果排名已经变化，旧的 pending 会被丢弃，改按当前排名目标执行。已成功 leg 不重复买入。
 - **同组已有持仓**：不再新增普通 legs，只重试“仍是当前排名目标”的 pending 失败 leg；不会因为同组另一个 leg 已成交而阻止该重试。
 - **动作**：对本组可交易候选（过滤仅：closed / 非 acceptingOrders）按 **YES 隐含概率降序**：
-  - **第 1 高** → `BUY YES`；若第 1 高**没有 YES 卖价（ask=0）**，整组本轮跳过，**不降级买下一档**。
+  - **第 1 高** → `BUY YES`；但必须满足 `(rank-1 概率 − rank-2 概率) × 100 ≥ execution.fallbackMinTopGapPct`（默认 40 个百分点）。差距不足时不买 YES，但 rank-3 NO 仍可独立生成。
+  - 若第 1 高**没有 YES 卖价（ask=0）**，整组本轮跳过，**不降级买下一档**。
   - **第 3 高** → `BUY NO`（组内候选不足 3 个或第 3 高没有 NO 卖价时不做这笔）。
   - **排名不按价格带/流动性/点差过滤**：这些只在下单时检查；被拒的腿记录 rejected，本轮不顺延替换（保持真实排名语义），失败 leg 下个窗口按当前排名重试。
 - **资金/仓位**：城市组按“组内最高概率”降序依次尝试；`maxPositions` 或现金不足时停止本次循环，剩余城市在后续周期继续（不会因为某个城市持仓而阻止其他城市建仓）。

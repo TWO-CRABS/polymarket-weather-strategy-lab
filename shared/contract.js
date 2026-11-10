@@ -128,6 +128,7 @@ export const LIMITS = Object.freeze({
     maxPositions: [1, 100],
     maxPositionsPerMarket: [1, 10],
     slippageBufferBps: [0, 1000],
+    fallbackMinTopGapPct: [0, 100],
   },
   exit: {
     takeProfitPct: [1, 1000],
@@ -188,6 +189,8 @@ export const DEFAULT_STRATEGY = Object.freeze({
     slippageBufferBps: 0,
     /** 周期性兜底：每个观察窗口到期时若空仓，买入概率第 1 高选项的 YES + 第 3 高选项的 NO。 */
     fallbackBuyEachWindow: false,
+    /** 兜底买 YES 的最低概率差（百分点）：rank1 - rank2 >= 该值才买。 */
+    fallbackMinTopGapPct: 40,
   },
   exit: {
     takeProfitPct: 50,

@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">18:44:04</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">18:56:01</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -234,7 +234,7 @@
       <header class="panel-head">
         <span class="panel-step">03</span>
         <div class="panel-title"><h2 id="h-execution">执行与仓位</h2><p>市价单按真实盘口逐档吃单（VWAP），计入滑点与官方 taker 手续费。</p></div>
-        <span class="badge badge-ghost">7 项参数</span>
+        <span class="badge badge-ghost">8 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
         <span class="field-label">订单类型<button type="button" class="help-dot" data-tip="系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。" aria-label="说明：系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。">?</button></span>
@@ -278,7 +278,11 @@
           <span class="switch"><input type="checkbox" id="f-execution-fallbackBuyEachWindow" data-path="execution.fallbackBuyEachWindow" data-kind="toggle"><i aria-hidden="true"></i></span>
         </label>
         <p class="hint"><button type="button" class="help-dot" data-tip="按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对没有持仓的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。若第 1 高没有 YES 卖盘，整组跳过，不降级买下一档。失败 leg 每窗口按当前排名重试；如果原目标已不再是当前 rank-1/rank-3，丢弃旧目标。已成交 leg 不会重复。各城市互不影响；仍受价格带/点差/仓位/现金/风控约束。" aria-label="说明：按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对没有持仓的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。若第 1 高没有 YES 卖盘，整组跳过，不降级买下一档。失败 leg 每窗口按当前排名重试；如果原目标已不再是当前 rank-1/rank-3，丢弃旧目标。已成交 leg 不会重复。各城市互不影响；仍受价格带/点差/仓位/现金/风控约束。">?</button>每个城市/日期组独立：每满一个观察窗口，无持仓时买组内概率第 1 高 YES + 第 3 高 NO（不足 3 个只买第 1）；若第 1 高没有 YES 卖盘（ask=0）则整组跳过，不降级买下一档；失败 leg 每窗口按当前排名重试，排名变化后丢弃旧目标</p>
-      </div></div></div>
+      </div><div class="field">
+      <label class="field-label" for="f-execution-fallbackMinTopGapPct">兜底 YES 最低概率差 <span class="hint">%</span><button type="button" class="help-dot" data-tip="仅兜底买 YES：第一高概率减第二高概率 ≥ 该百分点才买；例如 70% vs 20% = 50 点，≥40 可买。0 = 不限制。" aria-label="说明：仅兜底买 YES：第一高概率减第二高概率 ≥ 该百分点才买；例如 70% vs 20% = 50 点，≥40 可买。0 = 不限制。">?</button></label>
+      <input class="input num" type="number" id="f-execution-fallbackMinTopGapPct" data-path="execution.fallbackMinTopGapPct" data-kind="number" data-min="0" data-max="100" data-step="1" min="0" max="100" step="1" value="40" inputmode="decimal">
+      <span class="field-help">仅兜底买 YES：第一高概率 − 第二高概率 ≥ 该百分点才买；0 = 不限制</span>
+    </div></div></div>
     </section><section class="panel" aria-labelledby="h-exit">
       <header class="panel-head">
         <span class="panel-step">04</span>

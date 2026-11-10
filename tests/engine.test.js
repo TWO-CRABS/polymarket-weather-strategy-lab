@@ -1070,7 +1070,7 @@ test("periodic fallback plan: rank-1 YES + rank-3 NO over tradable candidates", 
       ["m5", mk("m5", 0.7, { acceptingOrders: false })],
     ]),
     portfolio: { positions: new Map() },
-    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 }, execution: { fallbackMinTopGapPct: 0 } },
   };
   const legs = planFallbackOrders(run);
   assert.deepEqual(
@@ -1111,7 +1111,7 @@ test("failed fallback leg is retried even after another leg in the same event fi
     marketIds: [...markets.keys()],
     markets,
     portfolio: { positions: new Map([["a3-n", { marketId: "a3" }]]) },
-    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 }, execution: { fallbackMinTopGapPct: 0 } },
     _fallbackPending: new Map([
       ["event:evt-a|a1|YES", { eventKey: "event:evt-a", marketId: "a1", outcome: "YES", rank: 1 }],
     ]),
@@ -1191,7 +1191,7 @@ test("stale fallback pending target is dropped when the rank changes", () => {
     marketIds: [...markets.keys()],
     markets,
     portfolio: { positions: new Map() },
-    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 }, execution: { fallbackMinTopGapPct: 0 } },
     _fallbackPending: new Map([
       ["event:evt-a|a1|YES", { eventKey: "event:evt-a", marketId: "a1", outcome: "YES", rank: 1 }],
     ]),
@@ -1205,6 +1205,84 @@ test("stale fallback pending target is dropped when the rank changes", () => {
   run.portfolio.positions = new Map([["a3-n", { marketId: "a3" }]]);
   run._fallbackPending.set("event:evt-a|a1|YES", { eventKey: "event:evt-a", marketId: "a1", outcome: "YES", rank: 1 });
   assert.deepEqual(planFallbackOrders(run), []);
+});
+
+test("fallback YES leg requires the configured probability gap to rank-2", () => {
+  const mk = (id, prob) => ({
+    id,
+    city: "GapCity",
+    bracket: id,
+    eventId: "evt-gap",
+    impliedProbability: prob,
+    spread: 0.01,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+  });
+  const makeRun = (p1, p2, p3) => ({
+    marketIds: ["g1", "g2", "g3"],
+    markets: new Map([
+      ["g1", mk("g1", p1)],
+      ["g2", mk("g2", p2)],
+      ["g3", mk("g3", p3)],
+    ]),
+    portfolio: { positions: new Map() },
+    config: { universe: { minPrice: 0.01, maxPrice: 0.99, maxSpread: 0.1 }, execution: { fallbackMinTopGapPct: 40 } },
+    _fallbackPending: new Map(),
+  });
+
+  // 70% vs 20% = 50 points -> buy YES; rank-3 NO unaffected.
+  assert.deepEqual(
+    planFallbackOrders(makeRun(0.7, 0.2, 0.1)).map((leg) => `${leg.rank}:${leg.outcome}`),
+    ["1:YES", "3:NO"],
+  );
+  // 60% vs 30% = 30 points < 40 -> no YES leg, but rank-3 NO remains.
+  assert.deepEqual(
+    planFallbackOrders(makeRun(0.6, 0.3, 0.1)).map((leg) => `${leg.rank}:${leg.outcome}`),
+    ["3:NO"],
+  );
+  // Exactly 40 points qualifies.
+  assert.deepEqual(
+    planFallbackOrders(makeRun(0.7, 0.3, 0.1)).map((leg) => `${leg.rank}:${leg.outcome}`),
+    ["1:YES", "3:NO"],
+  );
+});
+
+test("fallback pending YES is dropped when the probability gap no longer qualifies", () => {
+  const mk = (id, prob) => ({
+    id,
+    city: "GapCity",
+    bracket: id,
+    eventId: "evt-gap",
+    impliedProbability: prob,
+    spread: 0.01,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+  });
+  const run = {
+    marketIds: ["g1", "g2", "g3"],
+    markets: new Map([
+      ["g1", mk("g1", 0.6)],
+      ["g2", mk("g2", 0.3)],
+      ["g3", mk("g3", 0.1)],
+    ]),
+    portfolio: { positions: new Map() },
+    config: { universe: { minPrice: 0.01, maxPrice: 0.99, maxSpread: 0.1 }, execution: { fallbackMinTopGapPct: 40 } },
+    _fallbackPending: new Map([
+      ["event:evt-gap|g1|YES", { eventKey: "event:evt-gap", marketId: "g1", outcome: "YES", rank: 1 }],
+    ]),
+  };
+  assert.deepEqual(planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}`), ["3:NO"]);
+  assert.ok(!run._fallbackPending.has("event:evt-gap|g1|YES"));
 });
 
 test("periodic fallback plan is independent per city/date event group", () => {
@@ -1235,7 +1313,7 @@ test("periodic fallback plan is independent per city/date event group", () => {
     marketIds: [...markets.keys()],
     markets,
     portfolio: { positions: new Map() },
-    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 }, execution: { fallbackMinTopGapPct: 0 } },
   };
 
   const legs = planFallbackOrders(run);
@@ -1282,7 +1360,7 @@ test("periodic fallback ranks by probability even when the top bracket has a wid
     marketIds: [...markets.keys()],
     markets,
     portfolio: { positions: new Map() },
-    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 }, execution: { fallbackMinTopGapPct: 0 } },
   };
   assert.deepEqual(
     planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`),

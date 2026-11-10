@@ -342,6 +342,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-37 | 成交明细 rejected 记录显示详细拒绝原因（实际点差/流动性 vs 配置阈值、价格带、TTR 等），并优先使用拒单瞬间快照；旧记录无快照时回退当前行情（`tests/engine.test.js`） |
 | AC-38 | 兜底候选按名义概率排名；若第 1 高 YES 没有卖盘（ask=0），整组跳过，不降级买入下一档（`tests/engine.test.js`） |
 | AC-39 | 流动性分两个口径：`bookDepthUsd`=top10 bid+ask 总深度（市场质量/排序）；`executableDepthUsd`=目标方向（BUY asks / SELL bids、保护价内、top10）可成交深度，`minLiquidityUsd` 使用后者（`tests/engine.test.js`、`tests/market-time.test.js`） |
+| AC-40 | 兜底买 YES 要求 `rank-1 概率 − rank-2 概率 ≥ execution.fallbackMinTopGapPct`（默认 40 个百分点，0=关闭）；不满足时不买 YES，rank-3 NO 不受影响（`tests/engine.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |
