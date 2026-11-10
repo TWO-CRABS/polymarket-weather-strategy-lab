@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { cityEventSlug, cityEventUrl, citySlug } from "../shared/cityEvents.js";
+import { cityEventSlug, cityEventUrl, cityLocalDateKey, citySlug } from "../shared/cityEvents.js";
 
 test("city event slugs follow the Polymarket highest-temperature pattern", () => {
   assert.equal(cityEventSlug("London", "2026-11-10"), "highest-temperature-in-london-on-november-10-2026");
@@ -21,4 +21,16 @@ test("city event URL points at the official Polymarket event", () => {
   );
   assert.equal(cityEventUrl("Unknown City", "2026-11-10"), "https://polymarket.com/zh/event/highest-temperature-in-unknown-city-on-november-10-2026");
   assert.equal(cityEventUrl("London", null), null);
+});
+
+test("city local date drives the official event link (LA can still be on Nov 9)", () => {
+  const at = new Date("2026-11-10T05:00:00Z");
+  assert.equal(cityLocalDateKey("Los Angeles", at), "2026-11-09");
+  assert.equal(cityLocalDateKey("Shenzhen", at), "2026-11-10");
+  assert.equal(cityLocalDateKey("London", at), "2026-11-10");
+  assert.equal(cityLocalDateKey("New York City", at), "2026-11-10");
+  assert.equal(
+    cityEventUrl("Los Angeles", cityLocalDateKey("Los Angeles", at)),
+    "https://polymarket.com/zh/event/highest-temperature-in-los-angeles-on-november-9-2026",
+  );
 });

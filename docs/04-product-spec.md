@@ -335,7 +335,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-30 | 每日 UTC 00:00 自动滚动：活跃 marketIds 切换到新一天、旧市场关闭、旧仓位保留并继续结算、权益/成交连续，同一 run 不重启（`tests/rolling.test.js`） |
 | AC-31 | 动量成立但价格带/点差禁止入场时，默认记录 `kind="observation"` 的不可交易观察信号；不产生订单/手续费/成交，信号流可按入场/观察筛选（`tests/engine.test.js`） |
 | AC-32 | 策略构建器“市场范围”按当前 UTC 偏移（DST 感知）**升序**分组城市；每组显示 `时区(UTC±HH:MM)` 与当地日期时间，并支持一键全选/取消该组（`tests/city-timezones.test.js`） |
-| AC-33 | 策略构建器每个城市 chip 提供 Polymarket 官方事件外链（当前观察日），点击外链不改变城市勾选状态（`tests/city-events.test.js`） |
+| AC-33 | 策略构建器每个城市 chip 提供 Polymarket 官方事件外链，按**城市本地观察日**生成（如 UTC 已到 11/10 但洛杉矶仍是 11/9）；点击外链不改变城市勾选状态（`tests/city-events.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

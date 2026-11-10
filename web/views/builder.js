@@ -23,7 +23,7 @@ import {
 import * as api from "/web/api.js";
 import * as ui from "/web/components/ui.js";
 import { groupCitiesByTimezone, localDateTimeForTimeZone } from "/shared/cityTimezones.js";
-import { cityEventUrl } from "/shared/cityEvents.js";
+import { cityEventUrl, cityLocalDateKey } from "/shared/cityEvents.js";
 
 const PRICE_FIELD_LABELS = {
   mid: "中间价 mid",
@@ -633,7 +633,6 @@ export async function mount(root, ctx) {
     const cities = metaCities(ctx.store);
     const selected = Array.isArray(state.cfg.universe.cities) ? state.cfg.universe.cities : [];
     const selectedSet = new Set(selected);
-    const universeDate = ctx.store && ctx.store.meta ? ctx.store.meta.universeDate : null;
     // 保留已保存策略里选中、但当天没有市场的城市，避免打开配置时选择丢失
     const known = new Set(cities.map((city) => city.name));
     for (const name of selected) {
@@ -659,9 +658,7 @@ export async function mount(root, ctx) {
               </header>
               <div class="city-picker">
                 ${group.cities.map((city) => {
-                  const eventUrl = city.eventSlug
-                    ? `https://polymarket.com/zh/event/${encodeURIComponent(city.eventSlug)}`
-                    : cityEventUrl(city.name, universeDate);
+                  const eventUrl = cityEventUrl(city.name, cityLocalDateKey(city.name));
                   const title = `在 Polymarket 查看 ${city.name} 官方市场`;
                   return `<div class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
                   <label class="city-option-label">

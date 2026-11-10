@@ -9,6 +9,7 @@ const MONTHS = [
   "january", "february", "march", "april", "may", "june",
   "july", "august", "september", "october", "november", "december",
 ];
+import { timezoneForCity } from "./cityTimezones.js";
 
 const CITY_SLUG_OVERRIDES = Object.freeze({
   "New York City": "nyc",
@@ -30,10 +31,32 @@ export function citySlug(cityName) {
     .replace(/^-+|-+$/g, "");
 }
 
+/** Local calendar date key (YYYY-MM-DD) at the city's station timezone. */
+export function cityLocalDateKey(cityName, at = new Date()) {
+  const zone = timezoneForCity(cityName);
+  if (!zone) return at.toISOString().slice(0, 10);
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(at);
+    const pick = (type) => parts.find((part) => part.type === type)?.value || "";
+    const year = pick("year");
+    const month = pick("month");
+    const day = pick("day");
+    if (!year || !month || !day) return at.toISOString().slice(0, 10);
+    return `${year}-${month}-${day}`;
+  } catch {
+    return at.toISOString().slice(0, 10);
+  }
+}
+
 /**
  * Official Polymarket event slug for a city's high-temperature event.
  * @param {string} cityName
- * @param {string} dateKey YYYY-MM-DD (UTC observation date key)
+ * @param {string} dateKey YYYY-MM-DD (city-local observation date)
  * @returns {string|null}
  */
 export function cityEventSlug(cityName, dateKey) {
