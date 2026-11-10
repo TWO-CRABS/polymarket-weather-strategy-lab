@@ -106,6 +106,8 @@ export class Run {
     this._depthSlippageCost = 0;
     /** 周期性兜底建仓（execution.fallbackBuyEachWindow）的下次检查时间 */
     this._fallbackNextAt = null;
+    /** 兜底失败 leg：key -> {eventKey,marketId,outcome,rank,...}，每窗口重试直到成交/截止 */
+    this._fallbackPending = new Map();
     /** @type {((marketId:string)=>Promise<any>)|null} */
     this.resolutionProvider = cfg.resolutionProvider ?? null;
   }
@@ -124,6 +126,7 @@ export class Run {
     for (const marketId of this.marketIds) {
       if (!this.signalStates.has(marketId)) this.signalStates.set(marketId, createSignalState());
     }
+    this._fallbackPending.clear();
   }
 
   /**
@@ -150,6 +153,9 @@ export class Run {
     this._lastBookHash.clear();
     this._lastSampleTs.clear();
     this._observationLast.clear();
+    for (const [key, pending] of this._fallbackPending) {
+      if (!nextIds.has(pending.marketId)) this._fallbackPending.delete(key);
+    }
     this._fallbackNextAt = null;
     this._rejectedExitKeys.clear();
     this.broadcastMarkets();

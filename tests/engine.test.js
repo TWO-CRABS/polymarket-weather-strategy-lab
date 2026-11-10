@@ -1084,6 +1084,46 @@ test("periodic fallback plan: rank-1 YES + rank-3 NO over tradable candidates", 
   );
 });
 
+test("failed fallback leg is retried even after another leg in the same event fills", () => {
+  const mk = (id, prob, eventId) => ({
+    id,
+    city: "Alpha",
+    bracket: id,
+    eventId,
+    impliedProbability: prob,
+    spread: 0.01,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+  });
+  const markets = new Map([
+    ["a1", mk("a1", 0.8, "evt-a")],
+    ["a2", mk("a2", 0.5, "evt-a")],
+    ["a3", mk("a3", 0.3, "evt-a")],
+  ]);
+  const run = {
+    marketIds: [...markets.keys()],
+    markets,
+    portfolio: { positions: new Map([["a3-n", { marketId: "a3" }]]) },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+    _fallbackPending: new Map([
+      ["event:evt-a|a1|YES", { eventKey: "event:evt-a", marketId: "a1", outcome: "YES", rank: 1 }],
+    ]),
+  };
+  // a3 NO already filled; a1 YES failed -> only retry a1, don't add a3 again.
+  assert.deepEqual(
+    planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`),
+    ["1:YES:a1"],
+  );
+  run._fallbackPending.clear();
+  // No pending failed leg and the event already has a position -> no new legs.
+  assert.deepEqual(planFallbackOrders(run), []);
+});
+
 test("periodic fallback plan is independent per city/date event group", () => {
   const mk = (id, prob, eventId) => ({
     id,

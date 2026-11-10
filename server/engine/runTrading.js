@@ -466,19 +466,63 @@ function eventHasOpenPosition(run, marketIds) {
   return false;
 }
 
+function marketHasOpenPosition(run, marketId) {
+  for (const position of run.portfolio.positions.values()) {
+    if (position.marketId === marketId) return true;
+  }
+  return false;
+}
+
+function fallbackPendingKey(eventKey, marketId, outcome) {
+  return `${eventKey}|${marketId}|${outcome}`;
+}
+
 /**
- * 各城市独立兜底计划：只对“没有任何持仓”的事件组生成 legs。
- * @returns {Array<{market:any, outcome:"YES"|"NO", rank:number, eventKey:string}>}
+ * 城市/日期事件内的兜底 legs。
+ * - 初始/事件无持仓：按当前概率排名生成 rank-1 YES + rank-3 NO。
+ * - 同组已有持仓：不再新增普通 legs，但此前失败的 leg 必须每窗口重试；
+ *   这样 36°C NO 成交后，34°C YES 的失败 leg 仍会继续尝试。
  */
 export function planFallbackOrders(run) {
+  if (!run._fallbackPending) run._fallbackPending = new Map();
   const legs = [];
+  const planned = new Set();
+  const pushLeg = (leg) => {
+    const key = fallbackPendingKey(leg.eventKey, leg.market.id, leg.outcome);
+    if (planned.has(key)) return;
+    planned.add(key);
+    legs.push(leg);
+  };
   for (const group of groupFallbackCandidates(run)) {
-    if (eventHasOpenPosition(run, group.marketIds)) continue;
-    if (group.candidates[0]) {
-      legs.push({ market: group.candidates[0].market, outcome: "YES", rank: 1, eventKey: group.key });
+    // 清理已失效/已成交的失败 leg。
+    for (const pending of [...run._fallbackPending.values()]) {
+      if (pending.eventKey !== group.key) continue;
+      const market = run.markets?.get?.(pending.marketId);
+      if (!market || market.closed || market.acceptingOrders === false || marketHasOpenPosition(run, pending.marketId)) {
+        run._fallbackPending.delete(fallbackPendingKey(pending.eventKey, pending.marketId, pending.outcome));
+      }
     }
-    if (group.candidates[2]) {
-      legs.push({ market: group.candidates[2].market, outcome: "NO", rank: 3, eventKey: group.key });
+    const pending = [...run._fallbackPending.values()].filter((item) => item.eventKey === group.key);
+    const pendingOutcomes = new Set(pending.map((item) => item.outcome));
+    const hasPosition = eventHasOpenPosition(run, group.marketIds);
+
+    // 已失败的 leg 优先按原目标重试（即使同组其他括号已成交）。
+    for (const item of pending) {
+      const market = run.markets?.get?.(item.marketId);
+      if (!market || market.closed || market.acceptingOrders === false || marketHasOpenPosition(run, item.marketId)) continue;
+      pushLeg({ market, outcome: item.outcome, rank: item.rank, eventKey: group.key, retry: true });
+    }
+
+    // 事件组已有任意持仓时，不再新增普通 legs，只重试 pending 失败 leg。
+    if (hasPosition) continue;
+
+    const rank1 = group.candidates[0];
+    const rank3 = group.candidates[2];
+    if (rank1 && !pendingOutcomes.has("YES") && !marketHasOpenPosition(run, rank1.market.id)) {
+      pushLeg({ market: rank1.market, outcome: "YES", rank: 1, eventKey: group.key });
+    }
+    if (rank3 && !pendingOutcomes.has("NO") && !marketHasOpenPosition(run, rank3.market.id)) {
+      pushLeg({ market: rank3.market, outcome: "NO", rank: 3, eventKey: group.key });
     }
   }
   return legs;
@@ -534,6 +578,11 @@ export async function maybePeriodicFallback(run, now) {
       reason: "fallback_entry",
     };
     const result = await tryEntry(run, signal, market, now, { reason: "fallback_entry" });
+    const pendingKey = fallbackPendingKey(leg.eventKey, market.id, outcome);
+    if (!run._fallbackPending) run._fallbackPending = new Map();
+    // 每个 leg 先登记为 pending；成功/静默跳过时移除，失败则保留到下个窗口重试。
+    if (result.ok || result.silent) run._fallbackPending.delete(pendingKey);
+    else run._fallbackPending.set(pendingKey, { eventKey: leg.eventKey, marketId: market.id, outcome, rank });
     results.push({ ...result, outcome, rank, marketId: market.id, eventKey: leg.eventKey });
     if (result.ok) {
       run.sse.log(
