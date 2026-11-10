@@ -1269,17 +1269,21 @@ export async function mount(root, ctx) {
     if (slippage !== null && slippage > 0) lines.push(`滑点：${ui.fmtMoney(slippage, 2)}`);
     const pnl = num(trade.realizedPnl);
     if (pnl !== null && pnl !== 0) lines.push(`已实现盈亏：${ui.fmtMoney(pnl, 4)}`);
-    if (market) {
+    const snapshotSource = trade.marketSnapshot || market;
+    if (snapshotSource) {
       const snapshot = [];
-      const mid = num(market.impliedProbability);
-      const yes = quoteOf(market, "YES");
-      const spread = num(market.spread);
-      const liquidity = num(market.liquidityUsd);
+      const mid = num(snapshotSource.impliedProbability);
+      const yes = quoteOf(snapshotSource, "YES");
+      const spread = num(snapshotSource.spread);
+      const liquidity = num(snapshotSource.liquidityUsd);
       if (mid !== null) snapshot.push(`YES ${ui.fmtProb(mid)}`);
+      if (num(yes.bid) !== null) snapshot.push(`bid ${priceText(yes.bid)}`);
       if (num(yes.ask) !== null) snapshot.push(`ask ${priceText(yes.ask)}`);
       if (spread !== null) snapshot.push(`点差 ${ui.fmtCents(spread, 1)}`);
       if (liquidity !== null) snapshot.push(`流动性 ${ui.fmtMoney(liquidity)}`);
-      if (snapshot.length) lines.push(`市场快照：${snapshot.join(" · ")}`);
+      if (snapshot.length) {
+        lines.push(`${trade.marketSnapshot ? "拒单时快照" : "市场快照"}：${snapshot.join(" · ")}`);
+      }
     }
     lines.push(`时间：${ui.fmtTime(trade.ts)} · 状态：${status}`);
     const note = trade.status === "rejected"

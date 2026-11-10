@@ -321,7 +321,7 @@ test("replay run lifecycle: create -> running/ended -> trades/equity/signals/pos
     for (const key of [
       "id", "ts", "runId", "marketId", "tokenId", "outcome", "side", "shares", "price",
       "notional", "fee", "slippageCost", "totalCost", "cashDelta", "realizedPnl",
-      "signalId", "reason", "status", "rejectReason", "bookLevels",
+      "signalId", "reason", "status", "rejectReason", "bookLevels", "marketSnapshot",
     ]) {
       assert.ok(key in trade, `Trade.${key} missing`);
     }

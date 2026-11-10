@@ -555,6 +555,7 @@ export function makeTrade(run, fields) {
   const {
     market, tokenId, outcome, side, shares, price, notional, fee, slippageCost, spreadCost,
     realizedPnl, totalCost, cashDelta, signalId, reason, status, rejectReason, bookLevels, ts,
+    marketSnapshot,
   } = fields;
   return {
     id: newId("trd"),
@@ -578,6 +579,39 @@ export function makeTrade(run, fields) {
     status,
     rejectReason: rejectReason ?? null,
     bookLevels,
+    marketSnapshot: marketSnapshot ?? null,
+  };
+}
+
+/** Capture the quote at the exact rejection tick (not a later refreshed market). */
+export function captureMarketSnapshot(market) {
+  if (!market) return null;
+  const quote = (side) => {
+    const q = market.quotes?.[side];
+    if (!q) return null;
+    const clean = (value) => (Number.isFinite(Number(value)) ? roundTo(Number(value), 6) : null);
+    return {
+      bid: clean(q.bid),
+      ask: clean(q.ask),
+      mid: clean(q.mid),
+      last: clean(q.last),
+    };
+  };
+  return {
+    impliedProbability: Number.isFinite(Number(market.impliedProbability))
+      ? roundTo(Number(market.impliedProbability), 6)
+      : null,
+    spread: Number.isFinite(Number(market.spread)) ? roundTo(Number(market.spread), 6) : null,
+    liquidityUsd: Number.isFinite(Number(market.liquidityUsd)) ? roundTo(Number(market.liquidityUsd), 5) : null,
+    bookDepthUsd: Number.isFinite(Number(market.bookDepthUsd)) ? roundTo(Number(market.bookDepthUsd), 5) : null,
+    tradingCutoff: market.tradingCutoff || null,
+    stale: Boolean(market.stale),
+    acceptingOrders: market.acceptingOrders !== false,
+    closed: Boolean(market.closed),
+    quotes: {
+      YES: quote("YES"),
+      NO: quote("NO"),
+    },
   };
 }
 
@@ -617,6 +651,7 @@ export function recordRejectedEntry(run, signal, market, rejectReason, now, opts
     status: "rejected",
     rejectReason,
     bookLevels: [],
+    marketSnapshot: captureMarketSnapshot(market),
     ts: now,
   });
   recordTrade(run, trade, null);

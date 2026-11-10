@@ -520,6 +520,7 @@ export const STRATEGY_PRESETS = Object.freeze([
  * @property {"filled"|"partial"|"rejected"} status
  * @property {string|null} rejectReason
  * @property {Array<{price:number,size:number}>} bookLevels consumed
+ * @property {Object|null} [marketSnapshot] quote snapshot at rejection time
  */
 
 /**

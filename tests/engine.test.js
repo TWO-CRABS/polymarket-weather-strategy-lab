@@ -44,7 +44,7 @@ import {
   simulateBuy,
   simulateSell,
 } from "../server/engine/execution.js";
-import { planFallbackOrders, preRiskChecks, recordObservationSignal, processMarkets } from "../server/engine/runTrading.js";
+import { planFallbackOrders, preRiskChecks, recordObservationSignal, processMarkets, recordRejectedEntry } from "../server/engine/runTrading.js";
 import { Portfolio } from "../server/engine/portfolio.js";
 import {
   computeMetrics,
@@ -401,6 +401,49 @@ test("price band and spread guards run before the trigger (docs/03 §2.3)", () =
 /* ------------------------------------------------------------------------- */
 /* Execution (server/engine/execution.js)                                    */
 /* ------------------------------------------------------------------------- */
+
+test("rejected entry persists the quote snapshot at rejection time", () => {
+  const now = Date.now();
+  const market = {
+    id: "m-reject-snapshot",
+    city: "Wellington",
+    bracket: "18°C",
+    impliedProbability: 0.81,
+    spread: 0.24,
+    liquidityUsd: 167.12,
+    bookDepthUsd: 210.5,
+    stale: false,
+    acceptingOrders: true,
+    closed: false,
+    tokens: { yesTokenId: "yes-snap", noTokenId: "no-snap" },
+    quotes: {
+      YES: { bid: 0.65, ask: 0.89, mid: 0.77, last: 0.81 },
+      NO: { bid: 0.11, ask: 0.35, mid: 0.23, last: null },
+    },
+  };
+  const run = {
+    id: "run_reject_snapshot",
+    trades: [],
+    filledTradeCount: 0,
+    _spreadCost: 0,
+    _depthSlippageCost: 0,
+    store: { appendRecord() {} },
+    sse: { broadcast() {} },
+    portfolio: { snapshots: () => [], positionsValue: () => 0 },
+  };
+  recordRejectedEntry(run, { id: "sig_snap", tokenId: "yes-snap", outcome: "YES" }, market, "spread_too_wide", now, {
+    reason: "fallback_entry",
+  });
+  const trade = run.trades[0];
+  assert.equal(trade.status, "rejected");
+  assert.equal(trade.rejectReason, "spread_too_wide");
+  assert.equal(trade.marketSnapshot.spread, 0.24);
+  assert.equal(trade.marketSnapshot.impliedProbability, 0.81);
+  assert.equal(trade.marketSnapshot.liquidityUsd, 167.12);
+  assert.equal(trade.marketSnapshot.quotes.YES.bid, 0.65);
+  assert.equal(trade.marketSnapshot.quotes.YES.ask, 0.89);
+  assert.equal(trade.marketSnapshot.quotes.NO.bid, 0.11);
+});
 
 test("price-band blocked momentum returns a non-tradable candidate (13C collapse case)", () => {
   const config = configWith({
