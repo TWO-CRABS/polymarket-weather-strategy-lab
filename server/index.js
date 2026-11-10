@@ -156,7 +156,7 @@ async function main() {
   sse = new SseHub({
     heartbeatMs: config.sseHeartbeatMs,
     metaProvider: () => ({
-      cities: discovery.getCities(utcDateKey()),
+      cities: discovery.getCities(),
       universeDate: utcDateKey(),
       presets: STRATEGY_PRESETS,
       feeModel: FEES,

@@ -57,7 +57,8 @@ export function effectiveEventTradingEndMs(event) {
   if (!Number.isFinite(end)) return NaN;
   if (new Date(end).getUTCHours() === 12) {
     const dateKey = new Date(end).toISOString().slice(0, 10);
-    const localEnd = cityLocalDayEndMs(event?.city, dateKey);
+    const city = event?.city || extractCity(String(event?.title || ""));
+    const localEnd = cityLocalDayEndMs(city, dateKey);
     if (Number.isFinite(localEnd)) return localEnd;
     return end + 12 * 3600_000;
   }
@@ -269,10 +270,7 @@ export function normalizeMarket(market, event, now = nowMs()) {
  */
 export async function fetchTemperatureEvents(log = () => {}) {
   const now = nowMs();
-  const today = new Date(now);
-  const todayStart = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-  ).toISOString();
+  const lookbackStart = new Date(now - 48 * 3600_000).toISOString();
   const horizon = new Date(now + DISCOVERY_HORIZON_MS).toISOString();
 
   const collected = new Map();
@@ -298,7 +296,7 @@ export async function fetchTemperatureEvents(log = () => {}) {
       limit: "100",
       order: "endDate",
       ascending: "true",
-      end_date_min: todayStart,
+      end_date_min: lookbackStart,
       end_date_max: horizon,
     });
     if (cursor) params.set("after_cursor", cursor);

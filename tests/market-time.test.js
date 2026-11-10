@@ -48,6 +48,15 @@ test("event summaries use city-local end and fall back to UTC midnight", () => {
     "2026-11-09T08:00:00.000Z",
   );
   assert.equal(
+    new Date(
+      effectiveEventTradingEndMs({
+        endDate: "2026-11-08T12:00:00Z",
+        title: "Highest temperature in Los Angeles on November 8?",
+      }),
+    ).toISOString(),
+    "2026-11-09T08:00:00.000Z",
+  );
+  assert.equal(
     new Date(effectiveEventTradingEndMs({ endDate: "2026-11-08T12:00:00Z" })).toISOString(),
     "2026-11-09T00:00:00.000Z",
   );

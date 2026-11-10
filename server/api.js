@@ -81,7 +81,7 @@ export function createApiHandler(deps) {
   const metaPayload = () => ({
     contractVersion: CONTRACT_VERSION,
     serverTime: nowMs(),
-    cities: discovery.getCities(utcDateKey()),
+    cities: discovery.getCities(),
     universeDate: utcDateKey(),
     presets: STRATEGY_PRESETS,
     feeModel: FEES,
