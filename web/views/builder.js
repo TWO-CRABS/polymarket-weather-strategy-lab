@@ -23,6 +23,7 @@ import {
 import * as api from "/web/api.js";
 import * as ui from "/web/components/ui.js";
 import { groupCitiesByTimezone, localDateTimeForTimeZone } from "/shared/cityTimezones.js";
+import { cityEventUrl } from "/shared/cityEvents.js";
 
 const PRICE_FIELD_LABELS = {
   mid: "中间价 mid",
@@ -233,7 +234,11 @@ function metaCities(store) {
       if (!item || typeof item !== "object") return null;
       const name = item.name || item.city || item.label || "";
       if (!name) return null;
-      return { name, station: item.station || item.icao || item.code || "" };
+      return {
+        name,
+        station: item.station || item.icao || item.code || "",
+        eventSlug: item.eventSlug || item.slug || "",
+      };
     })
     .filter(Boolean);
 }
@@ -628,6 +633,7 @@ export async function mount(root, ctx) {
     const cities = metaCities(ctx.store);
     const selected = Array.isArray(state.cfg.universe.cities) ? state.cfg.universe.cities : [];
     const selectedSet = new Set(selected);
+    const universeDate = ctx.store && ctx.store.meta ? ctx.store.meta.universeDate : null;
     // 保留已保存策略里选中、但当天没有市场的城市，避免打开配置时选择丢失
     const known = new Set(cities.map((city) => city.name));
     for (const name of selected) {
@@ -652,12 +658,21 @@ export async function mount(root, ctx) {
                 <span class="city-tz-count" data-tz-count>${selectedInGroup}/${group.cities.length}</span>
               </header>
               <div class="city-picker">
-                ${group.cities.map((city) => `<label class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
-                  <input type="checkbox" value="${escapeAttr(city.name)}" data-city="${escapeAttr(city.name)}" ${selectedSet.has(city.name) ? "checked" : ""}>
-                  <span class="city-code" aria-hidden="true">${ui.escapeHtml(briefCityCode(city))}</span>
-                  <span class="city-name">${ui.escapeHtml(city.name)}</span>
-                  ${city.station ? `<span class="city-meta">${ui.escapeHtml(city.station)}</span>` : ""}
-                </label>`).join("")}
+                ${group.cities.map((city) => {
+                  const eventUrl = city.eventSlug
+                    ? `https://polymarket.com/zh/event/${encodeURIComponent(city.eventSlug)}`
+                    : cityEventUrl(city.name, universeDate);
+                  const title = `在 Polymarket 查看 ${city.name} 官方市场`;
+                  return `<div class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
+                  <label class="city-option-label">
+                    <input type="checkbox" value="${escapeAttr(city.name)}" data-city="${escapeAttr(city.name)}" ${selectedSet.has(city.name) ? "checked" : ""}>
+                    <span class="city-code" aria-hidden="true">${ui.escapeHtml(briefCityCode(city))}</span>
+                    <span class="city-name">${ui.escapeHtml(city.name)}</span>
+                    ${city.station ? `<span class="city-meta">${ui.escapeHtml(city.station)}</span>` : ""}
+                  </label>
+                  ${eventUrl ? `<a class="city-market-link" href="${ui.escapeHtml(eventUrl)}" target="_blank" rel="noopener noreferrer" title="${ui.escapeHtml(title)}" aria-label="${ui.escapeHtml(title)}">↗</a>` : ""}
+                </div>`;
+                }).join("")}
               </div>
             </section>`;
           }).join("")}
