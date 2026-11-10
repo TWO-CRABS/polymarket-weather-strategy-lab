@@ -127,15 +127,19 @@ export class Run {
   }
 
   /**
-   * 每日滚动：把活跃市场切到新一天；旧市场标记交易关闭并保留在 markets 里，
+   * 每日滚动：按城市刷新活跃市场；旧市场标记交易关闭并保留在 markets 里，
    * 已有仓位继续等待官方结算。权益/成交/指标不重置。
    */
   rollUniverse(markets, dateKey, now = nowMs()) {
+    const next = (Array.isArray(markets) ? markets : []).filter((market) => market && market.id);
+    const nextIds = new Set(next.map((market) => market.id));
+    // Only markets that left the active local-day set are closed; a city can
+    // roll to its next local day while another city is still on the old day.
     for (const marketId of this.marketIds) {
+      if (nextIds.has(marketId)) continue;
       const market = this.markets.get(marketId);
       if (market) market.closed = true;
     }
-    const next = (Array.isArray(markets) ? markets : []).filter((market) => market && market.id);
     this.marketIds = [];
     for (const market of next) {
       this.markets.set(market.id, market);
@@ -154,7 +158,7 @@ export class Run {
     this.store.upsertRunRecord(this.record()).catch(() => {});
     this.sse.log(
       "info",
-      `已切换到 ${dateKey} 市场（${this.marketIds.length} 个）；旧仓位保留，按官方裁决结算`,
+      `已刷新城市本地日市场（${this.marketIds.length} 个活跃）；旧市场按城市本地日关闭，旧仓位保留等待官方结算`,
       this.id,
     );
     return this.marketIds.length;

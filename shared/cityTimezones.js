@@ -108,6 +108,58 @@ export function formatUtcOffset(offsetMinutes) {
   return `UTC${sign}${hh}:${mm}`;
 }
 
+/** Local calendar date key (YYYY-MM-DD) for an IANA zone. */
+export function localDateKeyForTimeZone(timeZone, at = new Date()) {
+  if (!timeZone) return at.toISOString().slice(0, 10);
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(at);
+    const pick = (type) => parts.find((part) => part.type === type)?.value || "";
+    const year = pick("year");
+    const month = pick("month");
+    const day = pick("day");
+    if (!year || !month || !day) return at.toISOString().slice(0, 10);
+    return `${year}-${month}-${day}`;
+  } catch {
+    return at.toISOString().slice(0, 10);
+  }
+}
+
+/** Local calendar date key (YYYY-MM-DD) at the city's station timezone. */
+export function cityLocalDateKey(cityName, at = new Date()) {
+  return localDateKeyForTimeZone(timezoneForCity(cityName), at);
+}
+
+/**
+ * UTC epoch for the end of a city's local observation day (next local 00:00).
+ * For unknown cities, falls back to next UTC midnight.
+ */
+export function cityLocalDayEndMs(cityName, dateKey) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || ""));
+  if (!match) return NaN;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const nextUtcMidnight = Date.UTC(year, month - 1, day + 1, 0, 0, 0, 0);
+  if (!Number.isFinite(nextUtcMidnight)) return NaN;
+  const zone = timezoneForCity(cityName);
+  if (!zone) return nextUtcMidnight;
+  // Iterate because the offset may change at/around local midnight (DST).
+  let guess = nextUtcMidnight;
+  for (let i = 0; i < 3; i += 1) {
+    const offset = offsetMinutesForTimeZone(zone, new Date(guess));
+    if (!Number.isFinite(offset)) return nextUtcMidnight;
+    const next = nextUtcMidnight - offset * 60_000;
+    if (next === guess) break;
+    guess = next;
+  }
+  return guess;
+}
+
 /** Local current time (HH:mm) for an IANA zone. */
 export function localTimeForTimeZone(timeZone, at = new Date()) {
   if (!timeZone) return "";

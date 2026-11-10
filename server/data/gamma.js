@@ -16,6 +16,7 @@
  * fields: eventTitle / eventSlug / protocolVersion).
  */
 import { FEES } from "../../shared/contract.js";
+import { cityLocalDayEndMs } from "../../shared/cityTimezones.js";
 import { fetchJson, nowMs, parseDateMs, parseJsonArray, toNum, toNumOrNull } from "../util.js";
 
 const GAMMA = "https://gamma-api.polymarket.com";
@@ -27,7 +28,7 @@ const MAX_DISCOVERY_PAGES = 4;
 const POLYV2_SLUG = /^polyv2[-_]/i;
 
 /**
- * 实际交易截止（毫秒）：温度 negRisk 市场交易到观察日 24:00 UTC（次日 00:00Z）；
+ * 实际交易截止（毫秒）：温度 negRisk 市场交易到城市本地观察日 24:00（次日当地 00:00，DST 感知）；
  * 非温度市场回退到 endDate。优先使用快照里的 tradingCutoff。
  */
 export function effectiveTradingEndMs(market) {
@@ -36,19 +37,31 @@ export function effectiveTradingEndMs(market) {
   if (Number.isFinite(explicit)) return explicit;
   const end = Date.parse(market.endDate);
   if (!Number.isFinite(end)) return NaN;
-  // Weather events use endDate=observation day 12:00Z; real cutoff is 24:00 UTC.
-  if (market.negRisk && new Date(end).getUTCHours() === 12) return end + 12 * 3600_000;
+  // Weather events use endDate=observation day 12:00Z; real cutoff is the
+  // station-local end of that observation day (next local 00:00).
+  if (market.negRisk && new Date(end).getUTCHours() === 12) {
+    const dateKey = new Date(end).toISOString().slice(0, 10);
+    const localEnd = cityLocalDayEndMs(market.city, dateKey);
+    if (Number.isFinite(localEnd)) return localEnd;
+    return end + 12 * 3600_000;
+  }
   return end;
 }
 
 /**
  * 事件级实际交易截止。事件 keyset 摘要可能没有 negRisk 字段，因此用
- * “温度事件 endDate 固定为观察日 12:00Z”判定，并 +12h 得到 24:00 UTC。
+ * “温度事件 endDate 固定为观察日 12:00Z”判定，并按城市时区换算到当地 24:00。
  */
 export function effectiveEventTradingEndMs(event) {
   const end = parseDateMs(event?.endDate);
   if (!Number.isFinite(end)) return NaN;
-  return new Date(end).getUTCHours() === 12 ? end + 12 * 3600_000 : end;
+  if (new Date(end).getUTCHours() === 12) {
+    const dateKey = new Date(end).toISOString().slice(0, 10);
+    const localEnd = cityLocalDayEndMs(event?.city, dateKey);
+    if (Number.isFinite(localEnd)) return localEnd;
+    return end + 12 * 3600_000;
+  }
+  return end;
 }
 
 /** Common city aliases used by Polymarket event titles. */
@@ -156,7 +169,10 @@ export function normalizeMarket(market, event, now = nowMs()) {
   const endDateMs = parseDateMs(endDateRaw);
   const isNegRisk = Boolean(market.negRisk);
   const isWeatherCutoff = Number.isFinite(endDateMs) && isNegRisk && new Date(endDateMs).getUTCHours() === 12;
-  const tradingCutoffMs = isWeatherCutoff ? endDateMs + 12 * 3600_000 : endDateMs;
+  const observationDateKey = Number.isFinite(endDateMs) ? new Date(endDateMs).toISOString().slice(0, 10) : "";
+  const tradingCutoffMs = isWeatherCutoff
+    ? cityLocalDayEndMs(city, observationDateKey)
+    : endDateMs;
   const feeSchedule = normalizeFeeSchedule(market.feeSchedule);
   const takerFee =
     feeSchedule ??
@@ -193,7 +209,7 @@ export function normalizeMarket(market, event, now = nowMs()) {
     minOrderShares: minOrderSize > 0 ? minOrderSize : 5,
     endDate: endDateMs ? new Date(endDateMs).toISOString() : "",
     /**
-     * 温度（negRisk）市场的实际交易截止：观察日 24:00 UTC（次日 00:00Z）。
+     * 温度（negRisk）市场的实际交易截止：城市本地观察日 24:00（次日当地 00:00）。
      * Gamma 的 endDate 是观察日 12:00Z（约为裁决窗口起点），CLOB 实测交易/价格
      * 更新持续到次日 00:00Z 之后（Nov 7 伦敦 closedTime=Nov 8 00:41Z）。
      */
@@ -266,7 +282,7 @@ export async function fetchTemperatureEvents(log = () => {}) {
       if (!TEMPERATURE_TITLE.test(String(event.title || "").trim())) continue;
       const endMs = parseDateMs(event.endDate);
       if (!Number.isFinite(endMs)) continue;
-      // 温度事件 endDate 是观察日 12:00Z；实际交易到 24:00 UTC（next 00:00Z）。
+      // 温度事件 endDate 是观察日 12:00Z；实际交易到城市本地观察日 24:00。
       // 事件摘要可能没有 negRisk 字段，不能依赖它，否则会过早丢弃当天事件。
       const cutoffMs = effectiveEventTradingEndMs(event);
       if (!Number.isFinite(cutoffMs) || cutoffMs <= now) continue; // exclude expired/stale events
@@ -419,7 +435,7 @@ export class TemperatureDiscovery {
         const event = normalizeEvent(rawEvent, now);
         if (!event) continue;
         const openMarkets = event.markets.filter((m) => {
-          // 温度市场在观察日 12:00Z 之后仍可交易到 24:00 UTC（次日 00:00Z）
+          // 温度市场在观察日 12:00Z 之后仍可交易到城市本地 24:00。
           const cutoffMs = effectiveTradingEndMs(m);
           return !m.closed && Number.isFinite(cutoffMs) && cutoffMs > now;
         });

@@ -103,7 +103,27 @@ test("rollUniverse switches active markets, closes old markets and keeps old pos
   assert.equal(run.view().universeDate, newDate);
 });
 
-test("RunManager rolls a live run once per UTC date and retries when no markets", () => {
+test("rollUniverse merges city-local days: closes only departed markets and keeps current ones", () => {
+  const run = makeRun();
+  const oldDate = "2026-11-08";
+  const newDate = "2026-11-09";
+  const oldMarket = makeMarket("old-1", oldDate, 0.4);
+  const keepMarket = makeMarket("keep-1", newDate, 0.5);
+  const newMarket = makeMarket("new-1", newDate, 0.3);
+  run.source = { mode: "live", status: () => ({ status: "live" }) };
+  run.status = "running";
+  run.universeDate = oldDate;
+  run.setMarkets([oldMarket, keepMarket]);
+
+  run.rollUniverse([keepMarket, newMarket], newDate, Date.now());
+
+  assert.deepEqual(run.marketIds.sort(), ["keep-1", "new-1"]);
+  assert.equal(oldMarket.closed, true, "departed market must stop trading");
+  assert.equal(keepMarket.closed, false, "still-current market must remain open");
+  assert.equal(run.markets.get("old-1"), oldMarket, "old market retained for settlement");
+});
+
+test("RunManager rolls when the active city-local-day set changes and retries when no markets", () => {
   const today = utcDateKey();
   const todayMarket = makeMarket("today-1", today, 0.5);
   const discovery = {
@@ -132,6 +152,7 @@ test("RunManager rolls a live run once per UTC date and retries when no markets"
     sse: { log() {} },
     rollUniverse(markets, dateKey) {
       calls.push({ markets: markets.length, dateKey });
+      run.marketIds = markets.map((market) => market.id);
       run.universeDate = dateKey;
     },
   };
@@ -140,7 +161,7 @@ test("RunManager rolls a live run once per UTC date and retries when no markets"
   assert.equal(manager.rollDailyUniverses(Date.now()), true);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].dateKey, today);
-  assert.equal(manager.rollDailyUniverses(Date.now() + 1000), false, "must not roll twice");
+  assert.equal(manager.rollDailyUniverses(Date.now() + 1000), false, "same active set must not roll twice");
   assert.equal(calls.length, 1);
 
   // No markets for a new day: keep run running, do not roll, retry later.

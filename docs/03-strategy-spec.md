@@ -37,7 +37,7 @@
     "maxPrice": 0.98,                    // 0.5..0.999，下单时：YES mid 上限
     "minLiquidityUsd": 500,              // 0..1e6，下单时：流动性下限
     "maxSpread": 0.03,                   // 0.001..0.2，下单时：点差上限
-    "minTimeToResolutionSec": 900,       // 300..604800；距实际交易截止（次日 00:00 UTC）下限
+    "minTimeToResolutionSec": 900,       // 300..604800；距城市本地观察日结束（当地 24:00）下限
     "maxTimeToResolutionSec": 129600,    // 3600..1209600；上限
     "onlyAcceptingOrders": true          // true 时要求 active && !closed && acceptingOrders
   },
@@ -96,7 +96,7 @@
 |---|---|
 | `universe.minPrice/maxPrice` | ①市场发现时按 YES mid 过滤；②信号样本护栏（`p_ref`、`p_now` 都须在带内）；③入场执行时目标 token 的 bestAsk 也须在带内 |
 | `minLiquidityUsd` | `Σ_{top10 asks}(price×size) + Σ_{top10 bids}(price×size)`；盘口缺失记 0 |
-| `min/maxTimeToResolutionSec` | `resolutionTime = effectiveTradingEnd(market)`：温度 negRisk 市场为**观察日 24:00 UTC（次日 00:00Z）**；`ttr=(cutoff-now)/1000`，仅 `min≤ttr≤max` 可选（Gamma `endDate` 12:00Z 不是真实截止） |
+| `min/maxTimeToResolutionSec` | `resolutionTime = effectiveTradingEnd(market)`：温度 negRisk 市场为**城市本地观察日 24:00（次日当地 00:00）**；`ttr=(cutoff-now)/1000`，仅 `min≤ttr≤max` 可选（Gamma `endDate` 12:00Z 不是真实截止） |
 | `signal.priceField` | 见 §2.1；信号序列固定 YES token，不用 NO 序列（避免镜像重复计数） |
 | `execution.sizingValue` | 下单预算上限来源；实际预算还与现金、`maxPositionUsd`、最小下单量取 min（§3.2） |
 | `exit.holdToResolution` | `true`：禁用 TP/SL/maxHold/反向退出，只有结算（`resolution`）可平仓；`false`：全部主动退出生效。需求所述短线策略应为 `false` |
@@ -279,12 +279,13 @@ fee  = calcTakerFee(filled, VWAP)         // 官方公式；<0.00001 记 0；唯
 - **选市场语义**：live 只取当天（UTC 观察日）市场；按城市事件纳入**全部可交易括号**，不设数量上限，不按价格/流动性/点差做市场过滤。
 - **关闭**（默认 `false`）时行为与旧版完全一致。
 
-### 3.6 只做当天市场与 UTC 00:00 自动滚动
+### 3.6 只做各城市本地观察日与按城市滚动
 
-- live run 的 universe 只包含**当前 UTC 观察日**的市场（market.endDate 的 UTC 日期）；每天 **00:00 UTC**（前一日交易截止时刻）自动切到新一天。
+- live run 的 universe 按**每个城市自己的本地观察日**选择：`marketDateKey(market) === cityLocalDateKey(market.city, now)`。同一时刻洛杉矶可能仍是 11/9，深圳已经是 11/10，两个市场可以同时活跃。
+- 每个城市在自己的**本地 24:00（次日当地 00:00）**结束观察日；当某城市本地日期变化时，只关闭该城市旧市场并加入该城市新市场，其他城市不受影响。
 - 滚动时同一 run 继续：旧市场标记交易关闭、保留在内存中等待官方裁决；已有持仓继续按 settlement polling 结算；权益/成交/指标连续累计，不新建 run。
 - 新一天暂无市场时保持 running 并每 30s/每次 discovery 刷新重试，不崩溃、不重复滚动。
-- 构建器不复选日期；城市列表也按当天事件生成。
+- 构建器不复选日期；城市列表也按当天事件生成，官方外链按城市本地观察日生成。
 
 ## 4. 退出规则
 
@@ -313,11 +314,11 @@ holdSec     = (now - entryTs)/1000
 
 ### 4.3 结算（`resolution`）
 
-- **结算时点**：温度市场的**实际交易截止 = 观察日 24:00 UTC（次日 00:00Z）**（Gamma `endDate` 的观察日 12:00Z 不是真实截止；CLOB 价格历史显示交易/更新持续到次日 00:00Z 之后）。官方裁决紧随其后：**观察日次日 00:00 UTC 后首份 METAR**，最迟**次日 23:59 ET**，先到为准。实测：Nov 7 伦敦市场在 `2026-11-08T00:41Z`（24:00 UTC 后 41 分钟）closed 并给出 `outcomePrices`。
+- **结算时点**：温度市场的观察日按**城市本地日期**计算；实际交易截止近似为**城市本地观察日 24:00（次日当地 00:00）**（Gamma `endDate` 的观察日 12:00Z 不是真实截止）。官方裁决紧随其后：**该城市本地观察日结束后首份 METAR**，最迟**次日 23:59 ET**，先到为准。实测：Tokyo 11/9 在 `2026-11-09T15:23Z`（东京 11/10 00:23）closed，Shenzhen 11/9 在 `16:23Z`（深圳 11/10 00:23）closed，而 Los Angeles 11/9 在 UTC 11/10 05:00 仍在交易（洛杉矶 11/9 21:00）。
 - **当前实现（live）**：每 20 秒通过 Gamma `/markets/<id>` 轮询；当 `closed=true` 且 `outcomePrices` 明确为 `["1","0"]` / `["0","1"]`（或极罕见 50/50）时兑付；未裁决则标记 `resolution_pending=true` 并继续轮询。CLOB WS `market_resolved` 事件目前未接入（可作为增强）。
 - 二元市场赢家 1.0 USD/股、输家 0（极罕见 50/50 按 0.50 兑付）；`cash += payout`，**结算不收费**，`realizedPnl = payout - costBasis`，Trade 记 `reason=resolution`，随后删除持仓。
 - negRisk 温度组应恰有一个 YES；若出现 0/多个 winner（异常或未定），持仓按最后 mid 保留并标记 `resolution_pending=true`，继续轮询，不虚构成交。
-- **运行生命周期**：只要还有未结算持仓，run 保持 running 持续轮询；全部平仓且所有市场 `closed` 或超过 `tradingCutoff + 6h` 才自动 `ended`。每日 UTC 00:00 滚动到新一天市场，不新建 run。
+- **运行生命周期**：只要还有未结算持仓，run 保持 running 持续轮询；全部平仓且所有市场 `closed` 或超过 `tradingCutoff + 6h` 才自动 `ended`。按各城市本地日滚动到新市场，不新建 run。
 - **停止/重启后的结算恢复**：live 运行被手动停止，或服务重启把运行标记为 stopped 后，只要 journal 里仍有未平仓持仓，系统会从 `data/runs/<id>.jsonl` 回放成交重建持仓，并继续每 20s 轮询官方裁决；兑付后自动补记 `reason=resolution` Trade、更新现金/权益/指标与 `pendingSettlements/settledPositions`，看板与历史会显示「待结算 N」→「已结算 N」。
 - **回放**：不做结算（无 live resolutionProvider），历史数据结束即 `ended`，持仓按最后 mid 估值，报告标注 `openPositionsAtEnd`。
 

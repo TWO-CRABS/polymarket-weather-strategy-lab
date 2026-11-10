@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   CITY_TIMEZONES,
+  cityLocalDateKey,
+  cityLocalDayEndMs,
   formatUtcOffset,
   groupCitiesByTimezone,
   localDateTimeForTimeZone,
@@ -21,6 +23,18 @@ test("city timezone mapping covers the current weather city list", () => {
   assert.equal(timezoneForCity("Seoul (Incheon)"), "Asia/Seoul");
   assert.equal(timezoneForCity("Sao Paulo"), "America/Sao_Paulo");
   assert.equal(timezoneForCity("Unknown City"), null);
+});
+
+test("city local date and local day-end are timezone/DST-aware", () => {
+  const at = new Date("2026-11-10T05:00:00Z");
+  assert.equal(cityLocalDateKey("Los Angeles", at), "2026-11-09");
+  assert.equal(cityLocalDateKey("Shenzhen", at), "2026-11-10");
+  assert.equal(cityLocalDateKey("London", at), "2026-11-10");
+  assert.equal(new Date(cityLocalDayEndMs("Los Angeles", "2026-11-09")).toISOString(), "2026-11-10T08:00:00.000Z");
+  assert.equal(new Date(cityLocalDayEndMs("Shenzhen", "2026-11-09")).toISOString(), "2026-11-09T16:00:00.000Z");
+  assert.equal(new Date(cityLocalDayEndMs("London", "2026-11-09")).toISOString(), "2026-11-10T00:00:00.000Z");
+  assert.equal(new Date(cityLocalDayEndMs("Tokyo", "2026-11-09")).toISOString(), "2026-11-09T15:00:00.000Z");
+  assert.equal(new Date(cityLocalDayEndMs("New York City", "2026-11-09")).toISOString(), "2026-11-10T05:00:00.000Z");
 });
 
 test("UTC offsets are DST-aware at a fixed date", () => {

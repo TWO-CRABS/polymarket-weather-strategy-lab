@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">13:04:39</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">13:14:35</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -129,11 +129,11 @@
     </section><section class="panel" aria-labelledby="h-universe">
       <header class="panel-head">
         <span class="panel-step">01</span>
-        <div class="panel-title"><h2 id="h-universe">市场范围</h2><p>只交易当天的城市事件（UTC 00:00 自动切下一天）；城市多选，不选 = 全部城市。价格/流动性/点差在下单时判断，不影响市场发现。</p></div>
+        <div class="panel-title"><h2 id="h-universe">市场范围</h2><p>只交易各城市本地观察日的城市事件（按城市本地日滚动）；城市多选，不选 = 全部城市。价格/流动性/点差在下单时判断，不影响市场发现。</p></div>
         <span class="badge badge-ghost">8 项参数</span>
       </header>
       <div class="panel-body"><div class="field" data-cities-wrap="">
-      <label class="field-label" for="f-universe-cities-csv">城市（多选，不选 = 全部城市）<button type="button" class="help-dot" data-tip="只在这些城市的当天最高温市场里交易；不勾选 = 全部城市。城市列表按当天事件生成，跨天后自动更新；建议选少量城市控制负载。" aria-label="说明：只在这些城市的当天最高温市场里交易；不勾选 = 全部城市。城市列表按当天事件生成，跨天后自动更新；建议选少量城市控制负载。">?</button></label>
+      <label class="field-label" for="f-universe-cities-csv">城市（多选，不选 = 全部城市）<button type="button" class="help-dot" data-tip="只在这些城市的本地观察日最高温市场里交易；不勾选 = 全部城市。城市列表按各城市当前本地日生成，跨本地日后自动更新；建议选少量城市控制负载。" aria-label="说明：只在这些城市的本地观察日最高温市场里交易；不勾选 = 全部城市。城市列表按各城市当前本地日生成，跨本地日后自动更新；建议选少量城市控制负载。">?</button></label>
       <input class="input" id="f-universe-cities-csv" type="text" data-path="universe.cities" data-kind="cities-csv" value="" placeholder="留空 = 全部城市；多个城市用英文逗号分隔">
       <span class="field-help" id="citiesHelp">城市元数据暂不可用；可手动输入城市名，例如 New York, London。</span>
     </div><div class="field-row field-row-4"><div class="field">
@@ -153,7 +153,7 @@
       <input class="input num" type="number" id="f-universe-maxSpread" data-path="universe.maxSpread" data-kind="number" data-min="0.001" data-max="0.2" data-step="0.001" min="0.001" max="0.2" step="0.001" value="0.03" inputmode="decimal">
       <span class="field-help">0.03 = 3¢；超过不成交</span>
     </div></div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-universe-minTimeToResolutionSec">最短距交易截止 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距交易截止至少还有多少秒才纳入当天事件（900 = 15 分钟）。太近时价格已基本确定，交易价值低。" aria-label="说明：距交易截止至少还有多少秒才纳入当天事件（900 = 15 分钟）。太近时价格已基本确定，交易价值低。">?</button></label>
+      <label class="field-label" for="f-universe-minTimeToResolutionSec">最短距交易截止 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="距该城市本地观察日结束至少还有多少秒才纳入（900 = 15 分钟）。太近时价格已基本确定，交易价值低。" aria-label="说明：距该城市本地观察日结束至少还有多少秒才纳入（900 = 15 分钟）。太近时价格已基本确定，交易价值低。">?</button></label>
       <input class="input num" type="number" id="f-universe-minTimeToResolutionSec" data-path="universe.minTimeToResolutionSec" data-kind="number" data-min="300" data-max="604800" data-step="60" min="300" max="604800" step="60" value="900" inputmode="decimal">
       <span class="field-help">900 = 15 分钟</span>
     </div><div class="field">

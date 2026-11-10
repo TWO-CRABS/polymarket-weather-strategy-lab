@@ -46,7 +46,7 @@ const GROUP_DEFS = [
     key: "universe",
     step: "01",
     title: "市场范围",
-    desc: "只交易当天的城市事件（UTC 00:00 自动切下一天）；城市多选，不选 = 全部城市。价格/流动性/点差在下单时判断，不影响市场发现。",
+    desc: "只交易各城市本地观察日的城市事件（按城市本地日滚动）；城市多选，不选 = 全部城市。价格/流动性/点差在下单时判断，不影响市场发现。",
     fields: [
       { path: "universe.cities", kind: "cities", label: "城市（多选，不选 = 全部城市）" },
       { path: "universe.minPrice", label: "最低 YES 价格（下单时）", unit: "USDC 0–1", min: LIM.universe.minPrice[0], max: LIM.universe.minPrice[1], step: 0.001, help: "低于该值不成交，但市场仍会被跟踪" },
@@ -148,12 +148,12 @@ const GROUP_DEFS = [
 /* ------------------------------------------------------------------ */
 
 const FIELD_TIPS = {
-  "universe.cities": "只在这些城市的当天最高温市场里交易；不勾选 = 全部城市。城市列表按当天事件生成，跨天后自动更新；建议选少量城市控制负载。",
+  "universe.cities": "只在这些城市的本地观察日最高温市场里交易；不勾选 = 全部城市。城市列表按各城市当前本地日生成，跨本地日后自动更新；建议选少量城市控制负载。",
   "universe.minPrice": "下单时：YES 中间价低于该值则拒绝成交（0.02 = 2¢），但市场仍会被跟踪、参与概率排名。",
   "universe.maxPrice": "下单时：YES 中间价高于该值则拒绝成交（0.98 = 98¢），避免买接近确定的极端高价。",
   "universe.minLiquidityUsd": "下单时：市场流动性低于该值则拒绝成交。不会再把它从关注/排名中剔除。",
   "universe.maxSpread": "下单时：买一卖一价差超过该值则拒绝成交（0.03 = 3¢）；同时正常信号会跳过点差过宽的 tick。",
-  "universe.minTimeToResolutionSec": "距交易截止至少还有多少秒才纳入当天事件（900 = 15 分钟）。太近时价格已基本确定，交易价值低。",
+  "universe.minTimeToResolutionSec": "距该城市本地观察日结束至少还有多少秒才纳入（900 = 15 分钟）。太近时价格已基本确定，交易价值低。",
   "universe.maxTimeToResolutionSec": "距交易截止最多还有多少秒（129600 = 36 小时）。太远时价格波动慢、资金占用久。",
   "universe.onlyAcceptingOrders": "只交易当前可接单的市场；关闭后可能选到暂停/已关闭的市场，不建议关闭。",
   "signal.priceField": "用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。",

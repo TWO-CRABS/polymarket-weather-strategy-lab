@@ -112,7 +112,7 @@ function fmtIso(iso) {
 }
 
 /**
- * 温度市场实际交易截止：观察日 24:00 UTC（次日 00:00Z）。
+ * 温度市场实际交易截止：城市本地观察日 24:00（次日当地 00:00）。
  * 官方 Gamma 的 endDate 是观察日 12:00Z，不是真实截止时间（CLOB 实测交易到 00:00Z 后）。
  */
 function tradingCutoffMs(market) {
@@ -132,20 +132,18 @@ function utcDateParts(ms) {
   };
 }
 
-/** 交易截止提示：观察日 24:00 UTC。 */
+/** 交易截止提示：城市本地观察日 24:00。 */
 function tradingEndHint(market) {
   const endMs = Date.parse(market?.endDate);
   if (!Number.isFinite(endMs)) return "";
-  return `${utcDateParts(endMs).day} 24:00 UTC`;
+  return `${utcDateParts(endMs).day} 当地 24:00`;
 }
 
-/** 结算提示：观察日次日 00:00 UTC 后首份 METAR（通常 ~00:30–01:00 UTC）。 */
+/** 结算提示：城市本地观察日结束后的首份 METAR（通常约当地 00:30–01:00）。 */
 function settlementHint(market) {
   const cutoffMs = tradingCutoffMs(market);
   if (!Number.isFinite(cutoffMs)) return "";
-  const next = new Date(cutoffMs);
-  const label = `${String(next.getUTCMonth() + 1).padStart(2, "0")}/${String(next.getUTCDate()).padStart(2, "0")}`;
-  return `${label} 00:00 UTC 后（首份 METAR）`;
+  return "当地 24:00 后（首份 METAR）";
 }
 
 /** 官方 Polymarket 事件页（zh）。 */
@@ -771,14 +769,14 @@ export async function mount(root, ctx) {
     const end = num(run.endedAt) || Date.now();
     const elapsed = Math.max(0, end - started);
     const marketsTracked = num(run.marketsTracked) || num(state.feed.marketsTracked) || state.markets.size;
-    const todayLabel = run.mode === "live" && run.universeDate ? `今日 ${run.universeDate} 市场` : null;
+    const todayLabel = run.mode === "live" ? "按城市本地日" : null;
     el.sub.textContent = [
       run.strategyName || "未命名策略",
       modeLabel(run.mode),
       `已运行 ${ui.fmtDuration(elapsed)}`,
       `行情 ${ui.feedStatusLabel(state.feed.status)}`,
       todayLabel || `${marketsTracked} 个市场`,
-      run.mode === "live" ? "每日 00:00 UTC 自动切换" : null,
+      run.mode === "live" ? "按城市本地日滚动" : null,
       `契约 v${CONTRACT_VERSION}`,
     ].filter(Boolean).join(" · ");
   }
@@ -915,7 +913,7 @@ export async function mount(root, ctx) {
       const sumCls = group.sumOk ? "muted" : "down";
       return `<div class="market-group" role="group" aria-label="${ui.escapeHtml(group.city)} 温度市场">
         <div class="market-group-head">
-          <span class="market-group-city">${ui.escapeHtml(group.city)} · 今日</span>
+          <span class="market-group-city">${ui.escapeHtml(group.city)} · 本地日</span>
           <span class="market-group-sum">${group.markets.length} 个括号 · 概率和 <b class="${sumCls}" title="${group.sumOk ? "概率和接近 100%" : "概率和偏离 100%（可能含价差/未定价括号）"}">${sumPct.toFixed(1)}%</b></span>
         </div>
         <div class="market-group-grid">${group.markets.map(renderMarketCard).join("")}</div>
@@ -1032,8 +1030,8 @@ export async function mount(root, ctx) {
       `<span class="feed-chip">NO 买 ${ui.escapeHtml(priceText(no.bid))} / 卖 ${ui.escapeHtml(priceText(no.ask))} / 中 ${ui.escapeHtml(priceText(no.mid))}</span>`,
       `<span class="feed-chip">点差 ${ui.escapeHtml(ui.fmtCents(num(market.spread) || 0, 1))}</span>`,
       `<span class="feed-chip">流动性 ${ui.escapeHtml(ui.fmtMoney(num(market.liquidityUsd)))}</span>`,
-      `<span class="feed-chip" title="观察日 24:00 UTC 停止交易（Gamma endDate 12:00Z 不是真实截止）">交易截止 ${ui.escapeHtml(tradingEndHint(market))}</span>`,
-      `<span class="feed-chip" title="官方裁决：观察日次日 00:00 UTC 后首份 METAR；最迟次日 23:59 ET，以先到为准">预计结算 ${ui.escapeHtml(settlementHint(market))}</span>`,
+      `<span class="feed-chip" title="交易截止为城市本地观察日 24:00（Gamma endDate 12:00Z 不是真实截止）">交易截止 ${ui.escapeHtml(tradingEndHint(market))}</span>`,
+      `<span class="feed-chip" title="官方裁决：城市本地观察日结束后首份 METAR；最迟次日 23:59 ET，以先到为准">预计结算 ${ui.escapeHtml(settlementHint(market))}</span>`,
     ].join("");
   }
 

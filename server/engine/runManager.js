@@ -12,6 +12,7 @@
  */
 import { RUN_MODES, STRATEGY_VERSION, deepMerge, clone, roundTo, validateStrategy, normalizeStrategy } from "../../shared/contract.js";
 import { AppError, nowMs, newId, utcDateKey, marketDateKey } from "../util.js";
+import { cityLocalDateKey } from "../../shared/cityTimezones.js";
 import { Run } from "./run.js";
 import { ReplaySource, loadFixtureMarkets } from "../data/replay.js";
 import { compareMarketsForSelection, effectiveTradingEndMs } from "../data/gamma.js";
@@ -122,7 +123,7 @@ export class RunManager {
   }
 
   /**
-   * 选市场（live）：只取当天（UTC 观察日）市场，按完整城市事件纳入全部可交易括号，
+   * 选市场（live）：按各城市当前本地观察日选择，按完整城市事件纳入全部可交易括号，
    * 不限制数量、不按价格/流动性/点差过滤（这些仅在下单时检查）。
    * @param {any} config
    * @param {"live"|"replay"} mode
@@ -141,7 +142,7 @@ export class RunManager {
       }
     }
     const now = nowMs();
-    const dateKey = options.dateKey ?? (mode === "live" ? utcDateKey(now) : null);
+    const dateKey = options.dateKey ?? null;
     const cities = (u.cities || []).map((c) => String(c));
     const allCandidates = this.discovery.getCandidateMarkets();
     const withinTime = (market) => {
@@ -155,7 +156,13 @@ export class RunManager {
       if (!market.tokens?.yesTokenId || !market.tokens?.noTokenId) return false;
       if (u.onlyAcceptingOrders && !market.acceptingOrders) return false;
       if (!this._cityMatches(market, cities)) return false;
-      if (dateKey && marketDateKey(market) !== dateKey) return false;
+      // Live: each city trades its own current local observation day. A single
+      // run can therefore hold LA Nov 9 and Shenzhen Nov 10 at the same instant.
+      if (mode === "live") {
+        if (marketDateKey(market) !== cityLocalDateKey(market.city, new Date(now))) return false;
+      } else if (dateKey && marketDateKey(market) !== dateKey) {
+        return false;
+      }
       return withinTime(market);
     });
     if (markets.length === 0 && mode === "replay") {
@@ -433,7 +440,7 @@ export class RunManager {
     });
   }
 
-  /** 当前活跃（当天）市场快照；供看板一次性加载完整 universe。 */
+  /** 当前活跃（各城市本地观察日）市场快照；供看板一次性加载完整 universe。 */
   async getRunMarkets(id) {
     const run = this.active.get(id);
     if (run) {
@@ -700,7 +707,7 @@ export class RunManager {
   /* --------------------------- feed orchestration ------------------------ */
 
   /**
-   * 每日滚动：live run 在 UTC 日期变化时，将活跃市场切到新一天（完整城市事件），
+   * 每日滚动：live run 按城市本地日变化刷新活跃市场（完整城市事件），
    * 同一 run 继续跑；旧市场标记交易关闭并保留供官方结算。
    */
   rollDailyUniverses(now = nowMs()) {
@@ -708,19 +715,38 @@ export class RunManager {
     let changed = false;
     for (const run of this.active.values()) {
       if (run.mode !== "live" || run.status !== "running") continue;
-      if (run.universeDate === dateKey) continue;
-      const markets = this.selectMarkets(run.config, "live", { dateKey });
+      const markets = this.selectMarkets(run.config, "live");
+      const nextIds = new Set(markets.map((market) => market.id));
+      const currentIds = run.marketIds || [];
+      const same = currentIds.length === nextIds.size && currentIds.every((id) => nextIds.has(id));
+      if (same) {
+        // Keep metadata date fresh even when the active set did not change.
+        run.universeDate = dateKey;
+        continue;
+      }
       if (markets.length === 0) {
+        const nowMsValue = now;
+        const stale = currentIds.some((marketId) => {
+          const market = run.markets?.get?.(marketId);
+          if (!market) return false;
+          const cutoff = effectiveTradingEndMs(market);
+          return !Number.isFinite(cutoff) || cutoff <= nowMsValue;
+        });
+        if (stale) {
+          run.rollUniverse([], dateKey, now);
+          changed = true;
+        }
         if (run._rollWarnedDate !== dateKey) {
           run._rollWarnedDate = dateKey;
-          this.log("warn", `daily roll: run ${run.id} has no markets for ${dateKey}, will retry`);
-          run.sse.log("warn", `新一天（${dateKey}）暂无可用市场，继续等待并重试订阅`, run.id);
+          this.log("warn", `city-local roll: run ${run.id} has no markets for local dates, will retry`);
+          run.sse.log("warn", "城市本地日暂时没有可用市场，继续等待并重试订阅", run.id);
         }
         continue;
       }
+      run._rollWarnedDate = "";
       run.rollUniverse(markets, dateKey, now);
       changed = true;
-      this.log("info", `daily roll: run ${run.id} -> ${dateKey} (${markets.length} markets)`);
+      this.log("info", `city-local roll: run ${run.id} -> ${markets.length} active markets`);
     }
     if (changed) this.applyFeedTracking();
     return changed;
@@ -752,7 +778,7 @@ export class RunManager {
     for (const run of this.active.values()) {
       if (run.mode !== "live") continue;
       for (const marketId of run.marketIds) {
-        const market = this.discovery.getMarket(marketId) || run.markets.get(marketId);
+        const market = this.discovery.getMarket(marketId) || run.markets?.get?.(marketId);
         if (market && !market.closed) tracked.set(market.id, market);
       }
     }

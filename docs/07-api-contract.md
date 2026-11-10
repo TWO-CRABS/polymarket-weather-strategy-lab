@@ -38,7 +38,7 @@
     "maxPrice": 0.98,                // 下单时：YES 中间价上限
     "minLiquidityUsd": 500,          // 下单时：流动性下限
     "maxSpread": 0.03,               // 下单时：允许的最大点差（USDC）
-    "minTimeToResolutionSec": 900,   // 距实际交易截止（tradingCutoff，24:00 UTC）最短时间
+    "minTimeToResolutionSec": 900,   // 距城市本地观察日结束（当地 24:00）最短时间
     "maxTimeToResolutionSec": 129600,
     "onlyAcceptingOrders": true
   },
@@ -120,7 +120,7 @@
 | `tickSize` | number | 最小价格变动（0.001） |
 | `minOrderShares` | number | 卖出最小份额（5；市价 BUY 无股数下限，仅 $1 名义额门槛） |
 | `endDate` | string | ISO 时间（Gamma endDate；温度市场为观察日 12:00Z，**不是真实交易截止**） |
-| `tradingCutoff` | string | ISO 时间；温度 negRisk 市场实际交易截止 = 观察日 24:00 UTC（次日 00:00Z），用于 ttr/结算轮询 |
+| `tradingCutoff` | string | ISO 时间；温度 negRisk 市场实际交易截止 = 城市本地观察日 24:00（次日当地 00:00，DST 感知），用于 ttr/结算轮询 |
 | `eventStartTime` | string | ISO 时间 |
 | `acceptingOrders` | boolean | 是否可接单 |
 | `closed` | boolean | 是否已关闭/结算 |
@@ -177,7 +177,7 @@
 ### 3.7 RunSummary
 `{ id, strategyId, strategyName, mode, status, startedAt, endedAt, initialCapital, equity, cash, positionsValue, metrics, signalsCount, observationsCount, marketsTracked, marketIds, universeDate, pendingSettlements, settledPositions, feedStatus }`
 `strategyId` 为已保存策略 id，使用内联 strategy 启动时为 `null`。
-`marketIds` 为当前活跃（当天）Gamma market id 数组；`universeDate` 为当前活跃市场的 UTC 观察日（`YYYY-MM-DD`）；历史旧市场仍保留用于持仓结算。
+`marketIds` 为当前活跃（各城市本地观察日）Gamma market id 数组；`universeDate` 为服务端当前 UTC 日期（兼容字段，实际市场按城市本地日选择）；历史旧市场仍保留用于持仓结算。
 `pendingSettlements` 为“市场已停止交易/已关闭、但官方裁决尚未出的持仓数”；`settledPositions` 为官方裁决已兑付的笔数。两者用于看板/历史的「待结算 / 已结算」标识；停止或服务重启后，live 运行若仍有持仓会继续轮询官方裁决并自动补记（replay 不结算）。
 `status ∈ created | starting | running | paused | stopping | stopped | ended | error`
 `feedStatus ∈ connecting | live | degraded | offline`
@@ -190,7 +190,7 @@
 | Method | Path | 说明 | 响应 |
 |---|---|---|---|
 | GET | `/api/health` | 健康检查 | `{status:"ok", now, uptimeSec, feed:{status,marketsTracked,lastUpdate,latencyMs,mode,wsBatches,wsConnectedBatches}, runs:{active,total}}` |
-| GET | `/api/meta` | 前端初始化元数据 | `{contractVersion, serverTime, universeDate, cities:[...当天有市场的城市], presets:[{id,label,description,config}], feeModel:{...FEES}, limits:{...LIMITS}, priceFields, directions}` |
+| GET | `/api/meta` | 前端初始化元数据 | `{contractVersion, serverTime, universeDate, cities:[...各城市当前本地日有市场的城市], presets:[{id,label,description,config}], feeModel:{...FEES}, limits:{...LIMITS}, priceFields, directions}` |
 
 ### 4.2 市场
 | Method | Path | 参数 | 响应 |
@@ -223,7 +223,7 @@
 | GET | `/api/runs/:id/equity` | `limit?` | `{points:[EquityPoint], total}` |
 | GET | `/api/runs/:id/signals` | `limit?` | `{signals:[Signal], total}` |
 | GET | `/api/runs/:id/positions` | 当前持仓 | `{positions:[Position], positionsValue, cash, equity}` |
-| GET | `/api/runs/:id/markets` | 当前活跃（当天）完整市场快照 | `{markets:[MarketSnapshot]}` |
+| GET | `/api/runs/:id/markets` | 当前活跃（各城市本地观察日）完整市场快照 | `{markets:[MarketSnapshot]}` |
 
 ### 4.5 静态资源
 `GET /` → `web/index.html`；`/web/*`、`/shared/*`、`/design/*` 静态文件；未知路径 404 JSON。

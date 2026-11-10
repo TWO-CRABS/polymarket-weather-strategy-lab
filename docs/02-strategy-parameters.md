@@ -55,8 +55,8 @@
 | `overround_pct` | `(sum_bracket_prob − 1) × 100` | 派生 | 实测 `−2.4% ~ +6.6%`；`\|overround\| > 5%` 标记"组内高摩擦" | 高 overround = 组内整体贵/便宜，做多全组无利可图（实测 `Σ bestAsk = 1.04~1.22 > 1`） |
 | `neighbor_prob_low` / `neighbor_prob_high` | 相邻括号（index−1 / index+1）的 `implied_probability`；边界括号取单侧 | 派生 | `0..1` | 用于"括号轮动/邻接"策略：单括号偏离邻接插值 = 相对价值信号 |
 | `dist_to_edge_cc` | 到最近括号边界的距离（摄氏度）：中值 `m` 到区间 `[a,b]` 的 `min(\|m−a\|, \|m−b\|)`；`m` 取 `metar_max_so_far_cc`（有实况）否则 `forecast_high_cc` | 派生（气象 + `bracket_index`） | `0..∞ °C`；`< 0.5°C` 为"临界括号"（易翻档） | 结算按**整数半度进位**（16.5→17、−8.5→−8），边界 0.5°C 处概率跳变；临界括号报价最不稳定 |
-| `ttr_sec` | 距**实际交易截止**的秒数：温度市场 `(tradingCutoff − now)/1000`，`tradingCutoff = 观察日 24:00 UTC（次日 00:00Z）`；Gamma `endDate`（观察日 12:00Z）不是真实截止时间 | `S2 market.endDate` + 规则（`endDate+12h`，快照字段 `tradingCutoff`） | `900..129600`（`15min..36h`） | `ttr` 太短：已可判定但无流动性；太长：资金占用高、赔率未收敛 |
-| `resolution_eta_sec` | 预计裁决时间：`endDate + 观察日次日 00:00 UTC（24:00 UTC）后首份 METAR`（规则原文：次日首份 METAR 或次日 23:59 ET，取先到）；实测 Nov 7 伦敦于 Nov 8 00:41Z 裁决 | 规则文本 + `eventStartTime` | `0..36h` | 回放里"到点即结算"必须与真实节奏一致，否则收益率被高估 |
+| `ttr_sec` | 距**城市本地观察日结束**的秒数：温度市场 `(tradingCutoff − now)/1000`；`tradingCutoff = 城市本地观察日 24:00（次日当地 00:00）`；Gamma `endDate`（观察日 12:00Z）不是真实截止时间 | `S2 market.endDate` + 城市时区（`shared/cityTimezones.js`，快照字段 `tradingCutoff`） | `900..129600`（`15min..36h`） | `ttr` 太短：已可判定但无流动性；太长：资金占用高、赔率未收敛 |
+| `resolution_eta_sec` | 预计裁决时间：`城市本地观察日结束后的首份 METAR`（规则原文：次日首份 METAR 或次日 23:59 ET，取先到）；不同城市本地日不同，不能按统一 UTC 24:00 计算 | 规则文本 + 城市时区 + `eventStartTime` | `0..36h` | 回放里"到点即结算"必须与真实节奏一致，否则收益率被高估 |
 | `book_liquidity_usd` | 可成交深度：`Σ_{top10 asks}(price×size) + Σ_{top10 bids}(price×size)` | `S4` | `0..1e6`；默认门槛 `≥ 500`（保守 1000） | **不要用 Gamma `liquidity`**（§0.2-⑥ 差 16–650 倍） |
 | `volume_24h_usd` | 市场 24h 成交额 | `S3 volume24hr`（市场级）或 `S1 volume24hr`（事件级） | 实测单括号 `160 ~ 15 419`，事件 `3.5k ~ 51k` | 冷括号（`< 1k`）的 `prices-history` 几乎不动，任何"1 分钟 20%"都是噪声 |
 | `spread_abs` | `bestAsk − bestBid`（YES 侧） | `S4` 末位差 / `S5 /spread` | `0.001..0.05`；默认 `≤ 0.03`，推荐 `≤ 0.02` | 温度盘口实测常见 `0.014 ~ 0.036`，相当于 3.5%–35% 的报价宽度 |

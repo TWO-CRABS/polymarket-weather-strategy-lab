@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 
 import { RunManager } from "../server/engine/runManager.js";
 import { DEFAULT_STRATEGY, clone, normalizeStrategy } from "../shared/contract.js";
+import { cityLocalDateKey } from "../shared/cityTimezones.js";
 import { utcDateKey } from "../server/util.js";
 
 function makeMarket({ id, eventId, city, bracket, dateKey, impliedProbability = 0.5, liquidityUsd = 1000, spread = 0.01, tradingCutoff = null }) {
@@ -126,6 +127,40 @@ test("city multi-select restricts events; empty cities = all", () => {
   assert.deepEqual(selected.map((market) => market.id).sort(), ["a1", "a2"]);
   const all = manager.selectMarkets(makeConfig({ cities: [] }), "live", { dateKey: TODAY });
   assert.equal(all.length, 3);
+});
+
+test("live selection follows each city's current local observation day", () => {
+  const now = Date.now();
+  const at = new Date(now);
+  const laDate = cityLocalDateKey("Los Angeles", at);
+  const szDate = cityLocalDateKey("Shenzhen", at);
+  const la = makeMarket({
+    id: "la-local",
+    eventId: "evt-la",
+    city: "Los Angeles",
+    bracket: "1",
+    dateKey: laDate,
+    tradingCutoff: new Date(now + 3600_000).toISOString(),
+  });
+  const sz = makeMarket({
+    id: "sz-local",
+    eventId: "evt-sz",
+    city: "Shenzhen",
+    bracket: "1",
+    dateKey: szDate,
+    tradingCutoff: new Date(now + 3600_000).toISOString(),
+  });
+  const laPrevious = makeMarket({
+    id: "la-previous",
+    eventId: "evt-la-prev",
+    city: "Los Angeles",
+    bracket: "0",
+    dateKey: new Date(Date.parse(`${laDate}T00:00:00Z`) - 86400_000).toISOString().slice(0, 10),
+    tradingCutoff: new Date(now + 3600_000).toISOString(),
+  });
+  const manager = makeManager([la, sz, laPrevious]);
+  const picked = manager.selectMarkets(makeConfig(), "live", { dateKey: utcDateKey() });
+  assert.deepEqual(picked.map((market) => market.id).sort(), ["la-local", "sz-local"]);
 });
 
 test("TTR window still filters events by actual trading cutoff", () => {

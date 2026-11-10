@@ -311,7 +311,7 @@
 ### 10.1 UI ↔ `shared/contract.js` 字段映射
 | UI 区域 | contract 字段/实体 |
 |---|---|
-| 构建器 01 | `universe.cities / minPrice / maxPrice / minLiquidityUsd / maxSpread / minTimeToResolutionSec / maxTimeToResolutionSec / onlyAcceptingOrders`（只做当天，UTC 00:00 自动滚动） |
+| 构建器 01 | `universe.cities / minPrice / maxPrice / minLiquidityUsd / maxSpread / minTimeToResolutionSec / maxTimeToResolutionSec / onlyAcceptingOrders`（只做城市本地观察日，按城市本地日滚动；官方外链按城市本地日生成） |
 | 构建器 02 | `signal.priceField / windowSec / moveThresholdPct / minAbsMove / direction / confirmationTicks / cooldownSec / maxSignalsPerMarket / requireSpreadOk` |
 | 构建器 03 | `execution.orderType / sizingMode / sizingValue / maxPositionUsd / maxPositions / maxPositionsPerMarket / fillModel / slippageBufferBps`；`MarketSnapshot.tickSize / minOrderShares`（只读展示） |
 | 构建器 04 | `exit.takeProfitPct / stopLossPct / maxHoldSec / holdToResolution / exitOnOppositeSignal` |
