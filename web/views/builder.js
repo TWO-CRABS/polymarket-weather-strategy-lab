@@ -22,7 +22,7 @@ import {
 } from "/shared/contract.js";
 import * as api from "/web/api.js";
 import * as ui from "/web/components/ui.js";
-import { groupCitiesByTimezone } from "/shared/cityTimezones.js";
+import { groupCitiesByTimezone, localDateTimeForTimeZone } from "/shared/cityTimezones.js";
 
 const PRICE_FIELD_LABELS = {
   mid: "中间价 mid",
@@ -274,7 +274,7 @@ export async function mount(root, ctx) {
     destroyed: false,
     savedStrategies: [],
   };
-  const timers = { validate: 0 };
+  const timers = { validate: 0, time: 0 };
   let validateController = null;
   let tipEl = null;
 
@@ -395,6 +395,7 @@ export async function mount(root, ctx) {
   // 3) 首帧渲染表单
   renderForm();
   loadSavedStrategyOptions();
+  timers.time = window.setInterval(refreshCityTimezoneTimes, 30_000);
 
   /* -------------------- 渲染 -------------------- */
 
@@ -641,12 +642,12 @@ export async function mount(root, ctx) {
             const selectedInGroup = group.cities.filter((city) => selectedSet.has(city.name)).length;
             const allSelected = selectedInGroup === group.cities.length && group.cities.length > 0;
             const partiallySelected = selectedInGroup > 0 && !allSelected;
-            return `<section class="city-tz-group" data-tz-group="${escapeAttr(group.key)}" aria-label="${escapeAttr(group.label)}">
+            return `<section class="city-tz-group" data-tz-group="${escapeAttr(group.key)}" data-tz-zone="${escapeAttr(group.timeZone || "")}" aria-label="${escapeAttr(group.label)}">
               <header class="city-tz-head">
                 <label class="city-tz-toggle">
                   <input type="checkbox" data-tz-select="${escapeAttr(group.key)}" ${allSelected ? "checked" : ""} ${partiallySelected ? 'data-indeterminate="1"' : ""}>
-                  <span class="city-tz-label">${ui.escapeHtml(group.label)}</span>
-                  ${group.localTime ? `<span class="city-tz-time">当地 ${ui.escapeHtml(group.localTime)}</span>` : ""}
+                  <span class="city-tz-label">时区(${ui.escapeHtml(group.label)})</span>
+                  ${group.localDateTime ? `<span class="city-tz-time" data-tz-time>${ui.escapeHtml(group.localDateTime)}</span>` : ""}
                 </label>
                 <span class="city-tz-count" data-tz-count>${selectedInGroup}/${group.cities.length}</span>
               </header>
@@ -691,6 +692,17 @@ export async function mount(root, ctx) {
       for (const input of inputs) {
         input.closest(".city-option")?.classList.toggle("is-on", input.checked);
       }
+    }
+  }
+
+  function refreshCityTimezoneTimes() {
+    if (!root || state.destroyed) return;
+    for (const group of root.querySelectorAll(".city-tz-group[data-tz-zone]")) {
+      const zone = group.dataset.tzZone;
+      const target = group.querySelector("[data-tz-time]");
+      if (!zone || !target) continue;
+      const next = localDateTimeForTimeZone(zone);
+      if (next) target.textContent = next;
     }
   }
 
@@ -1318,6 +1330,8 @@ export async function mount(root, ctx) {
       state.destroyed = true;
       if (timers.validate) clearTimeout(timers.validate);
       timers.validate = 0;
+      if (timers.time) clearInterval(timers.time);
+      timers.time = 0;
       if (validateController) {
         try {
           validateController.abort();

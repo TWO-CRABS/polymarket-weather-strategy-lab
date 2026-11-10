@@ -5,6 +5,7 @@ import {
   CITY_TIMEZONES,
   formatUtcOffset,
   groupCitiesByTimezone,
+  localDateTimeForTimeZone,
   offsetMinutesForTimeZone,
   timezoneForCity,
 } from "../shared/cityTimezones.js";
@@ -35,9 +36,11 @@ test("UTC offsets are DST-aware at a fixed date", () => {
   assert.equal(formatUtcOffset(480), "UTC+08:00");
   assert.equal(formatUtcOffset(-300), "UTC-05:00");
   assert.equal(formatUtcOffset(330), "UTC+05:30");
+  assert.equal(localDateTimeForTimeZone("Asia/Shanghai", WINTER), "11月9日 20:00");
+  assert.equal(localDateTimeForTimeZone("Pacific/Auckland", WINTER), "11月10日 01:00");
 });
 
-test("groupCitiesByTimezone groups descending by offset and keeps unknowns last", () => {
+test("groupCitiesByTimezone groups ascending by offset and keeps unknowns last", () => {
   const groups = groupCitiesByTimezone(
     [
       { name: "New York City" },
@@ -49,12 +52,13 @@ test("groupCitiesByTimezone groups descending by offset and keeps unknowns last"
     WINTER,
   );
   assert.deepEqual(groups.map((group) => group.label), [
-    "UTC+13:00",
-    "UTC+08:00",
-    "UTC+00:00",
     "UTC-05:00",
+    "UTC+00:00",
+    "UTC+08:00",
+    "UTC+13:00",
     "其他 / 未识别时区",
   ]);
-  assert.deepEqual(groups[1].cities.map((city) => city.name), ["Shenzhen"]);
+  assert.equal(groups[2].cities[0].name, "Shenzhen");
+  assert.equal(groups[0].localDateTime, "11月9日 07:00");
   assert.equal(groups.at(-1).offsetMinutes, null);
 });

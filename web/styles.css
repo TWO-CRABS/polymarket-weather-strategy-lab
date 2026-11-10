@@ -1721,7 +1721,7 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .city-tz-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; min-width: 0; }
 .city-tz-toggle input { width: 13px; height: 13px; accent-color: var(--cyan); cursor: pointer; flex: 0 0 auto; }
 .city-tz-label { font-size: var(--fs-11); font-weight: 700; color: var(--text-1); font-family: var(--font-mono); }
-.city-tz-time { font-size: 9px; color: var(--text-3); font-family: var(--font-mono); white-space: nowrap; }
+.city-tz-time { font-size: 11px; color: var(--text-1); font-weight: 600; font-family: var(--font-mono); white-space: nowrap; opacity: 0.92; }
 .city-tz-count { font-size: 9px; color: var(--text-3); font-family: var(--font-mono); white-space: nowrap; }
 .city-tz-group .city-picker { gap: 6px; }
 .city-tz-group .city-option { height: 30px; padding: 0 9px 0 7px; }

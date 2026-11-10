@@ -123,6 +123,30 @@ export function localTimeForTimeZone(timeZone, at = new Date()) {
   }
 }
 
+/** Local date + time label (e.g. 11月10日 17:42) for an IANA zone. */
+export function localDateTimeForTimeZone(timeZone, at = new Date()) {
+  if (!timeZone) return "";
+  try {
+    const parts = new Intl.DateTimeFormat("zh-CN", {
+      timeZone,
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(at);
+    const pick = (type) => parts.find((part) => part.type === type)?.value || "";
+    const month = pick("month");
+    const day = pick("day");
+    const hour = pick("hour");
+    const minute = pick("minute");
+    if (!month || !day || !hour || !minute) return "";
+    return `${month}月${day}日 ${hour}:${minute}`;
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Group cities by their current UTC offset (DST-aware), descending by offset.
  * Unknown/legacy cities go to a final “其他 / 未识别时区” group.
@@ -144,7 +168,9 @@ export function groupCitiesByTimezone(cities, at = new Date()) {
         key,
         offsetMinutes: known ? offset : null,
         label: known ? formatUtcOffset(offset) : "其他 / 未识别时区",
+        timeZone: zone,
         localTime: zone ? localTimeForTimeZone(zone, at) : "",
+        localDateTime: zone ? localDateTimeForTimeZone(zone, at) : "",
         cities: [],
       });
     }
@@ -155,7 +181,7 @@ export function groupCitiesByTimezone(cities, at = new Date()) {
     if (a.offsetMinutes === null && b.offsetMinutes === null) return 0;
     if (a.offsetMinutes === null) return 1;
     if (b.offsetMinutes === null) return -1;
-    return b.offsetMinutes - a.offsetMinutes;
+    return a.offsetMinutes - b.offsetMinutes;
   });
   for (const group of list) {
     group.cities.sort((a, b) => a.name.localeCompare(b.name));
