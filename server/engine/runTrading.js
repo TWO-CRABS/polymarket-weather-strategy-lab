@@ -494,7 +494,7 @@ export function collectFallbackCandidates(run) {
     if (!market || market.closed || market.acceptingOrders === false) continue;
     const yes = market.quotes?.YES;
     const prob = Number(market.impliedProbability);
-    if (!yes || !(yes.ask > 0)) continue;
+    if (!yes) continue;
     if (!Number.isFinite(prob)) continue;
     candidates.push({ market, prob });
   }
@@ -579,10 +579,18 @@ export function planFallbackOrders(run) {
 
     const rank1 = group.candidates[0];
     const rank3 = group.candidates[2];
-    if (rank1 && !pendingOutcomes.has("YES") && !marketHasOpenPosition(run, rank1.market.id)) {
+    // 名义第 1 高没有 YES 卖盘时，整组跳过，不降级买下一档。
+    if (!rank1 || !(Number(rank1.market.quotes?.YES?.ask) > 0)) continue;
+    if (!pendingOutcomes.has("YES") && !marketHasOpenPosition(run, rank1.market.id)) {
       pushLeg({ market: rank1.market, outcome: "YES", rank: 1, eventKey: group.key });
     }
-    if (rank3 && !pendingOutcomes.has("NO") && !marketHasOpenPosition(run, rank3.market.id)) {
+    // 第 3 高只有存在 NO 卖盘时才生成 NO leg。
+    if (
+      rank3 &&
+      !pendingOutcomes.has("NO") &&
+      !marketHasOpenPosition(run, rank3.market.id) &&
+      Number(rank3.market.quotes?.NO?.ask) > 0
+    ) {
       pushLeg({ market: rank3.market, outcome: "NO", rank: 3, eventKey: group.key });
     }
   }

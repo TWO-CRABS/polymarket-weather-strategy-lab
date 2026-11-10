@@ -340,6 +340,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-35 | 成交明细支持按状态筛选：全部 / 已成交 / 部分成交 / 已拒绝；状态筛选与分组筛选可叠加，分组为「不分组」时仍可用（看板 `tradeStatusFilter`） |
 | AC-36 | 兜底失败 leg 保留 pending 并在每个观察窗口按原目标重试，直到成交/截止；同组其他 leg 已成交不阻止失败 leg 重试（`tests/engine.test.js`） |
 | AC-37 | 成交明细 rejected 记录显示详细拒绝原因（实际点差/流动性 vs 配置阈值、价格带、TTR 等），并优先使用拒单瞬间快照；旧记录无快照时回退当前行情（`tests/engine.test.js`） |
+| AC-38 | 兜底候选按名义概率排名；若第 1 高 YES 没有卖盘（ask=0），整组跳过，不降级买入下一档（`tests/engine.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

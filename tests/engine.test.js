@@ -1126,6 +1126,46 @@ test("failed fallback leg is retried even after another leg in the same event fi
   assert.deepEqual(planFallbackOrders(run), []);
 });
 
+test("fallback skips the whole event when nominal rank-1 has no YES ask instead of buying a lower bracket", () => {
+  const mk = (id, prob, { yesAsk = prob + 0.01, noAsk = 1 - prob + 0.01 } = {}) => ({
+    id,
+    city: "Qingdao",
+    bracket: id,
+    eventId: "evt-q",
+    impliedProbability: prob,
+    spread: 0.01,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: yesAsk, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: noAsk, mid: 1 - prob, last: null },
+    },
+  });
+  const markets = new Map([
+    ["15c", mk("15c", 0.998, { yesAsk: 0 })],
+    ["14c", mk("14c", 0.0005, { yesAsk: 0.001 })],
+    ["16c", mk("16c", 0.0005, { yesAsk: 0.001 })],
+    ["13c", mk("13c", 0.0005, { yesAsk: 0.001, noAsk: 0.001 })],
+  ]);
+  const run = {
+    marketIds: [...markets.keys()],
+    markets,
+    portfolio: { positions: new Map() },
+    config: { universe: { minPrice: 0.01, maxPrice: 0.99, maxSpread: 0.08 } },
+    _fallbackPending: new Map(),
+  };
+  // 15°C YES ask=0: do not substitute 16°C.
+  assert.deepEqual(planFallbackOrders(run), []);
+
+  // Once 15°C has a YES ask, it is rank-1; no lower bracket substitution.
+  markets.get("15c").quotes.YES.ask = 0.999;
+  const legs = planFallbackOrders(run);
+  assert.equal(legs[0].market.id, "15c");
+  assert.equal(legs[0].rank, 1);
+  assert.equal(legs[0].outcome, "YES");
+});
+
 test("periodic fallback plan is independent per city/date event group", () => {
   const mk = (id, prob, eventId) => ({
     id,

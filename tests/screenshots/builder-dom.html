@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">16:33:49</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">16:50:55</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -277,7 +277,7 @@
           <span class="field-label">每周期空仓兜底建仓（按城市独立）</span>
           <span class="switch"><input type="checkbox" id="f-execution-fallbackBuyEachWindow" data-path="execution.fallbackBuyEachWindow" data-kind="toggle"><i aria-hidden="true"></i></span>
         </label>
-        <p class="hint"><button type="button" class="help-dot" data-tip="按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对没有持仓的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。已成交 leg 不会重复；失败 leg 保留并在每个窗口按原目标重试，直到成交或交易截止。各城市互不影响；资金/仓位不足时剩余城市在后续周期继续。仍受价格带/点差/仓位/现金/风控约束。" aria-label="说明：按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对没有持仓的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。已成交 leg 不会重复；失败 leg 保留并在每个窗口按原目标重试，直到成交或交易截止。各城市互不影响；资金/仓位不足时剩余城市在后续周期继续。仍受价格带/点差/仓位/现金/风控约束。">?</button>每个城市/日期组独立：每满一个观察窗口，无持仓时买组内概率第 1 高 YES + 第 3 高 NO（不足 3 个只买第 1）；已成交 leg 不重复，失败 leg 每窗口按原目标重试直到成交/交易截止；其他城市持仓不影响该城市</p>
+        <p class="hint"><button type="button" class="help-dot" data-tip="按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对没有持仓的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。若第 1 高没有 YES 卖盘，整组跳过，不降级买下一档。已成交 leg 不会重复；失败 leg 保留并在每个窗口按原目标重试，直到成交或交易截止。各城市互不影响；仍受价格带/点差/仓位/现金/风控约束。" aria-label="说明：按城市/日期独立兜底：每个观察窗口（signal.windowSec）结束时，对没有持仓的城市/日期事件组，买入组内概率第 1 高选项的 YES + 概率第 3 高选项的 NO（组内不足 3 个只买 YES）。若第 1 高没有 YES 卖盘，整组跳过，不降级买下一档。已成交 leg 不会重复；失败 leg 保留并在每个窗口按原目标重试，直到成交或交易截止。各城市互不影响；仍受价格带/点差/仓位/现金/风控约束。">?</button>每个城市/日期组独立：每满一个观察窗口，无持仓时买组内概率第 1 高 YES + 第 3 高 NO（不足 3 个只买第 1）；若第 1 高没有 YES 卖盘（ask=0）则整组跳过，不降级买下一档；已成交 leg 不重复，失败 leg 每窗口按原目标重试直到成交/交易截止</p>
       </div></div></div>
     </section><section class="panel" aria-labelledby="h-exit">
       <header class="panel-head">
