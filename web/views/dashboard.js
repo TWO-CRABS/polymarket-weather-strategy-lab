@@ -50,6 +50,13 @@ const TRADE_STATUS_OPTIONS = [
   { value: "rejected", label: "已拒绝" },
 ];
 
+const SIGNAL_BLOCK_LABELS = {
+  outside_price_band: "价格带外",
+  below_price_floor: "低于价格带下限",
+  above_price_ceiling: "高于价格带上限",
+  spread_too_wide: "点差过宽",
+};
+
 /* ------------------------------------------------------------------ */
 /* 小工具                                                              */
 /* ------------------------------------------------------------------ */
@@ -1113,13 +1120,6 @@ export async function mount(root, ctx) {
   }
 
   /* -------------------- 信号流 -------------------- */
-
-  const SIGNAL_BLOCK_LABELS = {
-    outside_price_band: "价格带外",
-    below_price_floor: "低于价格带下限",
-    above_price_ceiling: "高于价格带上限",
-    spread_too_wide: "点差过宽",
-  };
 
   function renderSignals() {
     if (!el.signalFeed) return;
