@@ -22,6 +22,7 @@ import {
 } from "/shared/contract.js";
 import * as api from "/web/api.js";
 import * as ui from "/web/components/ui.js";
+import { groupCitiesByTimezone } from "/shared/cityTimezones.js";
 
 const PRICE_FIELD_LABELS = {
   mid: "中间价 mid",
@@ -470,6 +471,7 @@ export async function mount(root, ctx) {
     renderCostEstimate();
     renderJsonPreview();
     updateButtons();
+    syncCityTimezoneUI();
   }
 
   function renderBasicsPanel() {
@@ -631,15 +633,33 @@ export async function mount(root, ctx) {
       if (!known.has(name)) cities.push({ name, station: "" });
     }
     if (cities.length) {
+      const groups = groupCitiesByTimezone(cities);
       return `<div class="field" data-cities-wrap>
         <span class="field-label" id="lb-cities">${ui.escapeHtml(field.label)}${fieldTipDot("universe.cities")}</span>
-        <div class="city-picker" role="group" aria-labelledby="lb-cities">
-          ${cities.map((city) => `<label class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
-            <input type="checkbox" value="${escapeAttr(city.name)}" data-city="${escapeAttr(city.name)}" ${selectedSet.has(city.name) ? "checked" : ""}>
-            <span class="city-code" aria-hidden="true">${ui.escapeHtml(briefCityCode(city))}</span>
-            <span class="city-name">${ui.escapeHtml(city.name)}</span>
-            ${city.station ? `<span class="city-meta">${ui.escapeHtml(city.station)}</span>` : ""}
-          </label>`).join("")}
+        <div class="city-tz-groups">
+          ${groups.map((group) => {
+            const selectedInGroup = group.cities.filter((city) => selectedSet.has(city.name)).length;
+            const allSelected = selectedInGroup === group.cities.length && group.cities.length > 0;
+            const partiallySelected = selectedInGroup > 0 && !allSelected;
+            return `<section class="city-tz-group" data-tz-group="${escapeAttr(group.key)}" aria-label="${escapeAttr(group.label)}">
+              <header class="city-tz-head">
+                <label class="city-tz-toggle">
+                  <input type="checkbox" data-tz-select="${escapeAttr(group.key)}" ${allSelected ? "checked" : ""} ${partiallySelected ? 'data-indeterminate="1"' : ""}>
+                  <span class="city-tz-label">${ui.escapeHtml(group.label)}</span>
+                  ${group.localTime ? `<span class="city-tz-time">当地 ${ui.escapeHtml(group.localTime)}</span>` : ""}
+                </label>
+                <span class="city-tz-count" data-tz-count>${selectedInGroup}/${group.cities.length}</span>
+              </header>
+              <div class="city-picker">
+                ${group.cities.map((city) => `<label class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
+                  <input type="checkbox" value="${escapeAttr(city.name)}" data-city="${escapeAttr(city.name)}" ${selectedSet.has(city.name) ? "checked" : ""}>
+                  <span class="city-code" aria-hidden="true">${ui.escapeHtml(briefCityCode(city))}</span>
+                  <span class="city-name">${ui.escapeHtml(city.name)}</span>
+                  ${city.station ? `<span class="city-meta">${ui.escapeHtml(city.station)}</span>` : ""}
+                </label>`).join("")}
+              </div>
+            </section>`;
+          }).join("")}
         </div>
         <div class="city-actions">
           <button type="button" class="btn btn-ghost btn-xs" data-cities-all>全选</button>
@@ -654,6 +674,24 @@ export async function mount(root, ctx) {
         value="${escapeAttr(selected.join(", "))}" placeholder="留空 = 全部城市；多个城市用英文逗号分隔">
       <span class="field-help" id="citiesHelp">城市元数据暂不可用；可手动输入城市名，例如 New York, London。</span>
     </div>`;
+  }
+
+  function syncCityTimezoneUI() {
+    if (!root) return;
+    for (const group of root.querySelectorAll(".city-tz-group")) {
+      const inputs = [...group.querySelectorAll("input[data-city]")];
+      const checked = inputs.filter((input) => input.checked);
+      const toggle = group.querySelector("input[data-tz-select]");
+      if (toggle) {
+        toggle.checked = inputs.length > 0 && checked.length === inputs.length;
+        toggle.indeterminate = checked.length > 0 && checked.length < inputs.length;
+      }
+      const count = group.querySelector("[data-tz-count]");
+      if (count) count.textContent = `${checked.length}/${inputs.length}`;
+      for (const input of inputs) {
+        input.closest(".city-option")?.classList.toggle("is-on", input.checked);
+      }
+    }
   }
 
   function citiesHelpText(selected) {
@@ -1088,6 +1126,27 @@ export async function mount(root, ctx) {
     if (!(target instanceof Element)) return;
 
     // 城市多选
+    const tzSelect = target.closest("input[data-tz-select]");
+    if (tzSelect) {
+      const group = tzSelect.closest(".city-tz-group");
+      const inputs = group ? [...group.querySelectorAll("input[data-city]")] : [];
+      const set = new Set(Array.isArray(state.cfg.universe.cities) ? state.cfg.universe.cities : []);
+      for (const input of inputs) {
+        input.checked = tzSelect.checked;
+        const name = input.dataset.city;
+        if (tzSelect.checked) set.add(name);
+        else set.delete(name);
+      }
+      state.cfg.universe.cities = [...set];
+      syncCityTimezoneUI();
+      const help = root.querySelector("#citiesHelp");
+      if (help) help.textContent = citiesHelpText(state.cfg.universe.cities);
+      state.presetId = "";
+      updatePresetChip();
+      scheduleValidate();
+      return;
+    }
+
     const cityInput = target.closest("input[data-city]");
     if (cityInput) {
       const name = cityInput.dataset.city;
@@ -1095,7 +1154,7 @@ export async function mount(root, ctx) {
       if (cityInput.checked) set.add(name);
       else set.delete(name);
       state.cfg.universe.cities = [...set];
-      cityInput.closest(".city-option")?.classList.toggle("is-on", cityInput.checked);
+      syncCityTimezoneUI();
       const help = root.querySelector("#citiesHelp");
       if (help) help.textContent = citiesHelpText(state.cfg.universe.cities);
       state.presetId = "";
@@ -1172,8 +1231,8 @@ export async function mount(root, ctx) {
       state.cfg.universe.cities = all ? inputs.map((input) => input.dataset.city) : [];
       for (const input of inputs) {
         input.checked = all;
-        input.closest(".city-option")?.classList.toggle("is-on", all);
       }
+      syncCityTimezoneUI();
       const help = root.querySelector("#citiesHelp");
       if (help) help.textContent = citiesHelpText(state.cfg.universe.cities);
       state.presetId = "";

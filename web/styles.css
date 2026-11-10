@@ -1708,3 +1708,23 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .sig.observation { border-left-color: var(--amber); background: rgba(245, 183, 61, 0.045); }
 .sig.observation .sig-title { color: var(--text-2); }
 .sig-observation { color: var(--amber-text); font-weight: 600; }
+
+/* ---------- B25. 城市按时区分组选择 ---------- */
+.city-tz-groups { display: grid; gap: 8px; margin-top: 6px; }
+.city-tz-group {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: rgba(255, 255, 255, 0.012);
+  padding: 8px 9px 9px;
+}
+.city-tz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.city-tz-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; min-width: 0; }
+.city-tz-toggle input { width: 13px; height: 13px; accent-color: var(--cyan); cursor: pointer; flex: 0 0 auto; }
+.city-tz-label { font-size: var(--fs-11); font-weight: 700; color: var(--text-1); font-family: var(--font-mono); }
+.city-tz-time { font-size: 9px; color: var(--text-3); font-family: var(--font-mono); white-space: nowrap; }
+.city-tz-count { font-size: 9px; color: var(--text-3); font-family: var(--font-mono); white-space: nowrap; }
+.city-tz-group .city-picker { gap: 6px; }
+.city-tz-group .city-option { height: 30px; padding: 0 9px 0 7px; }
+@media (max-width: 600px) {
+  .city-tz-time { display: none; }
+}
