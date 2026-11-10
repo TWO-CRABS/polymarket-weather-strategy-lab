@@ -204,8 +204,13 @@ export function normalizeMarket(market, event, now = nowMs()) {
     impliedProbability: mid ?? 0,
     liquidityUsd: toNum(market.liquidityNum ?? market.liquidityClob ?? market.liquidity, 0),
     volume24hUsd: toNum(market.volume24hr ?? market.volume24h, 0),
-    /** additive: real top-of-book depth in USDC, filled by discovery priming */
+    /** additive: top-N bid+ask depth in USDC (market-quality metric) */
     bookDepthUsd: 0,
+    /** additive: per-side executable depth (BUY uses ask, SELL uses bid) */
+    executableDepthUsd: {
+      YES: { ask: 0, bid: 0 },
+      NO: { ask: 0, bid: 0 },
+    },
     tickSize: tickSize > 0 ? tickSize : 0.001,
     minOrderShares: minOrderSize > 0 ? minOrderSize : 5,
     endDate: endDateMs ? new Date(endDateMs).toISOString() : "",
@@ -344,12 +349,40 @@ export async function fetchMarketById(marketId) {
   return list[0] || null;
 }
 
-/** Top-5-level bid+ask depth in USDC (real executable liquidity proxy). */
-export function bookDepthUsd(book) {
+/** Top-N bid+ask depth in USDC (market-quality metric, not one-side executable depth). */
+export function bookDepthUsd(book, levels = 10) {
   if (!book) return 0;
   let depth = 0;
-  for (const level of (book.asks || []).slice(0, 5)) depth += level.price * level.size;
-  for (const level of (book.bids || []).slice(0, 5)) depth += level.price * level.size;
+  const n = Math.max(0, Math.floor(levels));
+  for (const level of (book.asks || []).slice(0, n)) depth += level.price * level.size;
+  for (const level of (book.bids || []).slice(0, n)) depth += level.price * level.size;
+  return depth;
+}
+
+/**
+ * Top-N executable depth for one order side.
+ * BUY: asks ascending, only levels with price <= limitPrice.
+ * SELL: bids descending, only levels with price >= limitPrice.
+ */
+export function sideDepthUsd(book, side, { levels = 10, limitPrice = null } = {}) {
+  if (!book) return 0;
+  const n = Math.max(0, Math.floor(levels));
+  const isBuy = side === "BUY";
+  const rows = (isBuy ? book.asks : book.bids) || [];
+  let depth = 0;
+  let used = 0;
+  for (const level of rows) {
+    if (used >= n) break;
+    const price = Number(level?.price);
+    const size = Number(level?.size);
+    if (!(price > 0) || !(size > 0)) continue;
+    if (limitPrice !== null) {
+      const limit = Number(limitPrice);
+      if (Number.isFinite(limit) && (isBuy ? price > limit + 1e-9 : price < limit - 1e-9)) break;
+    }
+    depth += price * size;
+    used += 1;
+  }
   return depth;
 }
 
@@ -558,6 +591,16 @@ export class TemperatureDiscovery {
       if (yesBid > 0 && yesAsk > 0) market.spread = Math.max(0, yesAsk - yesBid);
     }
     market.bookDepthUsd = bookDepthUsd(yesBook) + bookDepthUsd(noBook);
+    market.executableDepthUsd = {
+      YES: {
+        ask: sideDepthUsd(yesBook, "BUY"),
+        bid: sideDepthUsd(yesBook, "SELL"),
+      },
+      NO: {
+        ask: sideDepthUsd(noBook, "BUY"),
+        bid: sideDepthUsd(noBook, "SELL"),
+      },
+    };
     market.updatedAt = nowMs();
     market.stale = false;
   }

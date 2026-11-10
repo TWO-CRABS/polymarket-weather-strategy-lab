@@ -121,6 +121,8 @@
 | `minOrderShares` | number | 卖出最小份额（5；市价 BUY 无股数下限，仅 $1 名义额门槛） |
 | `endDate` | string | ISO 时间（Gamma endDate；温度市场为观察日 12:00Z，**不是真实交易截止**） |
 | `tradingCutoff` | string | ISO 时间；温度 negRisk 市场实际交易截止 = 城市本地观察日 24:00（次日当地 00:00，DST 感知），用于 ttr/结算轮询 |
+| `bookDepthUsd` | number | top10 bid+ask 总深度（USDC），市场质量/排序用 |
+| `executableDepthUsd` | object | `{YES:{ask,bid},NO:{ask,bid}}`，各方向 top10 可成交深度；BUY 用 ask，SELL 用 bid |
 | `eventStartTime` | string | ISO 时间 |
 | `acceptingOrders` | boolean | 是否可接单 |
 | `closed` | boolean | 是否已关闭/结算 |

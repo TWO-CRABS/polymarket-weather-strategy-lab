@@ -95,7 +95,7 @@
 | 字段 | 语义 |
 |---|---|
 | `universe.minPrice/maxPrice` | ①市场发现时按 YES mid 过滤；②信号样本护栏（`p_ref`、`p_now` 都须在带内）；③入场执行时目标 token 的 bestAsk 也须在带内 |
-| `minLiquidityUsd` | `Σ_{top10 asks}(price×size) + Σ_{top10 bids}(price×size)`；盘口缺失记 0 |
+| `minLiquidityUsd` | **下单时按目标方向的可成交深度**：BUY 只统计保护价内的 asks，SELL 只统计保护价内的 bids，取 top10 档 `price×size` 之和；`bookDepthUsd`（asks+bids top10）仅用于市场质量排序，不再作为该门槛 |
 | `min/maxTimeToResolutionSec` | `resolutionTime = effectiveTradingEnd(market)`：温度 negRisk 市场为**城市本地观察日 24:00（次日当地 00:00）**；`ttr=(cutoff-now)/1000`，仅 `min≤ttr≤max` 可选（Gamma `endDate` 12:00Z 不是真实截止） |
 | `signal.priceField` | 见 §2.1；信号序列固定 YES token，不用 NO 序列（避免镜像重复计数） |
 | `execution.sizingValue` | 下单预算上限来源；实际预算还与现金、`maxPositionUsd`、最小下单量取 min（§3.2） |

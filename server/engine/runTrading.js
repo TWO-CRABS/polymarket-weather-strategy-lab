@@ -9,7 +9,7 @@
 import { calcTakerFee } from "./fee.js";
 import { bookMid, simulateBuy, simulateSell } from "./execution.js";
 import { evaluateSignal, createSignalState } from "./signal.js";
-import { effectiveTradingEndMs } from "../data/gamma.js";
+import { effectiveTradingEndMs, sideDepthUsd } from "../data/gamma.js";
 import { newId, roundTo } from "../util.js";
 
 export const RESOLUTION_POLL_MS = 20_000;
@@ -298,8 +298,10 @@ function rejectDetailDuration(seconds) {
 }
 
 /** Fixed risk pre-check order (docs/03 §6). */
-export function preRiskChecks(run, market, signal, now) {
+export function preRiskChecks(run, market, signal, now, opts = {}) {
   const fail = (reason, detail) => ({ ok: false, reason, detail });
+  const side = signal.outcome === "YES" ? "YES" : "NO";
+  const targetQuote = market.quotes?.[side];
   if (run.killSwitchTripped || run.status !== "running") {
     return fail("risk_blocked", "运行已停止或风控熔断，禁止新开仓");
   }
@@ -323,7 +325,28 @@ export function preRiskChecks(run, market, signal, now) {
     return fail("market_not_accepting_orders", "市场不可接单（acceptingOrders=false）");
   }
   if (market.stale) return fail("stale_market", "行情已过期（stale=true）");
-  if (Number.isFinite(market.liquidityUsd) && market.liquidityUsd < run.config.universe.minLiquidityUsd) {
+  // 下单时流动性按“目标方向可成交深度”判断：
+  // BUY 只统计保护价以内的 asks；SELL 只统计 bids；top10 档。
+  // 没有盘口快照时回退 Gamma liquidity 字段，兼容旧记录/测试。
+  const targetAsk = Number(targetQuote?.ask);
+  let executableDepth = null;
+  if (targetAsk > 0) {
+    const bps = Number(run.config.execution?.slippageBufferBps) || 0;
+    const buyLimit = Math.min(0.999, targetAsk * (1 + bps / 10000));
+    if (opts.book) {
+      executableDepth = sideDepthUsd(opts.book, "BUY", { limitPrice: buyLimit, levels: 10 });
+    } else if (Number(market.executableDepthUsd?.[side]?.ask) > 0) {
+      executableDepth = Number(market.executableDepthUsd[side].ask);
+    }
+  }
+  if (Number.isFinite(executableDepth)) {
+    if (executableDepth < run.config.universe.minLiquidityUsd) {
+      return fail(
+        "liquidity_too_low",
+        `可成交 ${side} ask 深度 ${rejectDetailMoney(executableDepth)} < 下限 ${rejectDetailMoney(run.config.universe.minLiquidityUsd)}`,
+      );
+    }
+  } else if (Number.isFinite(market.liquidityUsd) && market.liquidityUsd < run.config.universe.minLiquidityUsd) {
     return fail(
       "liquidity_too_low",
       `流动性 ${rejectDetailMoney(market.liquidityUsd)} < 下限 ${rejectDetailMoney(run.config.universe.minLiquidityUsd)}`,
@@ -401,7 +424,9 @@ export async function tryEntry(run, signal, market, now, opts = {}) {
     // no pyramiding by default; do not spam rejected trades for this silent guard
     return { ok: false, reason: "max_positions_per_market", silent: true };
   }
-  const risk = preRiskChecks(run, market, signal, now);
+  const risk = preRiskChecks(run, market, signal, now, {
+    book: run.source?.getBook ? run.source.getBook(signal.tokenId) : null,
+  });
   if (!risk.ok) return reject(risk.reason, risk.detail);
   const budgetUsd = computeBudget(run, market);
   if (!(budgetUsd > 0)) {
@@ -723,6 +748,7 @@ export function captureMarketSnapshot(market) {
     spread: Number.isFinite(Number(market.spread)) ? roundTo(Number(market.spread), 6) : null,
     liquidityUsd: Number.isFinite(Number(market.liquidityUsd)) ? roundTo(Number(market.liquidityUsd), 5) : null,
     bookDepthUsd: Number.isFinite(Number(market.bookDepthUsd)) ? roundTo(Number(market.bookDepthUsd), 5) : null,
+    executableDepthUsd: market.executableDepthUsd ?? null,
     tradingCutoff: market.tradingCutoff || null,
     stale: Boolean(market.stale),
     acceptingOrders: market.acceptingOrders !== false,

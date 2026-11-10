@@ -1334,4 +1334,14 @@ test("order-time checks reject low liquidity and wide spread (price/liquidity ar
   assert.match(spreadCheck.detail, /点差.*上限/);
   market.spread = 0.01;
   assert.equal(preRiskChecks(run, market, signal, now).ok, true);
+
+  // With a live book, liquidity is checked against target-side executable asks,
+  // not Gamma's aggregate liquidity field.
+  const thinAskBook = {
+    asks: [{ price: 0.51, size: 10 }],
+    bids: [{ price: 0.49, size: 1000 }],
+  };
+  const thin = preRiskChecks(run, market, signal, now, { book: thinAskBook });
+  assert.equal(thin.reason, "liquidity_too_low");
+  assert.match(thin.detail, /可成交 YES ask 深度/);
 });

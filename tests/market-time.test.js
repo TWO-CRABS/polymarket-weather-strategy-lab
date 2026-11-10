@@ -7,7 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { effectiveEventTradingEndMs, effectiveTradingEndMs } from "../server/data/gamma.js";
+import { bookDepthUsd, effectiveEventTradingEndMs, effectiveTradingEndMs, sideDepthUsd } from "../server/data/gamma.js";
 
 test("weather cutoff follows city-local observation-day end (DST-aware)", () => {
   const market = { endDate: "2026-11-09T12:00:00.000Z", negRisk: true, city: "Los Angeles" };
@@ -76,4 +76,25 @@ test("non-weather / non-noon endDate are not shifted", () => {  assert.equal(
     "2026-11-09T00:00:00.000Z",
   );
   assert.ok(Number.isNaN(effectiveTradingEndMs({ endDate: "", negRisk: true })));
+});
+
+test("book depth keeps total top-N and side-specific executable depth separate", () => {
+  const book = {
+    asks: [
+      { price: 0.10, size: 100 },
+      { price: 0.12, size: 200 },
+      { price: 0.20, size: 300 },
+    ],
+    bids: [
+      { price: 0.09, size: 50 },
+      { price: 0.08, size: 100 },
+    ],
+  };
+  assert.equal(bookDepthUsd(book), 10 + 24 + 60 + 4.5 + 8);
+  assert.equal(sideDepthUsd(book, "BUY"), 10 + 24 + 60);
+  assert.equal(sideDepthUsd(book, "SELL"), 4.5 + 8);
+  // BUY protection at 12¢ excludes the 20¢ ask.
+  assert.equal(sideDepthUsd(book, "BUY", { limitPrice: 0.12 }), 10 + 24);
+  assert.equal(sideDepthUsd(book, "BUY", { limitPrice: 0.12, levels: 1 }), 10);
+  assert.equal(sideDepthUsd(null, "BUY"), 0);
 });
