@@ -280,29 +280,68 @@ export function feeRate(run, market) {
   return market.feeSchedule?.rate ?? run.config.fees.takerFeeRate ?? 0.05;
 }
 
+/** Human-readable rejection detail for the trade table. */
+function rejectDetailCents(value) {
+  return Number.isFinite(Number(value)) ? `${(Number(value) * 100).toFixed(2)}¢` : "—";
+}
+
+function rejectDetailMoney(value) {
+  return Number.isFinite(Number(value)) ? `$${Number(value).toFixed(2)}` : "—";
+}
+
+function rejectDetailDuration(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value)) return "—";
+  if (Math.abs(value) >= 3600) return `${(value / 3600).toFixed(1)}h`;
+  if (Math.abs(value) >= 60) return `${(value / 60).toFixed(1)}m`;
+  return `${value.toFixed(1)}s`;
+}
+
 /** Fixed risk pre-check order (docs/03 §6). */
 export function preRiskChecks(run, market, signal, now) {
-  if (run.killSwitchTripped || run.status !== "running") return { ok: false, reason: "risk_blocked" };
+  const fail = (reason, detail) => ({ ok: false, reason, detail });
+  if (run.killSwitchTripped || run.status !== "running") {
+    return fail("risk_blocked", "运行已停止或风控熔断，禁止新开仓");
+  }
   const equity = run.portfolio.equity();
   if (run.config.risk.killSwitch && equity < run.peakEquity) {
     const drawdownPct = ((run.peakEquity - equity) / run.peakEquity) * 100;
-    if (drawdownPct >= run.config.risk.maxDrawdownPct) return { ok: false, reason: "risk_blocked" };
+    if (drawdownPct >= run.config.risk.maxDrawdownPct) {
+      return fail(
+        "risk_blocked",
+        `当前回撤 ${drawdownPct.toFixed(2)}% ≥ 上限 ${Number(run.config.risk.maxDrawdownPct).toFixed(2)}%`,
+      );
+    }
   }
   if (run.config.risk.dailyLossLimitUsd > 0 && equity - run.dayStartEquity <= -run.config.risk.dailyLossLimitUsd) {
-    return { ok: false, reason: "risk_blocked" };
+    return fail(
+      "risk_blocked",
+      `当日亏损 ${rejectDetailMoney(run.dayStartEquity - equity)} ≥ 日亏上限 ${rejectDetailMoney(run.config.risk.dailyLossLimitUsd)}`,
+    );
   }
-  if (!market.acceptingOrders) return { ok: false, reason: "market_not_accepting_orders" };
-  if (market.stale) return { ok: false, reason: "stale_market" };
+  if (!market.acceptingOrders) {
+    return fail("market_not_accepting_orders", "市场不可接单（acceptingOrders=false）");
+  }
+  if (market.stale) return fail("stale_market", "行情已过期（stale=true）");
   if (Number.isFinite(market.liquidityUsd) && market.liquidityUsd < run.config.universe.minLiquidityUsd) {
-    return { ok: false, reason: "liquidity_too_low" };
+    return fail(
+      "liquidity_too_low",
+      `流动性 ${rejectDetailMoney(market.liquidityUsd)} < 下限 ${rejectDetailMoney(run.config.universe.minLiquidityUsd)}`,
+    );
   }
   if (Number.isFinite(market.spread) && market.spread > run.config.universe.maxSpread) {
-    return { ok: false, reason: "spread_too_wide" };
+    return fail(
+      "spread_too_wide",
+      `点差 ${rejectDetailCents(market.spread)} > 上限 ${rejectDetailCents(run.config.universe.maxSpread)}`,
+    );
   }
   const ttrSec = (effectiveTradingEndMs(market) - now) / 1000;
-  if (!Number.isFinite(ttrSec)) return { ok: false, reason: "risk_blocked" };
+  if (!Number.isFinite(ttrSec)) return fail("risk_blocked", "无法计算距交易截止时间");
   if (ttrSec < run.config.universe.minTimeToResolutionSec || ttrSec > run.config.universe.maxTimeToResolutionSec) {
-    return { ok: false, reason: "risk_blocked" };
+    return fail(
+      "risk_blocked",
+      `距截止 ${rejectDetailDuration(ttrSec)}，超出允许范围 ${rejectDetailDuration(run.config.universe.minTimeToResolutionSec)}–${rejectDetailDuration(run.config.universe.maxTimeToResolutionSec)}`,
+    );
   }
   const yesMid = market.impliedProbability;
   if (
@@ -310,19 +349,31 @@ export function preRiskChecks(run, market, signal, now) {
     yesMid < run.config.universe.minPrice ||
     yesMid > run.config.universe.maxPrice
   ) {
-    return { ok: false, reason: "risk_blocked" };
+    return fail(
+      "risk_blocked",
+      `YES 中间价 ${rejectDetailCents(yesMid)} 超出价格带 ${rejectDetailCents(run.config.universe.minPrice)}–${rejectDetailCents(run.config.universe.maxPrice)}`,
+    );
   }
   const quote = signal.outcome === "YES" ? market.quotes?.YES : market.quotes?.NO;
   const bestAsk = quote?.ask ?? 0;
-  if (!(bestAsk > 0)) return { ok: false, reason: "no_liquidity" };
+  if (!(bestAsk > 0)) return fail("no_liquidity", `${signal.outcome || "目标"} 盘口没有有效卖价`);
   if (bestAsk < run.config.universe.minPrice || bestAsk > run.config.universe.maxPrice) {
-    return { ok: false, reason: "risk_blocked" };
+    return fail(
+      "risk_blocked",
+      `目标 ${signal.outcome} 卖价 ${rejectDetailCents(bestAsk)} 超出价格带 ${rejectDetailCents(run.config.universe.minPrice)}–${rejectDetailCents(run.config.universe.maxPrice)}`,
+    );
   }
   if (run.portfolio.positions.size >= run.config.execution.maxPositions) {
-    return { ok: false, reason: "max_positions" };
+    return fail(
+      "max_positions",
+      `持仓数 ${run.portfolio.positions.size} ≥ 上限 ${run.config.execution.maxPositions}`,
+    );
   }
   if (run.portfolio.positionsForMarket(market.id).length >= run.config.execution.maxPositionsPerMarket) {
-    return { ok: false, reason: "max_positions_per_market" };
+    return fail(
+      "max_positions_per_market",
+      `该市场持仓 ${run.portfolio.positionsForMarket(market.id).length} ≥ 上限 ${run.config.execution.maxPositionsPerMarket}`,
+    );
   }
   return { ok: true };
 }
@@ -342,20 +393,25 @@ export function computeBudget(run, market) {
 
 export async function tryEntry(run, signal, market, now, opts = {}) {
   const reason = opts.reason || "signal";
-  const reject = (rejectReason) => {
-    recordRejectedEntry(run, signal, market, rejectReason, now, { reason });
-    return { ok: false, reason: rejectReason };
+  const reject = (rejectReason, detail = null) => {
+    recordRejectedEntry(run, signal, market, rejectReason, now, { reason, detail });
+    return { ok: false, reason: rejectReason, detail };
   };
   if (run.portfolio.positionsForMarket(market.id).length > 0) {
     // no pyramiding by default; do not spam rejected trades for this silent guard
     return { ok: false, reason: "max_positions_per_market", silent: true };
   }
   const risk = preRiskChecks(run, market, signal, now);
-  if (!risk.ok) return reject(risk.reason);
+  if (!risk.ok) return reject(risk.reason, risk.detail);
   const budgetUsd = computeBudget(run, market);
-  if (!(budgetUsd > 0)) return reject("insufficient_cash");
+  if (!(budgetUsd > 0)) {
+    return reject(
+      "insufficient_cash",
+      `可用下单预算 ${rejectDetailMoney(budgetUsd)} ≤ 0（现金/仓位上限不足）`,
+    );
+  }
   const book = run.source?.getBook ? run.source.getBook(signal.tokenId) : null;
-  if (!book) return reject("no_liquidity");
+  if (!book) return reject("no_liquidity", `${signal.outcome || "目标"} token 没有盘口数据`);
   const fill = simulateBuy({
     book,
     budgetUsd,
@@ -364,8 +420,13 @@ export async function tryEntry(run, signal, market, now, opts = {}) {
     slippageBufferBps: run.config.execution.slippageBufferBps,
     tickSize: market.tickSize,
   });
-  if (!fill.ok) return reject(fill.rejectReason);
-  if (fill.notional + fill.fee > run.portfolio.cash + 1e-9) return reject("insufficient_cash");
+  if (!fill.ok) return reject(fill.rejectReason, `盘口撮合失败（${fill.rejectReason}）`);
+  if (fill.notional + fill.fee > run.portfolio.cash + 1e-9) {
+    return reject(
+      "insufficient_cash",
+      `现金不足：需要 ${rejectDetailMoney(fill.notional + fill.fee)}，可用 ${rejectDetailMoney(run.portfolio.cash)}`,
+    );
+  }
   const quote = signal.outcome === "YES" ? market.quotes?.YES : market.quotes?.NO;
   const reference = quote?.ask ?? fill.price;
   const portfolioPosition = run.portfolio.buy({
@@ -604,7 +665,7 @@ export function makeTrade(run, fields) {
   const {
     market, tokenId, outcome, side, shares, price, notional, fee, slippageCost, spreadCost,
     realizedPnl, totalCost, cashDelta, signalId, reason, status, rejectReason, bookLevels, ts,
-    marketSnapshot,
+    marketSnapshot, rejectDetail,
   } = fields;
   return {
     id: newId("trd"),
@@ -629,6 +690,7 @@ export function makeTrade(run, fields) {
     rejectReason: rejectReason ?? null,
     bookLevels,
     marketSnapshot: marketSnapshot ?? null,
+    rejectDetail: rejectDetail ?? null,
   };
 }
 
@@ -701,6 +763,7 @@ export function recordRejectedEntry(run, signal, market, rejectReason, now, opts
     rejectReason,
     bookLevels: [],
     marketSnapshot: captureMarketSnapshot(market),
+    rejectDetail: opts.detail || null,
     ts: now,
   });
   recordTrade(run, trade, null);

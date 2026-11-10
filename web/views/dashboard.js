@@ -1273,12 +1273,77 @@ export async function mount(root, ctx) {
     hideTradeTip();
   }
 
+  function rejectDetailForTrade(trade) {
+    if (!trade || trade.status !== "rejected") return "";
+    if (trade.rejectDetail) return trade.rejectDetail;
+    const snap = trade.marketSnapshot;
+    const u = state.config?.universe;
+    if (!snap || !u) return "";
+    const cents = (value) => (num(value) === null ? "—" : `${(Number(value) * 100).toFixed(2)}¢`);
+    const money = (value) => (num(value) === null ? "—" : `$${Number(value).toFixed(2)}`);
+    const duration = (seconds) => {
+      const value = Number(seconds);
+      if (!Number.isFinite(value)) return "—";
+      if (Math.abs(value) >= 3600) return `${(value / 3600).toFixed(1)}h`;
+      if (Math.abs(value) >= 60) return `${(value / 60).toFixed(1)}m`;
+      return `${value.toFixed(1)}s`;
+    };
+    switch (trade.rejectReason) {
+      case "spread_too_wide":
+        return `点差 ${cents(snap.spread)} > 上限 ${cents(u.maxSpread)}`;
+      case "liquidity_too_low":
+        return `流动性 ${money(snap.liquidityUsd)} < 下限 ${money(u.minLiquidityUsd)}`;
+      case "market_not_accepting_orders":
+        return "市场不可接单（acceptingOrders=false）";
+      case "stale_market":
+        return "行情已过期（stale=true）";
+      case "no_liquidity":
+        return `${trade.outcome || "目标"} 盘口没有有效卖价`;
+      case "below_min_order":
+        return "市价 BUY 名义额低于 $1 最小下单额";
+      case "insufficient_cash": {
+        const budget = Math.min(
+          Number(state.config?.execution?.sizingValue) || 0,
+          Number(state.run?.cash) || 0,
+        );
+        return `可用下单预算 ${money(budget)} 不足`;
+      }
+      case "max_positions":
+        return `持仓数 ${state.positions.length} ≥ 上限 ${state.config?.execution?.maxPositions ?? "—"}`;
+      case "max_positions_per_market":
+        return `该市场持仓数 ≥ 上限 ${state.config?.execution?.maxPositionsPerMarket ?? "—"}`;
+      case "risk_blocked": {
+        const mid = num(snap.impliedProbability);
+        if (mid !== null && (mid < u.minPrice || mid > u.maxPrice)) {
+          return `YES 中间价 ${cents(mid)} 超出价格带 ${cents(u.minPrice)}–${cents(u.maxPrice)}`;
+        }
+        const quote = snap.quotes?.[trade.outcome || "YES"];
+        const bestAsk = num(quote?.ask);
+        if (bestAsk !== null && bestAsk > 0 && (bestAsk < u.minPrice || bestAsk > u.maxPrice)) {
+          return `目标 ${trade.outcome || "YES"} 卖价 ${cents(bestAsk)} 超出价格带 ${cents(u.minPrice)}–${cents(u.maxPrice)}`;
+        }
+        const cutoffMs = Date.parse(snap.tradingCutoff);
+        if (Number.isFinite(cutoffMs) && Number.isFinite(Number(trade.ts))) {
+          const ttrSec = (cutoffMs - Number(trade.ts)) / 1000;
+          if (ttrSec < u.minTimeToResolutionSec || ttrSec > u.maxTimeToResolutionSec) {
+            return `距截止 ${duration(ttrSec)}，超出允许范围 ${duration(u.minTimeToResolutionSec)}–${duration(u.maxTimeToResolutionSec)}`;
+          }
+        }
+        return "风控拦截（回撤/日亏/持仓上限）";
+      }
+      default:
+        return "";
+    }
+  }
+
   function buildTradeTip({ trade, market, city, bracket, date, reason }) {
     const status = TRADE_STATUS_LABELS[trade.status] || trade.status || "—";
     const lines = [`${reason} · ${status}`];
     if (trade.reason) lines.push(`触发来源：${reason}（${trade.reason}）`);
+    const rejectDetail = rejectDetailForTrade(trade);
     if (trade.status === "rejected" && trade.rejectReason) {
       lines.push(`拒绝原因：${ui.rejectReasonLabel(trade.rejectReason)}（${trade.rejectReason}）`);
+      if (rejectDetail) lines.push(`详情：${rejectDetail}`);
     }
     lines.push(`市场：${[city, bracket, date].filter(Boolean).join(" · ") || "—"}`);
     lines.push(`方向：${trade.side || "—"}${trade.outcome ? ` ${trade.outcome}` : ""}`);
@@ -1456,6 +1521,7 @@ export async function mount(root, ctx) {
     }
     const renderRow = ({ trade, market, city, bracket, date, reason }) => {
       const rejected = trade.status === "rejected";
+      const rejectDetail = rejected ? rejectDetailForTrade(trade) : "";
       const pnl = num(trade.realizedPnl);
       const selected = state.selectedMarketId && trade.marketId === state.selectedMarketId;
       const bracketText = [bracket, date].filter(Boolean).join(" · ");
@@ -1470,7 +1536,7 @@ export async function mount(root, ctx) {
         <td class="num-col cell-amber">${ui.escapeHtml(feeText(trade.fee))}</td>
         <td class="num-col cell-dim">${ui.escapeHtml(ui.fmtMoney(num(trade.slippageCost) || 0, 2))}</td>
         <td class="num-col">${trade.side === "SELL" && pnl !== null ? ui.pnlSpan(pnl, { money: true, digits: 4 }) : '<span class="muted">—</span>'}</td>
-        <td class="trade-reason"><span class="trade-reason-trigger" tabindex="0" data-trade-tip="${tipAttr}"><b>${ui.escapeHtml(reason)}</b>${rejected && trade.rejectReason ? `<span class="down">${ui.escapeHtml(ui.rejectReasonLabel(trade.rejectReason))}</span>` : ""}</span></td>
+        <td class="trade-reason"><span class="trade-reason-trigger" tabindex="0" data-trade-tip="${tipAttr}"><b>${ui.escapeHtml(reason)}</b>${rejected && trade.rejectReason ? `<span class="down">${ui.escapeHtml(ui.rejectReasonLabel(trade.rejectReason))}</span>` : ""}${rejectDetail ? `<span class="trade-reject-detail">${ui.escapeHtml(rejectDetail)}</span>` : ""}</span></td>
         <td>${ui.tradeStatusBadge(trade.status)}</td>
       </tr>`;
     };

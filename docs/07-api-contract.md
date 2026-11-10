@@ -156,6 +156,7 @@
 | `status` | `filled` / `partial` / `rejected` |
 | `rejectReason` | 见 `REJECT_REASONS`，仅 rejected |
 | `marketSnapshot?` | rejected 时记录：`{impliedProbability, spread, liquidityUsd, bookDepthUsd, quotes:{YES,NO}, tradingCutoff, stale, acceptingOrders, closed}`，为**拒单瞬间**快照；成交/旧记录可为 null |
+| `rejectDetail?` | rejected 时的可读原因，例如 `点差 12.00¢ > 上限 8.00¢`、`流动性 $61.05 < 下限 $100.00`；旧记录可为 null |
 | `bookLevels` | 消耗的档位 `[{price,size}]` |
 
 ### 3.4 Position

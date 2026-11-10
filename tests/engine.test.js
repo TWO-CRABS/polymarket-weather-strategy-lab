@@ -433,10 +433,12 @@ test("rejected entry persists the quote snapshot at rejection time", () => {
   };
   recordRejectedEntry(run, { id: "sig_snap", tokenId: "yes-snap", outcome: "YES" }, market, "spread_too_wide", now, {
     reason: "fallback_entry",
+    detail: "点差 24.00¢ > 上限 8.00¢",
   });
   const trade = run.trades[0];
   assert.equal(trade.status, "rejected");
   assert.equal(trade.rejectReason, "spread_too_wide");
+  assert.equal(trade.rejectDetail, "点差 24.00¢ > 上限 8.00¢");
   assert.equal(trade.marketSnapshot.spread, 0.24);
   assert.equal(trade.marketSnapshot.impliedProbability, 0.81);
   assert.equal(trade.marketSnapshot.liquidityUsd, 167.12);
@@ -1282,10 +1284,14 @@ test("order-time checks reject low liquidity and wide spread (price/liquidity ar
   };
   const signal = { outcome: "YES" };
 
-  assert.equal(preRiskChecks(run, market, signal, now).reason, "liquidity_too_low");
+  const liquidityCheck = preRiskChecks(run, market, signal, now);
+  assert.equal(liquidityCheck.reason, "liquidity_too_low");
+  assert.match(liquidityCheck.detail, /流动性.*下限/);
   market.liquidityUsd = 1000;
   market.spread = 0.2;
-  assert.equal(preRiskChecks(run, market, signal, now).reason, "spread_too_wide");
+  const spreadCheck = preRiskChecks(run, market, signal, now);
+  assert.equal(spreadCheck.reason, "spread_too_wide");
+  assert.match(spreadCheck.detail, /点差.*上限/);
   market.spread = 0.01;
   assert.equal(preRiskChecks(run, market, signal, now).ok, true);
 });
