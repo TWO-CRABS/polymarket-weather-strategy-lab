@@ -277,6 +277,47 @@ export async function mount(root, ctx) {
   let stopBusy = false;
   let tradeTipEl = null;
   let tradeTipTarget = null;
+  const missingMarketAttempts = new Set();
+
+  async function enrichMissingMarketMeta() {
+    if (state.destroyed) return;
+    const ids = [];
+    const seen = new Set();
+    const add = (marketId) => {
+      if (!marketId || state.markets.has(marketId) || missingMarketAttempts.has(marketId) || seen.has(marketId)) return;
+      seen.add(marketId);
+      ids.push(marketId);
+    };
+    for (const position of state.positions || []) add(position.marketId);
+    for (const trade of state.trades || []) add(trade.marketId);
+    const batch = ids.slice(0, 120);
+    if (!batch.length) return;
+    for (const marketId of batch) missingMarketAttempts.add(marketId);
+    let cursor = 0;
+    let loaded = 0;
+    const worker = async () => {
+      while (cursor < batch.length) {
+        const marketId = batch[cursor];
+        cursor += 1;
+        try {
+          const data = await api.getJSON(`/api/markets/${encodeURIComponent(marketId)}`);
+          if (data?.market) {
+            state.markets.set(marketId, data.market);
+            loaded += 1;
+          }
+        } catch {
+          /* old market may not exist in Gamma anymore */
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(5, batch.length) }, worker));
+    if (!state.destroyed && loaded > 0) {
+      renderMarkets();
+      renderTrades();
+      renderPositions();
+      renderSelectedMarket();
+    }
+  }
   const TRADE_STATUS_LABELS = { filled: "已成交", partial: "部分成交", rejected: "已拒绝" };
   const TRADE_REASON_NOTES = {
     signal: "价格动量信号触发入场。",
@@ -444,6 +485,7 @@ export async function mount(root, ctx) {
       if (marketsRes.status === "fulfilled" && marketsRes.value) {
         applyMarkets(marketsRes.value.markets || []);
       }
+      void enrichMissingMarketMeta();
       return { ok: true };
     } catch (error) {
       state.error = api.describeError(error);
@@ -1450,7 +1492,7 @@ export async function mount(root, ctx) {
       const market = trade.marketId ? state.markets.get(trade.marketId) : null;
       const city = market ? cityLabel(market) : (trade.city || trade.marketId || "—");
       const bracket = market ? bracketLabel(market) : (trade.bracket || "");
-      const date = market ? shortDate(market.endDate) : "";
+      const date = shortDate(market?.endDate || trade.endDate);
       const reason = ui.reasonLabel(trade.reason) || trade.reason || "—";
       return {
         trade,
@@ -1570,7 +1612,7 @@ export async function mount(root, ctx) {
       const market = position.marketId ? state.markets.get(position.marketId) : null;
       const city = market ? cityLabel(market) : (position.city || "—");
       const bracket = market ? bracketLabel(market) : (position.bracket || "");
-      const date = market ? shortDate(market.endDate) : "";
+      const date = shortDate(market?.endDate || position.endDate);
       const selected = state.selectedMarketId && position.marketId === state.selectedMarketId;
       const mid = num(position.midPrice) !== null ? position.midPrice : (market ? midOf(market, position.outcome || "YES") : null);
       const implied = num(position.impliedProbability) !== null

@@ -15,6 +15,7 @@ import {
   validateStrategy,
 } from "../shared/contract.js";
 import { AppError, UpstreamError, nowMs, roundTo, utcDateKey } from "./util.js";
+import { extractCity, fetchMarketById } from "./data/gamma.js";
 
 const MAX_LIMIT = 500;
 
@@ -151,8 +152,47 @@ export function createApiHandler(deps) {
 
     const marketMatch = /^\/api\/markets\/([^/]+)$/.exec(pathname);
     if (method === "GET" && marketMatch) {
-      const market = discovery.getMarket(marketMatch[1]) || feed.getSnapshot(marketMatch[1]);
-      if (!market) throw new AppError(404, "MARKET_NOT_FOUND", `市场不存在: ${marketMatch[1]}`);
+      const marketId = marketMatch[1];
+      let market = discovery.getMarket(marketId) || feed.getSnapshot(marketId);
+      if (!market) {
+        // Settings/recovery can reference markets that already left discovery.
+        // Rehydrate their display metadata from Gamma so old trades/positions
+        // don't fall back to raw numeric market ids.
+        const raw = await fetchMarketById(marketId).catch(() => null);
+        if (raw) {
+          const question = String(raw.question || "");
+          const bracket =
+            String(raw.groupItemTitle || "").trim() ||
+            (/(?:be|between)\s+(.+?)\s+on\b/i.exec(question)?.[1]?.trim() ?? "");
+          let tokenIds = [];
+          try {
+            tokenIds = JSON.parse(raw.clobTokenIds || "[]");
+          } catch {
+            /* ignore malformed token ids */
+          }
+          market = {
+            id: String(raw.id || marketId),
+            question,
+            city: extractCity("", question),
+            bracket,
+            endDate: raw.endDate || "",
+            eventId: String(raw.eventId || ""),
+            eventSlug: "",
+            tokens: {
+              yesTokenId: tokenIds[0] || "",
+              noTokenId: tokenIds[1] || "",
+            },
+            quotes: {},
+            closed: Boolean(raw.closed),
+            acceptingOrders: Boolean(raw.acceptingOrders),
+            impliedProbability: null,
+            liquidityUsd: 0,
+            updatedAt: 0,
+            stale: true,
+          };
+        }
+      }
+      if (!market) throw new AppError(404, "MARKET_NOT_FOUND", `市场不存在: ${marketId}`);
       sendJson(res, 200, { market });
       return true;
     }

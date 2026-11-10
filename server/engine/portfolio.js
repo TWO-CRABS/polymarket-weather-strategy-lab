@@ -30,7 +30,7 @@ export class Portfolio {
    * Apply a filled BUY.
    * @returns {any} position snapshot
    */
-  buy({ tokenId, marketId, outcome, city, bracket, shares, price, fee, ts, midPrice, impliedProbability }) {
+  buy({ tokenId, marketId, outcome, city, bracket, endDate, shares, price, fee, ts, midPrice, impliedProbability }) {
     const notional = roundTo(shares * price, 5);
     const cost = roundTo(notional + fee, 5);
     this.cash = roundTo(this.cash - cost, 6);
@@ -52,6 +52,7 @@ export class Portfolio {
       outcome,
       city,
       bracket,
+      endDate,
       shares,
       costBasis: cost,
       entryFee: fee,
@@ -185,6 +186,7 @@ export class Portfolio {
       outcome: position.outcome,
       city: position.city,
       bracket: position.bracket,
+      endDate: position.endDate ?? null,
       shares: money(shares, 2),
       avgPrice: money(avgPrice, 6),
       costBasis: money(costBasis, 5),

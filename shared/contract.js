@@ -505,6 +505,11 @@ export const STRATEGY_PRESETS = Object.freeze([
  * @property {number} ts
  * @property {string} runId
  * @property {string} marketId
+ * @property {string|null} [city] market display metadata for old/stopped runs
+ * @property {string|null} [bracket]
+ * @property {string|null} [endDate]
+ * @property {string|null} [question]
+ * @property {string|null} [eventSlug]
  * @property {string} tokenId
  * @property {"YES"|"NO"} outcome
  * @property {"BUY"|"SELL"} side
@@ -534,6 +539,7 @@ export const STRATEGY_PRESETS = Object.freeze([
  * @property {"YES"|"NO"} outcome
  * @property {string} city
  * @property {string} bracket
+ * @property {string} [endDate]
  * @property {number} shares
  * @property {number} avgPrice        costBasis / shares (fees included)
  * @property {number} costBasis       notional + entry fees

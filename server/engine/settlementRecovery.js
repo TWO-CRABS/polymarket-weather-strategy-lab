@@ -41,6 +41,7 @@ export function rehydratePortfolio(initialCapital, tradeRecords = []) {
         outcome: trade.outcome,
         city: trade.city,
         bracket: trade.bracket,
+        endDate: trade.endDate ?? null,
         shares: trade.shares,
         price: trade.price,
         fee: trade.fee,
@@ -76,6 +77,9 @@ export function marketsFromTrades(tradeRecords = []) {
       id: trade.marketId,
       city: trade.city ?? "",
       bracket: trade.bracket ?? "",
+      endDate: trade.endDate ?? null,
+      question: trade.question ?? "",
+      eventSlug: trade.eventSlug ?? "",
       tokens: { yesTokenId: null, noTokenId: null },
       quotes: {},
       closed: true, // 已停止/过期的运行：直接进入“待裁决”轮询

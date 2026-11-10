@@ -439,6 +439,8 @@ test("rejected entry persists the quote snapshot at rejection time", () => {
   assert.equal(trade.status, "rejected");
   assert.equal(trade.rejectReason, "spread_too_wide");
   assert.equal(trade.rejectDetail, "点差 24.00¢ > 上限 8.00¢");
+  assert.equal(trade.city, "Wellington");
+  assert.equal(trade.bracket, "18°C");
   assert.equal(trade.marketSnapshot.spread, 0.24);
   assert.equal(trade.marketSnapshot.impliedProbability, 0.81);
   assert.equal(trade.marketSnapshot.liquidityUsd, 167.12);

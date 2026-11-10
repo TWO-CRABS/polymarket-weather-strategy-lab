@@ -142,7 +142,8 @@
 ### 3.3 Trade
 | 字段 | 说明 |
 |---|---|
-| `id, ts, runId, marketId, tokenId, outcome(YES/NO), side(BUY/SELL)` | 基础 |
+| `id, ts, runId, marketId, tokenId, outcome(YES/NO), side(BUY/SELL)` | 基础；新 Trade 还带 `city, bracket, endDate, question, eventSlug` 供停止/重启后的复盘展示 |
+| `city, bracket, endDate, question, eventSlug` | 可选市场展示元数据（旧 journal 可能缺失，前端可按 marketId 懒加载） |
 | `shares` | 成交份额 |
 | `price` | VWAP 成交价 |
 | `notional` | `shares × price` |

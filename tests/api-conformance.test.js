@@ -322,6 +322,7 @@ test("replay run lifecycle: create -> running/ended -> trades/equity/signals/pos
       "id", "ts", "runId", "marketId", "tokenId", "outcome", "side", "shares", "price",
       "notional", "fee", "slippageCost", "totalCost", "cashDelta", "realizedPnl",
       "signalId", "reason", "status", "rejectReason", "bookLevels", "marketSnapshot", "rejectDetail",
+      "city", "bracket", "endDate",
     ]) {
       assert.ok(key in trade, `Trade.${key} missing`);
     }
