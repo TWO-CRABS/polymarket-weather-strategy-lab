@@ -1166,6 +1166,47 @@ test("fallback skips the whole event when nominal rank-1 has no YES ask instead 
   assert.equal(legs[0].outcome, "YES");
 });
 
+test("stale fallback pending target is dropped when the rank changes", () => {
+  const mk = (id, prob, eventId) => ({
+    id,
+    city: "Alpha",
+    bracket: id,
+    eventId,
+    impliedProbability: prob,
+    spread: 0.01,
+    closed: false,
+    acceptingOrders: true,
+    tokens: { yesTokenId: `${id}-y`, noTokenId: `${id}-n` },
+    quotes: {
+      YES: { bid: prob - 0.01, ask: prob + 0.01, mid: prob, last: null },
+      NO: { bid: 1 - prob - 0.01, ask: 1 - prob + 0.01, mid: 1 - prob, last: null },
+    },
+  });
+  const markets = new Map([
+    ["a1", mk("a1", 0.4, "evt-a")],
+    ["a2", mk("a2", 0.8, "evt-a")],
+    ["a3", mk("a3", 0.3, "evt-a")],
+  ]);
+  const run = {
+    marketIds: [...markets.keys()],
+    markets,
+    portfolio: { positions: new Map() },
+    config: { universe: { minPrice: 0.02, maxPrice: 0.98, maxSpread: 0.05 } },
+    _fallbackPending: new Map([
+      ["event:evt-a|a1|YES", { eventKey: "event:evt-a", marketId: "a1", outcome: "YES", rank: 1 }],
+    ]),
+  };
+  // a2 is now rank-1; a1 pending is stale and must not be bought.
+  const legs = planFallbackOrders(run).map((leg) => `${leg.rank}:${leg.outcome}:${leg.market.id}`);
+  assert.deepEqual(legs, ["1:YES:a2", "3:NO:a3"]);
+  assert.ok(!run._fallbackPending.has("event:evt-a|a1|YES"));
+
+  // With a position in the event, the stale pending is dropped and no new leg is added.
+  run.portfolio.positions = new Map([["a3-n", { marketId: "a3" }]]);
+  run._fallbackPending.set("event:evt-a|a1|YES", { eventKey: "event:evt-a", marketId: "a1", outcome: "YES", rank: 1 });
+  assert.deepEqual(planFallbackOrders(run), []);
+});
+
 test("periodic fallback plan is independent per city/date event group", () => {
   const mk = (id, prob, eventId) => ({
     id,

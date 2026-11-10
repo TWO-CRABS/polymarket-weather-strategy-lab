@@ -580,39 +580,43 @@ export function planFallbackOrders(run) {
     legs.push(leg);
   };
   for (const group of groupFallbackCandidates(run)) {
-    // 清理已失效/已成交的失败 leg。
+    const rank1 = group.candidates[0];
+    const rank3 = group.candidates[2];
+
+    // 每窗口重新排名：pending 只有在原目标仍是当前 rank-1 YES / rank-3 NO
+    // 时才继续重试；排名变化后丢弃旧目标，避免买了已经过时的括号。
     for (const pending of [...run._fallbackPending.values()]) {
       if (pending.eventKey !== group.key) continue;
       const market = run.markets?.get?.(pending.marketId);
-      if (!market || market.closed || market.acceptingOrders === false || marketHasOpenPosition(run, pending.marketId)) {
+      const stillCurrentLeg =
+        (pending.outcome === "YES" && rank1?.market.id === pending.marketId) ||
+        (pending.outcome === "NO" && rank3?.market.id === pending.marketId);
+      if (!market || market.closed || market.acceptingOrders === false || marketHasOpenPosition(run, pending.marketId) || !stillCurrentLeg) {
         run._fallbackPending.delete(fallbackPendingKey(pending.eventKey, pending.marketId, pending.outcome));
       }
     }
-    const pending = [...run._fallbackPending.values()].filter((item) => item.eventKey === group.key);
-    const pendingOutcomes = new Set(pending.map((item) => item.outcome));
-    const hasPosition = eventHasOpenPosition(run, group.marketIds);
 
-    // 已失败的 leg 优先按原目标重试（即使同组其他括号已成交）。
-    for (const item of pending) {
-      const market = run.markets?.get?.(item.marketId);
-      if (!market || market.closed || market.acceptingOrders === false || marketHasOpenPosition(run, item.marketId)) continue;
-      pushLeg({ market, outcome: item.outcome, rank: item.rank, eventKey: group.key, retry: true });
-    }
-
-    // 事件组已有任意持仓时，不再新增普通 legs，只重试 pending 失败 leg。
-    if (hasPosition) continue;
-
-    const rank1 = group.candidates[0];
-    const rank3 = group.candidates[2];
     // 名义第 1 高没有 YES 卖盘时，整组跳过，不降级买下一档。
     if (!rank1 || !(Number(rank1.market.quotes?.YES?.ask) > 0)) continue;
-    if (!pendingOutcomes.has("YES") && !marketHasOpenPosition(run, rank1.market.id)) {
+
+    const hasPosition = eventHasOpenPosition(run, group.marketIds);
+    if (hasPosition) {
+      // 同组已有持仓：不新增普通 legs，只重试仍然对应当前排名目标的失败 leg。
+      for (const pending of run._fallbackPending.values()) {
+        if (pending.eventKey !== group.key) continue;
+        const market = run.markets?.get?.(pending.marketId);
+        if (!market || market.closed || market.acceptingOrders === false || marketHasOpenPosition(run, pending.marketId)) continue;
+        pushLeg({ market, outcome: pending.outcome, rank: pending.rank, eventKey: group.key, retry: true });
+      }
+      continue;
+    }
+
+    if (!marketHasOpenPosition(run, rank1.market.id)) {
       pushLeg({ market: rank1.market, outcome: "YES", rank: 1, eventKey: group.key });
     }
     // 第 3 高只有存在 NO 卖盘时才生成 NO leg。
     if (
       rank3 &&
-      !pendingOutcomes.has("NO") &&
       !marketHasOpenPosition(run, rank3.market.id) &&
       Number(rank3.market.quotes?.NO?.ask) > 0
     ) {
