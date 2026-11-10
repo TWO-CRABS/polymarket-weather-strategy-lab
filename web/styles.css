@@ -1758,3 +1758,18 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
   background: rgba(34, 211, 238, 0.1);
   outline: none;
 }
+
+/* 持仓城市优先展示 */
+.market-group.has-position { border-left: 2px solid var(--cyan); padding-left: 7px; margin-left: -9px; }
+.market-group-held {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 999px;
+  color: var(--cyan);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 15px;
+  vertical-align: 1px;
+}

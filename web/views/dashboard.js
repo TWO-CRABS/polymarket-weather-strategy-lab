@@ -181,7 +181,7 @@ function yesDisplay(market) {
   return { value: null, isLast: false };
 }
 
-function groupMarkets(markets) {
+function groupMarkets(markets, heldMarketIds = null) {
   const groups = new Map();
   for (const market of markets) {
     const key = market.eventId || `${market.city || "未知城市"}`;
@@ -202,9 +202,13 @@ function groupMarkets(markets) {
       markets: items,
       sum,
       sumOk: Math.abs(sum - 1) <= 0.05,
+      hasPosition: Boolean(heldMarketIds && items.some((market) => heldMarketIds.has(market.id))),
     };
   });
-  list.sort((a, b) => String(a.city).localeCompare(String(b.city), "zh-CN"));
+  list.sort((a, b) => {
+    if (a.hasPosition !== b.hasPosition) return a.hasPosition ? -1 : 1;
+    return String(a.city).localeCompare(String(b.city), "zh-CN");
+  });
   return list;
 }
 
@@ -907,13 +911,18 @@ export async function mount(root, ctx) {
       if (el.marketFoot) el.marketFoot.innerHTML = '<span class="muted">暂无市场数据</span>';
       return;
     }
-    const groups = groupMarkets(markets);
+    const heldMarketIds = new Set(
+      (state.positions || [])
+        .filter((position) => (num(position.shares) || 0) > 0)
+        .map((position) => position.marketId),
+    );
+    const groups = groupMarkets(markets, heldMarketIds);
     el.marketGrid.innerHTML = groups.map((group) => {
       const sumPct = group.sum * 100;
       const sumCls = group.sumOk ? "muted" : "down";
-      return `<div class="market-group" role="group" aria-label="${ui.escapeHtml(group.city)} 温度市场">
+      return `<div class="market-group${group.hasPosition ? " has-position" : ""}" role="group" aria-label="${ui.escapeHtml(group.city)} 温度市场">
         <div class="market-group-head">
-          <span class="market-group-city">${ui.escapeHtml(group.city)} · 本地日</span>
+          <span class="market-group-city">${ui.escapeHtml(group.city)} · 本地日${group.hasPosition ? ' <span class="market-group-held">持仓</span>' : ""}</span>
           <span class="market-group-sum">${group.markets.length} 个括号 · 概率和 <b class="${sumCls}" title="${group.sumOk ? "概率和接近 100%" : "概率和偏离 100%（可能含价差/未定价括号）"}">${sumPct.toFixed(1)}%</b></span>
         </div>
         <div class="market-group-grid">${group.markets.map(renderMarketCard).join("")}</div>
@@ -1706,6 +1715,7 @@ export async function mount(root, ctx) {
           else if ((num(data.position.shares) || 0) > 0) state.positions.push(data.position);
           state.trades = trimTrades(state.trades);
           renderPositions();
+          renderMarkets();
         }
         return;
       }
@@ -1713,6 +1723,7 @@ export async function mount(root, ctx) {
         state.positions = Array.isArray(data.positions) ? data.positions : [];
         state.trades = trimTrades(state.trades);
         renderPositions();
+        renderMarkets();
         return;
       case "equity": {
         if (data.point && num(data.point.equity) !== null) {
