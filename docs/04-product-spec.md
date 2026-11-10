@@ -337,6 +337,7 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-32 | 策略构建器“市场范围”按当前 UTC 偏移（DST 感知）**升序**分组城市；每组显示 `时区(UTC±HH:MM)` 与当地日期时间，并支持一键全选/取消该组（`tests/city-timezones.test.js`） |
 | AC-33 | 策略构建器每个城市 chip 提供 Polymarket 官方事件外链，按**城市本地观察日**生成（如 UTC 已到 11/10 但洛杉矶仍是 11/9）；点击外链不改变城市勾选状态（`tests/city-events.test.js`） |
 | AC-34 | rejected entry 保存拒单瞬间 `marketSnapshot`（bid/ask/spread/流动性），成交详情优先显示该快照而不是当前行情（`tests/engine.test.js`） |
+| AC-35 | 成交明细支持按状态筛选：全部 / 已成交 / 部分成交 / 已拒绝；状态筛选与分组筛选可叠加，分组为「不分组」时仍可用（看板 `tradeStatusFilter`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

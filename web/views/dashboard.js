@@ -43,6 +43,13 @@ const TRADE_GROUP_OPTIONS = [
   { value: "reason", label: "按原因" },
 ];
 
+const TRADE_STATUS_OPTIONS = [
+  { value: "all", label: "全部状态" },
+  { value: "filled", label: "已成交" },
+  { value: "partial", label: "部分成交" },
+  { value: "rejected", label: "已拒绝" },
+];
+
 /* ------------------------------------------------------------------ */
 /* 小工具                                                              */
 /* ------------------------------------------------------------------ */
@@ -246,6 +253,7 @@ export async function mount(root, ctx) {
     equityRange: 0,
     tradeGroupBy: "none",
     tradeFilter: "all",
+    tradeStatusFilter: "all",
     signalFilter: "all",
     error: null,
     destroyed: false,
@@ -313,6 +321,7 @@ export async function mount(root, ctx) {
     tradeBadge: root.querySelector("#tradeCountBadge"),
     tradeGroupBy: root.querySelector("#tradeGroupBy"),
     tradeFilter: root.querySelector("#tradeFilter"),
+    tradeStatusFilter: root.querySelector("#tradeStatusFilter"),
     positionsBody: root.querySelector("#positionsBody"),
     positionsEmpty: root.querySelector("#positionsEmpty"),
     positionBadge: root.querySelector("#positionBadge"),
@@ -339,6 +348,10 @@ export async function mount(root, ctx) {
   });
   el.tradeFilter?.addEventListener("change", () => {
     state.tradeFilter = el.tradeFilter.value;
+    renderTrades();
+  });
+  el.tradeStatusFilter?.addEventListener("change", () => {
+    state.tradeStatusFilter = el.tradeStatusFilter.value;
     renderTrades();
   });
 
@@ -610,6 +623,12 @@ export async function mount(root, ctx) {
                   <span>分组</span>
                   <select class="input input-xs" id="tradeGroupBy" aria-label="成交明细分组方式">
                     ${TRADE_GROUP_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="trade-control">
+                  <span>状态</span>
+                  <select class="input input-xs" id="tradeStatusFilter" aria-label="成交明细状态筛选">
+                    ${TRADE_STATUS_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join("")}
                   </select>
                 </label>
                 <label class="trade-control">
@@ -1402,7 +1421,10 @@ export async function mount(root, ctx) {
       el.tradeFilter.value = state.tradeFilter;
       el.tradeFilter.disabled = groupBy === "none";
     }
-    const filteredRows = decorated.filter((row) => state.tradeFilter === "all" || groupValue(row) === state.tradeFilter);
+    const filteredRows = decorated.filter((row) => {
+      if (state.tradeStatusFilter !== "all" && row.trade.status !== state.tradeStatusFilter) return false;
+      return state.tradeFilter === "all" || groupValue(row) === state.tradeFilter;
+    });
     const rejectedKey = (trade) => `${trade.marketId || ""}|${trade.side || ""}|${trade.outcome || ""}`;
     const latestRejected = new Map();
     for (const row of filteredRows) {
