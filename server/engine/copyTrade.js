@@ -6,7 +6,7 @@
  * static leaderboard are tried in order. All orders use normal risk checks.
  */
 import { newId } from "../util.js";
-import { TRADER_REACTION_LEADERBOARD } from "../../shared/traderReactionLeaderboard.js";
+import { TRADER_REACTION_LEADERBOARDS } from "../../shared/traderReactionLeaderboards.js";
 import { releaseNodeForCity } from "./metarReleaseWindow.js";
 import { executeExit, tryEntry } from "./runTrading.js";
 
@@ -17,10 +17,9 @@ function normalizedWallet(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function leaderboardSubstitutes(minRatePct) {
-  const users = Array.isArray(TRADER_REACTION_LEADERBOARD?.users)
-    ? TRADER_REACTION_LEADERBOARD.users
-    : [];
+function leaderboardSubstitutes(city, minRatePct) {
+  const cityUsers = TRADER_REACTION_LEADERBOARDS?.cities?.[city]?.users;
+  const users = Array.isArray(cityUsers) ? cityUsers : [];
   return users
     .filter((user) => user && user.wallet)
     .filter((user) => user.eligible === true || (
@@ -33,12 +32,12 @@ function leaderboardSubstitutes(minRatePct) {
     .filter(Boolean);
 }
 
-function candidateWallets(run, opts = {}) {
+function candidateWallets(run, city, opts = {}) {
   const cfg = run.config.signal;
   const primary = normalizedWallet(cfg.copyTraderUser);
   const subs = Array.isArray(opts.substitutes)
     ? opts.substitutes.map(normalizedWallet).filter(Boolean)
-    : leaderboardSubstitutes(Number(cfg.copyTraderMinReactionRatePct) || 90);
+    : leaderboardSubstitutes(city, Number(cfg.copyTraderMinReactionRatePct) || 90);
   const all = [];
   if (primary) all.push({ wallet: primary, source: "primary" });
   for (const wallet of subs) {
@@ -74,12 +73,12 @@ function activeReleaseWindow(run, now, store) {
   return { nodeTs, groups: list, allowedMarketIds, byCondition };
 }
 
-async function fetchUserTrades(run, wallet, now, active) {
+async function fetchUserTrades(run, wallet, now, nodeTs) {
   if (typeof run.source?.getPublicTrades !== "function") return [];
-  const windowMs = (Number(run.config.signal.metarReleaseWindowSec) || 120) * 1000;
+  const windowMs = (Number(run.config.signal.metarReleaseWindowSec) || 300) * 1000;
   const start = Math.max(
     Number(run.startedAt || 0),
-    Number(active.nodeTs) - windowMs,
+    Number(nodeTs) - windowMs,
     now - TRADE_WINDOW_SEC * 1000,
   );
   const end = Math.floor(now / 1000);
@@ -174,29 +173,37 @@ export async function processCopyTrades(run, now, opts = {}) {
   if (!run._copyTradeSeen) run._copyTradeSeen = new Set();
   const active = activeReleaseWindow(run, now, opts.store);
   if (!active) return;
-  const candidates = candidateWallets(run, opts);
-  if (!candidates.length) return;
-  const primary = candidates.find((c) => c.source === "primary");
+  if (!run._copyPrimaryNodes) run._copyPrimaryNodes = new Map();
   const fallbackDelayMs = Math.max(0, Number(cfg.copyTraderFallbackDelaySec) || 0) * 1000;
-  const primaryDone = run._copyPrimaryNode === active.nodeTs;
-  const tryList = primaryDone ? [] : candidates;
 
-  for (const candidate of tryList) {
-    if (candidate.source === "substitute" && now < active.nodeTs + fallbackDelayMs) continue;
-    const trades = await fetchUserTrades(run, candidate.wallet, now, active);
-    if (!trades.length) continue;
-    const windowMs = (Number(cfg.metarReleaseWindowSec) || 120) * 1000;
-    const eligible = trades
-      .filter((trade) => Number(trade.timestamp) * 1000 >= Math.max(Number(run.startedAt || 0), Number(active.nodeTs) - windowMs))
-      .filter((trade) => active.allowedMarketIds.has(marketForTrade(run, trade, active)?.id))
-      .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
-    for (const trade of eligible) {
-      const market = marketForTrade(run, trade, active);
-      if (!market) continue;
-      const copied = await copyOneTrade(run, market, trade, candidate.source, now);
-      if (copied) {
-        if (candidate.source === "primary") run._copyPrimaryNode = active.nodeTs;
-        return;
+  for (const group of active.groups) {
+    const candidates = candidateWallets(run, group.city, opts);
+    if (!candidates.length) continue;
+    const primaryDone = run._copyPrimaryNodes.get(group.city) === group.node.nodeTs;
+    const tryList = primaryDone ? [] : candidates;
+    for (const candidate of tryList) {
+      if (candidate.source === "substitute" && now < group.node.nodeTs + fallbackDelayMs) continue;
+      const trades = await fetchUserTrades(run, candidate.wallet, now, group.node.nodeTs);
+      if (!trades.length) continue;
+      const windowMs = (Number(cfg.metarReleaseWindowSec) || 300) * 1000;
+      const eligible = trades
+        .filter((trade) => Number(trade.timestamp) * 1000 >= Math.max(Number(run.startedAt || 0), Number(group.node.nodeTs) - windowMs))
+        .filter((trade) => marketForTrade(run, trade, {
+          byCondition: group.conditions,
+          allowedMarketIds: new Set(group.markets.keys()),
+        }))
+        .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+      for (const trade of eligible) {
+        const market = marketForTrade(run, trade, {
+          byCondition: group.conditions,
+          allowedMarketIds: new Set(group.markets.keys()),
+        });
+        if (!market) continue;
+        const copied = await copyOneTrade(run, market, trade, candidate.source, now);
+        if (copied) {
+          if (candidate.source === "primary") run._copyPrimaryNodes.set(group.city, group.node.nodeTs);
+          break;
+        }
       }
     }
   }

@@ -12,6 +12,7 @@
 import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { spawn } from "node:child_process";
 
 import { config } from "./config.js";
 import { Store } from "./store.js";
@@ -246,6 +247,25 @@ async function main() {
     "info",
     `feed mode=${config.feedMode} pollMs=${config.pollMs} discoveryMs=${config.discoveryMs} dataDir=${config.dataDir}`,
   );
+
+  // Incremental trader-reaction sync: the script reads the local manifest,
+  // fetches only missing city/date events, then rebuilds per-city rankings.
+  // Run detached so a long backfill never blocks the HTTP server.
+  if (process.env.NODE_ENV !== "test" && process.env.TRADER_REACTION_SYNC !== "off") {
+    try {
+      const script = path.resolve(import.meta.dirname, "..", "scripts", "sync-trader-reactions.mjs");
+      const child = spawn(process.execPath, [script, "--incremental", "--from=2026-10-23"], {
+        cwd: path.resolve(import.meta.dirname, ".."),
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      child.unref();
+      log("info", `trader-reaction incremental sync started (pid=${child.pid})`);
+    } catch (err) {
+      log("warn", `trader-reaction sync failed to start: ${err.message}`);
+    }
+  }
 
   /* ------------------------------ shutdown ------------------------------- */
   let shuttingDown = false;
