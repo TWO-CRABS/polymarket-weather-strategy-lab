@@ -14,7 +14,8 @@
  *   5. Data API /v2/prices-history: 60s midpoint series for each target YES
  *      token around its node → baseline at node-120s + first reprice.
  *   6. Aggregate per wallet: ahead events / qualified events, reaction rate,
- *      Wilson lower bound; eligible = qualified>=100 && wilsonLower>0.9.
+ *      Wilson lower bound; eligible = allQualifiedNodes>=100 && wilsonLower>0.9.
+ *      denominator = ALL qualified warming nodes, not only nodes where the wallet traded.
  *
  * Writes shared/traderReactionLeaderboard.js:
  *   export const TRADER_REACTION_LEADERBOARD = { generatedAt,
@@ -416,7 +417,8 @@ async function main() {
     ` * users: ${aggregate.users.length} wallets with >=1 qualified observation; eligible: ${aggregate.users.filter((user) => user.eligible).length}`,
     " * definition: ahead = direction-correct trade (BUY YES or SELL NO target) inside",
     " * node ±120s and strictly before the first >= max(0.05, 2 ticks) target reprice;",
-    " * qualified (per wallet) = qualified nodes where the wallet traded the target at all.",
+    " * qualified (per wallet) = number of qualified nodes where the wallet traded the",
+    " * target at all (shown as `involved`); reactionRate denominator = all qualified nodes.",
     " */",
     "",
     "export const TRADER_REACTION_LEADERBOARD = " + JSON.stringify(payload, null, 2) + ";",

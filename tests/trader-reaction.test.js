@@ -420,6 +420,28 @@ test("computeTraderReactionStats aggregates ahead/qualified per wallet (dedupe +
   assert.equal(stats.totals.directionCorrectTrades, 6);
 });
 
+test("reaction rate uses all qualified warming nodes as the denominator", () => {
+  const { nodes, priceByToken } = nodeFixtures();
+  // Make node B qualified too; W1 is ahead on A and B, W2 only on A.
+  priceByToken.set("yes-b", [{ ts: 1880, price: 0.5 }, { ts: 2100, price: 0.6 }]);
+  const stats = computeTraderReactionStats({
+    warmingNodes: nodes,
+    targetMarketTrades: tradeFixtures(),
+    priceByToken,
+  });
+  assert.equal(stats.qualifiedWarmingNodes, 2);
+  const byWallet = new Map(stats.users.map((user) => [user.wallet, user]));
+  assert.equal(byWallet.get("0xw1").ahead, 2);
+  assert.equal(byWallet.get("0xw1").qualified, 2);
+  assert.equal(byWallet.get("0xw1").reactionRate, 1);
+  assert.equal(byWallet.get("0xw2").ahead, 1);
+  assert.equal(byWallet.get("0xw2").qualified, 2);
+  assert.equal(byWallet.get("0xw2").reactionRate, 0.5, "not inflated to 1/1=100%");
+  assert.equal(byWallet.get("0xw3").reactionRate, 0);
+  assert.equal(byWallet.get("0xw1").involved, 2);
+  assert.equal(byWallet.get("0xw2").involved, 1);
+});
+
 test("computeTraderReactionStats eligibility thresholds are configurable", () => {
   const { nodes, priceByToken } = nodeFixtures();
   const stats = computeTraderReactionStats({

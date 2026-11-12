@@ -506,20 +506,25 @@ export function computeTraderReactionStats(input) {
   for (const count of aheadByWallet.values()) aheadTradeTotal += count;
 
   const users = [];
-  for (const [wallet, qualified] of qualifiedByWallet) {
-    if (qualified <= 0) continue;
-    const ahead = Math.min(aheadByWallet.get(wallet) ?? 0, qualified);
-    const reactionRate = ahead / qualified;
-    const lower = wilsonLowerBound(ahead, qualified, options.wilsonZ);
+  const qualifiedNodeCount = nodes.filter((node) => node.qualified).length;
+  for (const [wallet, involved] of qualifiedByWallet) {
+    if (involved <= 0) continue;
+    const ahead = Math.min(aheadByWallet.get(wallet) ?? 0, qualifiedNodeCount);
+    // Recommended formula: denominator is ALL qualified warming nodes, not
+    // only the nodes in which this wallet happened to trade. The latter
+    // inflates 1/1 or 2/2 users into misleading 100% rates.
+    const reactionRate = qualifiedNodeCount > 0 ? ahead / qualifiedNodeCount : 0;
+    const lower = wilsonLowerBound(ahead, qualifiedNodeCount, options.wilsonZ);
     users.push({
       wallet,
       pseudonym: pseudonymByWallet.get(wallet) ?? "",
       reactionRate: Number(reactionRate.toFixed(6)),
       per100: Number((reactionRate * 100).toFixed(3)),
       ahead,
-      qualified,
+      qualified: qualifiedNodeCount,
+      involved,
       wilsonLower: Number(lower.toFixed(6)),
-      eligible: qualified >= options.eligibleMinQualified && lower > options.eligibleMinWilson,
+      eligible: qualifiedNodeCount >= options.eligibleMinQualified && lower > options.eligibleMinWilson,
     });
   }
   users.sort((a, b) => (

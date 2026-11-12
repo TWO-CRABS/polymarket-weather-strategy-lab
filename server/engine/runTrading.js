@@ -570,7 +570,7 @@ function fallbackPendingKey(eventKey, marketId, outcome) {
 
 /** True when this event group is inside a known METAR release guard window. */
 export function fallbackBlockedByMetarRelease(run, market, now) {
-  if (run?.config?.signal?.metarReleaseEnabled === false) return false;
+  if (run?.config?.signal?.metarReleaseEnabled !== true) return false;
   if (!run?.config?.execution?.fallbackAllowInMetarWindow) {
     // Imported lazily to keep the data-store module out of engine unit fixtures.
     return isFallbackBlockedAtMetarRelease(market?.city, now, 300);
