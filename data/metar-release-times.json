@@ -490,14 +490,14 @@
     },
     "Wellington": {
       "station": "NZWN",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T11:10:11.788Z"
     },
     "Wuhan": {
       "station": "ZHHH",

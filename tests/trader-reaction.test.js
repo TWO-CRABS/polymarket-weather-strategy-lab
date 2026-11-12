@@ -31,6 +31,11 @@ import {
   wilsonLowerBound,
 } from "../server/research/traderReaction.js";
 
+const computeFixed = (input) => computeTraderReactionStats({
+  ...input,
+  options: { preWindowSec: 120, postWindowSec: 120, ...(input?.options || {}) },
+});
+
 /* ------------------------------------------------------------------------- */
 /* Bracket parsing + temperature mapping                                     */
 /* ------------------------------------------------------------------------- */
@@ -372,7 +377,7 @@ function tradeFixtures() {
 
 test("computeTraderReactionStats aggregates ahead/qualified per wallet (dedupe + direction + window)", () => {
   const { nodes, priceByToken } = nodeFixtures();
-  const stats = computeTraderReactionStats({
+  const stats = computeFixed({
     warmingNodes: nodes,
     targetMarketTrades: tradeFixtures(),
     priceByToken,
@@ -424,7 +429,7 @@ test("reaction rate uses all qualified warming nodes as the denominator", () => 
   const { nodes, priceByToken } = nodeFixtures();
   // Make node B qualified too; W1 is ahead on A and B, W2 only on A.
   priceByToken.set("yes-b", [{ ts: 1880, price: 0.5 }, { ts: 2100, price: 0.6 }]);
-  const stats = computeTraderReactionStats({
+  const stats = computeFixed({
     warmingNodes: nodes,
     targetMarketTrades: tradeFixtures(),
     priceByToken,
@@ -444,7 +449,7 @@ test("reaction rate uses all qualified warming nodes as the denominator", () => 
 
 test("computeTraderReactionStats eligibility thresholds are configurable", () => {
   const { nodes, priceByToken } = nodeFixtures();
-  const stats = computeTraderReactionStats({
+  const stats = computeFixed({
     warmingNodes: nodes,
     targetMarketTrades: tradeFixtures(),
     priceByToken,
@@ -456,7 +461,7 @@ test("computeTraderReactionStats eligibility thresholds are configurable", () =>
   assert.equal(byWallet.get("0xw3").eligible, false);
   assert.equal(byWallet.get("0xw4").eligible, false);
   // contract default: eligible iff qualified>=100 && wilsonLower>0.9
-  const defaults = computeTraderReactionStats({ warmingNodes: nodes, targetMarketTrades: tradeFixtures(), priceByToken });
+  const defaults = computeFixed({ warmingNodes: nodes, targetMarketTrades: tradeFixtures(), priceByToken });
   for (const user of defaults.users) {
     assert.equal(user.eligible, user.qualified >= 100 && user.wilsonLower > 0.9);
   }
@@ -466,7 +471,7 @@ test("baseline quality gates disqualify sentinel/absent baselines", () => {
   const { nodes } = nodeFixtures();
   const trades = tradeFixtures();
   // sentinel baseline 0.0005 is below minBaselineMid -> node unqualified even if the mid 'moves'
-  const stats = computeTraderReactionStats({
+  const stats = computeFixed({
     warmingNodes: [nodes[0]],
     targetMarketTrades: trades,
     priceByToken: new Map([["yes-a", [{ ts: 880, price: 0.0005 }, { ts: 1060, price: 0.2 }]]]),
@@ -475,7 +480,7 @@ test("baseline quality gates disqualify sentinel/absent baselines", () => {
   assert.equal(stats.users.length, 0);
 
   // missing history -> unqualified
-  const missing = computeTraderReactionStats({
+  const missing = computeFixed({
     warmingNodes: [nodes[0]],
     targetMarketTrades: trades,
     priceByToken: new Map(),
@@ -486,14 +491,14 @@ test("baseline quality gates disqualify sentinel/absent baselines", () => {
 
 test("computeTraderReactionStats is deterministic and defaults are exposed", () => {
   const { nodes, priceByToken } = nodeFixtures();
-  const run = () => computeTraderReactionStats({
+  const run = () => computeFixed({
     warmingNodes: nodes,
     targetMarketTrades: tradeFixtures(),
     priceByToken,
   });
   assert.deepEqual(run(), run());
-  assert.equal(REACTION_DEFAULTS.preWindowSec, 120);
-  assert.equal(REACTION_DEFAULTS.postWindowSec, 120);
+  assert.equal(REACTION_DEFAULTS.preWindowSec, 300);
+  assert.equal(REACTION_DEFAULTS.postWindowSec, 300);
   assert.equal(REACTION_DEFAULTS.minMove, 0.05);
   assert.equal(REACTION_DEFAULTS.eligibleMinQualified, 100);
   assert.equal(REACTION_DEFAULTS.eligibleMinWilson, 0.9);

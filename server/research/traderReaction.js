@@ -21,6 +21,7 @@
  * Terminology / defaults
  * ----------------------
  * - nodeTs            epoch seconds of the METAR report that entered a new bracket.
+ *                     reaction window is ±300s (±5 min) by default.
  * - baseline          target YES mid at `nodeTs - 120s` (latest known before the node).
  * - reprice           first target YES mid after `nodeTs` whose absolute move vs
  *                     baseline is >= max(minMove, 2 × tickSize); sign is recorded
@@ -35,9 +36,9 @@
 /** Default tunables (documented in the script and the QA report). */
 export const REACTION_DEFAULTS = Object.freeze({
   /** window before the METAR node (seconds) */
-  preWindowSec: 120,
+  preWindowSec: 300,
   /** window after the METAR node (seconds) */
-  postWindowSec: 120,
+  postWindowSec: 300,
   /** baseline/reprice tolerance */
   minMove: 0.05,
   /** price ticks used in max(minMove, 2 ticks) */

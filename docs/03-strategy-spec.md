@@ -53,7 +53,7 @@
     "requireSpreadOk": true,             // true 时 spread 超限不产生入场信号
     "recordObservation": true,           // 价格带外动量记录为不可交易观察信号
     "metarReleaseEnabled": true,         // METAR 温度发布窗口信号
-    "metarReleaseWindowSec": 120,        // 10..600，节点前后窗口（默认各 2 分钟）
+    "metarReleaseWindowSec": 300,        // 10..600，节点前后窗口（默认各 5 分钟）
     "metarReleaseMinProbabilityPct": 50, // 1..99，严格大于该概率才触发
     "metarReleaseRequireRising": true,   // 是否要求当前概率高于发布前基准
     "copyTraderEnabled": false,          // 跟买/跟卖公开钱包

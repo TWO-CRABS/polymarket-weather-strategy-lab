@@ -183,7 +183,7 @@ export const DEFAULT_STRATEGY = Object.freeze({
     recordObservation: true,
     /** METAR 温度发布窗口信号 */
     metarReleaseEnabled: true,
-    metarReleaseWindowSec: 120,
+    metarReleaseWindowSec: 300,
     metarReleaseMinProbabilityPct: 50,
     metarReleaseRequireRising: true,
     /** 跟买/跟卖某个公开钱包；替补使用 reaction leaderboard 前三 */
