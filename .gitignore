@@ -1,6 +1,7 @@
 # Runtime / generated data (只忽略仓库根目录的 data/，不要忽略 server/data 源码)
 node_modules/
-/data/
+/data/*
+!/data/metar-release-times.json
 *.log
 *.tmp
 

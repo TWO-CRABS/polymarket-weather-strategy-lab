@@ -243,6 +243,60 @@ export class ClobClient {
     }
   }
 
+  /**
+   * Public trade tape: Data API v2 `/v2/trades`.
+   *
+   * Filters: `user` (proxy wallet), `condition` (condition id(s)), `event_id`
+   * (Gamma event id(s)). `start`/`end` are epoch seconds and are only honored
+   * by the API on the `user` shape (the condition/event shapes serve a fixed
+   * three-year window); they are still forwarded when supplied.
+   * Pagination is keyset-based: pass `cursor` / follow `pagination.next_cursor`.
+   *
+   * Note: the API has no token filter — condition/event feeds include both YES
+   * and NO tokens, so callers must match `token_id` client-side.
+   *
+   * @param {{user?:string, condition?:string|string[], eventId?:string|string[]|number,
+   *   limit?:number, cursor?:string|null, start?:number, end?:number,
+   *   takerOnly?:boolean}} [opts]
+   * @returns {Promise<{data:Array<object>, pagination:{limit:number, offset:number,
+   *   has_more:boolean, next_cursor:string|null}}>}
+   */
+  async getPublicTrades(opts = {}) {
+    const limit = Math.min(1000, Math.max(1, Math.floor(Number(opts.limit) || 100)));
+    const params = new URLSearchParams();
+    params.set("limit", String(limit));
+    if (opts.user) params.set("user", String(opts.user));
+    if (opts.condition) {
+      params.set("condition", Array.isArray(opts.condition) ? opts.condition.join(",") : String(opts.condition));
+    }
+    if (opts.eventId !== undefined && opts.eventId !== null && opts.eventId !== "") {
+      params.set("event_id", Array.isArray(opts.eventId) ? opts.eventId.join(",") : String(opts.eventId));
+    }
+    if (opts.cursor) params.set("cursor", String(opts.cursor));
+    const start = Number(opts.start);
+    const end = Number(opts.end);
+    if (Number.isFinite(start)) params.set("start", String(Math.floor(start)));
+    if (Number.isFinite(end)) params.set("end", String(Math.floor(end)));
+    if (opts.takerOnly === true) params.set("taker_only", "true");
+    else if (opts.takerOnly === false) params.set("taker_only", "false");
+
+    const json = await this._request(`${this.dataBase}/v2/trades?${params.toString()}`);
+    const data = Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray(json)
+        ? json
+        : [];
+    const pagination = json?.pagination && typeof json.pagination === "object"
+      ? {
+          limit: Number(json.pagination.limit) || limit,
+          offset: Number(json.pagination.offset) || 0,
+          has_more: Boolean(json.pagination.has_more),
+          next_cursor: json.pagination.next_cursor ?? null,
+        }
+      : { limit, offset: 0, has_more: false, next_cursor: null };
+    return { data, pagination };
+  }
+
   _mapHistory(rows) {
     const points = [];
     for (const row of rows) {

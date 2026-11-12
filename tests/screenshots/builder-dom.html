@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">19:11:48</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">18:47:21</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -171,7 +171,7 @@
       <header class="panel-head">
         <span class="panel-step">02</span>
         <div class="panel-title"><h2 id="h-signal">信号规则</h2><p>滚动窗口动量：窗口内涨跌幅 ≥ 阈值触发；UP 买入 YES，DOWN 买入 NO。</p></div>
-        <span class="badge badge-ghost">10 项参数</span>
+        <span class="badge badge-ghost">18 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
         <label class="field-label" for="f-signal-priceField">参考价格字段<button type="button" class="help-dot" data-tip="用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。" aria-label="说明：用哪个价格计算涨跌幅：mid=中间价（推荐，稳定）；last=最新成交（可能很久不更新）；best_bid/best_ask=买一/卖一价（会随盘口跳动）。">?</button></label>
@@ -229,12 +229,50 @@
           <span class="switch"><input type="checkbox" id="f-signal-recordObservation" data-path="signal.recordObservation" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
         </label>
         <p class="hint"><button type="button" class="help-dot" data-tip="动量成立但最新价已在价格带外（或点差超限）时，不产生入场单，只在信号流记录一条“观察·不可交易”信号，便于分析概率坍缩。默认开启，不产生成交。" aria-label="说明：动量成立但最新价已在价格带外（或点差超限）时，不产生入场单，只在信号流记录一条“观察·不可交易”信号，便于分析概率坍缩。默认开启，不产生成交。">?</button>动量成立但价格带/点差不允许入场时，在信号流中标记为“观察·不可交易”，不会下单</p>
-      </div></div></div>
+      </div><div class="field switch-field">
+        <label class="switch-row" for="f-signal-metarReleaseEnabled">
+          <span class="field-label">METAR 温度发布窗口信号</span>
+          <span class="switch"><input type="checkbox" id="f-signal-metarReleaseEnabled" data-path="signal.metarReleaseEnabled" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
+        </label>
+        <p class="hint"><button type="button" class="help-dot" data-tip="城市本地 METAR 温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES，并卖出目标 NO、同城市/同日期其它 YES。执行顺序固定：兜底建仓先执行，发布信号后执行；仍走正常风控。" aria-label="说明：城市本地 METAR 温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES，并卖出目标 NO、同城市/同日期其它 YES。执行顺序固定：兜底建仓先执行，发布信号后执行；仍走正常风控。">?</button>城市本地温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES；卖出目标 NO 和同城市/同日期其它 YES。兜底建仓始终先执行</p>
+      </div></div><div class="field-row field-row-4"><div class="field">
+      <label class="field-label" for="f-signal-metarReleaseWindowSec">发布窗口前后 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="发布节点前后各多少秒内视为窗口，默认 120 秒（前后各 2 分钟）。" aria-label="说明：发布节点前后各多少秒内视为窗口，默认 120 秒（前后各 2 分钟）。">?</button></label>
+      <input class="input num" type="number" id="f-signal-metarReleaseWindowSec" data-path="signal.metarReleaseWindowSec" data-kind="number" data-min="10" data-max="600" data-step="10" min="10" max="600" step="10" value="120" inputmode="decimal">
+      <span class="field-help">默认 120 秒 = 节点前后各 2 分钟</span>
+    </div><div class="field">
+      <label class="field-label" for="f-signal-metarReleaseMinProbabilityPct">最低概率 <span class="hint">%</span><button type="button" class="help-dot" data-tip="当前 YES 概率必须严格大于该百分比才触发；默认 50。" aria-label="说明：当前 YES 概率必须严格大于该百分比才触发；默认 50。">?</button></label>
+      <input class="input num" type="number" id="f-signal-metarReleaseMinProbabilityPct" data-path="signal.metarReleaseMinProbabilityPct" data-kind="number" data-min="1" data-max="99" data-step="1" min="1" max="99" step="1" value="50" inputmode="decimal">
+      <span class="field-help">严格大于该值才触发；默认 50</span>
+    </div><div class="field switch-field">
+        <label class="switch-row" for="f-signal-metarReleaseRequireRising">
+          <span class="field-label">要求概率相对发布前上涨</span>
+          <span class="switch"><input type="checkbox" id="f-signal-metarReleaseRequireRising" data-path="signal.metarReleaseRequireRising" data-kind="toggle" checked=""><i aria-hidden="true"></i></span>
+        </label>
+        <p class="hint"><button type="button" class="help-dot" data-tip="开启时要求当前概率高于节点前基准；关闭时只看是否超过最低概率。" aria-label="说明：开启时要求当前概率高于节点前基准；关闭时只看是否超过最低概率。">?</button>开启时要求当前概率高于节点前基准；关闭则只看是否超过最低概率</p>
+      </div><div class="field switch-field">
+        <label class="switch-row" for="f-signal-copyTraderEnabled">
+          <span class="field-label">跟买/跟卖信号</span>
+          <span class="switch"><input type="checkbox" id="f-signal-copyTraderEnabled" data-path="signal.copyTraderEnabled" data-kind="toggle"><i aria-hidden="true"></i></span>
+        </label>
+        <p class="hint"><button type="button" class="help-dot" data-tip="开启后在 METAR 发布窗口内跟随指定钱包在当前订阅天气市场的公开交易；买入跟买、卖出只跟卖已持有仓位。" aria-label="说明：开启后在 METAR 发布窗口内跟随指定钱包在当前订阅天气市场的公开交易；买入跟买、卖出只跟卖已持有仓位。">?</button>在 METAR 发布窗口内跟随指定钱包在已订阅天气市场的公开交易；主用户 30 秒无动作后用反应率前三替补</p>
+      </div></div><div class="field-row field-row-4"><div class="field">
+        <label class="field-label" for="f-signal-copyTraderUser">跟单钱包地址<button type="button" class="help-dot" data-tip="要跟随的 Polymarket proxy wallet（0x 开头 40 字节）。留空则不跟单。" aria-label="说明：要跟随的 Polymarket proxy wallet（0x 开头 40 字节）。留空则不跟单。">?</button></label>
+        <input class="input" type="text" id="f-signal-copyTraderUser" data-path="signal.copyTraderUser" data-kind="text" value="" placeholder="0x...（留空则不跟单）">
+        <span class="field-help">proxy wallet 地址；只复制动作，不复制仓位大小，仍走正常风控</span>
+      </div><div class="field">
+      <label class="field-label" for="f-signal-copyTraderFallbackDelaySec">替补等待 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="主用户在该发布窗口内无动作时，等待多少秒后按反应率前三替补依次尝试。" aria-label="说明：主用户在该发布窗口内无动作时，等待多少秒后按反应率前三替补依次尝试。">?</button></label>
+      <input class="input num" type="number" id="f-signal-copyTraderFallbackDelaySec" data-path="signal.copyTraderFallbackDelaySec" data-kind="number" data-min="0" data-max="300" data-step="1" min="0" max="300" step="1" value="30" inputmode="decimal">
+      <span class="field-help">主用户在该节点窗口内无动作后，等待多久启用前三替补</span>
+    </div><div class="field">
+      <label class="field-label" for="f-signal-copyTraderMinReactionRatePct">替补最低反应率 <span class="hint">%</span><button type="button" class="help-dot" data-tip="替补候选的最低优先市场反应率（Wilson 下界）；默认 90%。" aria-label="说明：替补候选的最低优先市场反应率（Wilson 下界）；默认 90%。">?</button></label>
+      <input class="input num" type="number" id="f-signal-copyTraderMinReactionRatePct" data-path="signal.copyTraderMinReactionRatePct" data-kind="number" data-min="0" data-max="100" data-step="1" min="0" max="100" step="1" value="90" inputmode="decimal">
+      <span class="field-help">榜单 Wilson 下界高于该值才纳入替补；默认 90</span>
+    </div></div></div>
     </section><section class="panel" aria-labelledby="h-execution">
       <header class="panel-head">
         <span class="panel-step">03</span>
         <div class="panel-title"><h2 id="h-execution">执行与仓位</h2><p>市价单按真实盘口逐档吃单（VWAP），计入滑点与官方 taker 手续费。</p></div>
-        <span class="badge badge-ghost">8 项参数</span>
+        <span class="badge badge-ghost">9 项参数</span>
       </header>
       <div class="panel-body"><div class="field-row field-row-4"><div class="field">
         <span class="field-label">订单类型<button type="button" class="help-dot" data-tip="系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。" aria-label="说明：系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。">?</button></span>
@@ -282,7 +320,13 @@
       <label class="field-label" for="f-execution-fallbackMinTopGapPct">兜底 YES 最低概率差 <span class="hint">%</span><button type="button" class="help-dot" data-tip="仅兜底买 YES：第一高概率减第二高概率 ≥ 该百分点才买；例如 70% vs 20% = 50 点，≥40 可买。0 = 不限制。" aria-label="说明：仅兜底买 YES：第一高概率减第二高概率 ≥ 该百分点才买；例如 70% vs 20% = 50 点，≥40 可买。0 = 不限制。">?</button></label>
       <input class="input num" type="number" id="f-execution-fallbackMinTopGapPct" data-path="execution.fallbackMinTopGapPct" data-kind="number" data-min="0" data-max="100" data-step="1" min="0" max="100" step="1" value="40" inputmode="decimal">
       <span class="field-help">仅兜底买 YES：第一高概率 − 第二高概率 ≥ 该百分点才买；0 = 不限制</span>
-    </div></div></div>
+    </div><div class="field switch-field">
+        <label class="switch-row" for="f-execution-fallbackAllowInMetarWindow">
+          <span class="field-label">节点窗口内允许兜底建仓</span>
+          <span class="switch"><input type="checkbox" id="f-execution-fallbackAllowInMetarWindow" data-path="execution.fallbackAllowInMetarWindow" data-kind="toggle"><i aria-hidden="true"></i></span>
+        </label>
+        <p class="hint"><button type="button" class="help-dot" data-tip="默认关闭：METAR 发布节点前后各 5 分钟内不新建/不重试兜底仓位；打开后恢复兜底建仓。" aria-label="说明：默认关闭：METAR 发布节点前后各 5 分钟内不新建/不重试兜底仓位；打开后恢复兜底建仓。">?</button>默认关闭：METAR 发布节点前后各 5 分钟内不建仓/不重试兜底；打开后恢复兜底</p>
+      </div></div></div>
     </section><section class="panel" aria-labelledby="h-exit">
       <header class="panel-head">
         <span class="panel-step">04</span>

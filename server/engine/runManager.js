@@ -319,6 +319,7 @@ export class RunManager {
       getBook: (tokenId) => feed.getBook(tokenId),
       getHistory: (tokenId, seconds) => feed.getHistory(tokenId, seconds),
       getLatest: (tokenId) => feed.getLatest(tokenId),
+      getPublicTrades: (opts) => this.clob.getPublicTrades(opts),
     };
   }
 

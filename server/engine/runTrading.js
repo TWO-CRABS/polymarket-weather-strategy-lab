@@ -10,6 +10,7 @@ import { calcTakerFee } from "./fee.js";
 import { bookMid, simulateBuy, simulateSell } from "./execution.js";
 import { evaluateSignal, createSignalState } from "./signal.js";
 import { effectiveTradingEndMs, sideDepthUsd } from "../data/gamma.js";
+import { isFallbackBlockedAtMetarRelease } from "./metarReleaseWindow.js";
 import { newId, roundTo } from "../util.js";
 
 export const RESOLUTION_POLL_MS = 20_000;
@@ -126,6 +127,9 @@ export function recordObservationSignal(run, market, candidate, now) {
 export async function processMarkets(run, now) {
   for (const market of run.markets.values()) {
     if (!market || market.closed) continue;
+    // Release signal owns this event group until its node window ends; do not
+    // let momentum/fallback buy back positions that were just rotated.
+    if (run._metarReleaseLockedGroups?.has(fallbackEventKey(market))) continue;
     const yesBook = run.source?.getBook ? run.source.getBook(market.tokens.yesTokenId) : null;
     const hash = yesBook?.hash || "";
     const lastHash = run._lastBookHash.get(market.id);
@@ -564,13 +568,23 @@ function fallbackPendingKey(eventKey, marketId, outcome) {
   return `${eventKey}|${marketId}|${outcome}`;
 }
 
+/** True when this event group is inside a known METAR release guard window. */
+export function fallbackBlockedByMetarRelease(run, market, now) {
+  if (run?.config?.signal?.metarReleaseEnabled === false) return false;
+  if (!run?.config?.execution?.fallbackAllowInMetarWindow) {
+    // Imported lazily to keep the data-store module out of engine unit fixtures.
+    return isFallbackBlockedAtMetarRelease(market?.city, now, 300);
+  }
+  return false;
+}
+
 /**
  * 城市/日期事件内的兜底 legs。
  * - 初始/事件无持仓：按当前概率排名生成 rank-1 YES + rank-3 NO。
  * - 同组已有持仓：不再新增普通 legs，但此前失败的 leg 必须每窗口重试；
  *   这样 36°C NO 成交后，34°C YES 的失败 leg 仍会继续尝试。
  */
-export function planFallbackOrders(run) {
+export function planFallbackOrders(run, now = Date.now()) {
   if (!run._fallbackPending) run._fallbackPending = new Map();
   const legs = [];
   const planned = new Set();
@@ -581,6 +595,8 @@ export function planFallbackOrders(run) {
     legs.push(leg);
   };
   for (const group of groupFallbackCandidates(run)) {
+    // METAR 发布节点前后 5 分钟内默认暂停兜底（pending 保留，窗口后再重试）。
+    if (fallbackBlockedByMetarRelease(run, group.candidates[0]?.market, now)) continue;
     const rank1 = group.candidates[0];
     const rank2 = group.candidates[1];
     const rank3 = group.candidates[2];
@@ -646,7 +662,7 @@ export async function maybePeriodicFallback(run, now) {
   // 每个窗口最多检查一次；按 now 重新对齐，避免长缺口后连续补发
   run._fallbackNextAt = now + windowMs;
 
-  const legs = planFallbackOrders(run);
+  const legs = planFallbackOrders(run, now);
   if (!legs.length) return { checked: true, skipped: "no_leg" };
 
   const results = [];

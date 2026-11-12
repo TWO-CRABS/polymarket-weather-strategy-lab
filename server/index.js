@@ -19,6 +19,8 @@ import { SseHub } from "./sse.js";
 import { ClobClient } from "./data/clob.js";
 import { Feed } from "./data/feed.js";
 import { TemperatureDiscovery } from "./data/gamma.js";
+import { startMetarReleaseScheduler } from "./data/metarReleaseScheduler.js";
+import { stopMetarReleaseScheduler } from "./data/metarReleaseScheduler.js";
 import { RunManager } from "./engine/runManager.js";
 import { createApiHandler } from "./api.js";
 import { FEES, STRATEGY_PRESETS } from "../shared/contract.js";
@@ -193,6 +195,15 @@ async function main() {
     discovery.start();
     runs.applyFeedTracking();
     feed.start();
+    // Each city refreshes its previous local day's METAR release minutes at
+    // that city's local 00:10; startup catches up only when today is missing.
+    let metarScheduler = null;
+    try {
+      metarScheduler = startMetarReleaseScheduler({ log });
+      log("info", `METAR release scheduler active (${metarScheduler.cities().length} cities)`);
+    } catch (err) {
+      log("warn", `METAR release scheduler failed to start: ${err.message}`);
+    }
     // 重启恢复：已停止/已结束但仍有持仓的 live 运行继续等待官方裁决并补记兑付
     runs
       .recoverSettlements()
@@ -242,6 +253,7 @@ async function main() {
     if (shuttingDown) return;
     shuttingDown = true;
     log("info", `${signal} received: shutting down gracefully`);
+    stopMetarReleaseScheduler();
     discovery.stop();
     feed.stop();
     try {

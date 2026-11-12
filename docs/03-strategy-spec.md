@@ -51,7 +51,15 @@
     "cooldownSec": 300,                  // 0..86400，同市场同方向冷却
     "maxSignalsPerMarket": 5,            // 1..100，每市场整轮运行最多入场信号数
     "requireSpreadOk": true,             // true 时 spread 超限不产生入场信号
-    "recordObservation": true            // 价格带外动量记录为不可交易观察信号
+    "recordObservation": true,           // 价格带外动量记录为不可交易观察信号
+    "metarReleaseEnabled": true,         // METAR 温度发布窗口信号
+    "metarReleaseWindowSec": 120,        // 10..600，节点前后窗口（默认各 2 分钟）
+    "metarReleaseMinProbabilityPct": 50, // 1..99，严格大于该概率才触发
+    "metarReleaseRequireRising": true,   // 是否要求当前概率高于发布前基准
+    "copyTraderEnabled": false,          // 跟买/跟卖公开钱包
+    "copyTraderUser": "",                // proxy wallet（0x...），留空不跟单
+    "copyTraderFallbackDelaySec": 30,    // 主用户无动作后启用前三替补
+    "copyTraderMinReactionRatePct": 90   // 替补最低优先市场反应率（Wilson 下界）
   },
   "execution": {
     "orderType": "market",               // 仅 market（FAK：吃可吃档位，剩余撤销）
@@ -63,7 +71,8 @@
     "fillModel": "book_walk",            // 仅 book_walk：逐档吃对手盘
     "slippageBufferBps": 0,              // 0..1000，价格保护 buffer（100=1%）
     "fallbackBuyEachWindow": false,      // 每个观测窗口周期空仓时：买第 1 高 YES + 第 3 高 NO
-    "fallbackMinTopGapPct": 40           // 兜底 YES 要求 rank1-rank2 概率差 ≥ 40 个百分点
+    "fallbackMinTopGapPct": 40,          // 兜底 YES 要求 rank1-rank2 概率差 ≥ 40 个百分点
+    "fallbackAllowInMetarWindow": false  // 默认发布节点前后 5 分钟暂停兜底
   },
   "exit": {
     "takeProfitPct": 50,                 // 1..1000，费用后净收益率阈值
@@ -199,7 +208,71 @@ t=0s `mid=0.200`，t=60s `mid=0.240` ⇒ `retPct=(0.240/0.200-1)×100=+20.00`、
 - `RunSummary` 分别返回 `signalsCount`（入场信号）与 `observationsCount`（观察信号）；旧记录默认 0。
 - 例：13°C YES 从 89.5¢ 跌到 0.5¢，`minPrice=0.03` 时会产生 DOWN 观察信号（`below_price_floor`），但不会买入接近 99.5¢ 的 NO。
 
-## 3. 执行模型（market order / book walk）
+### 2.8 METAR 温度发布窗口信号
+
+#### 节点常量
+
+- `data/metar-release-times.json` 保存每个城市（香港除外）的站点与 `minuteOffsetsUtc`。
+- 每个城市按自己的 IANA 时区，在**本地日期 00:10** 更新该城市“昨天”的 METAR 节点；只更新该城市条目，其它城市不变。
+- 节点来源：`https://aviationweather.gov/api/data/metar?ids=<ICAO>&format=json&date=<now ISO>&hours=48`，只保留 `metarType=METAR`（排除 SPECI）并按站点本地日期过滤前一天。
+- 节点以 UTC minute-of-hour 表示，每小时循环，不受 DST 影响。
+- 香港不生成节点；运行时只读静态数据，不调用 AviationWeather。
+
+#### 触发
+
+在某个城市节点 `nodeTs` 的：
+
+```text
+|now - nodeTs| <= metarReleaseWindowSec * 1000
+```
+
+窗口内扫描该城市当前观察日事件组的所有活跃括号：
+
+```text
+pNow > metarReleaseMinProbabilityPct / 100
+```
+
+若 `metarReleaseRequireRising=true`，还要求：
+
+```text
+pNow > pBase
+```
+
+- `pBase`：节点前最近有效 YES mid；
+- `pNow`：当前有效 YES mid，缺失时回退 implied；
+- 多个满足时选择 `pNow` 最高者；
+- 无 baseline / 无有效价格不触发。
+
+#### 执行顺序
+
+```text
+settlements
+→ processMarkets（含兜底建仓）
+→ processMetarRelease
+→ marks/equity/metrics
+```
+
+- **兜底建仓始终先执行**；发布信号在兜底之后。
+- 发布信号命中后锁定该事件组到节点窗口结束，普通入场/兜底不再回买。
+- 执行顺序：先卖目标市场 NO、同组其它市场 YES；后买目标市场 YES。
+- 发布信号使用正常 `preRiskChecks`，不做无风控强制模式；即使买入被风控拒绝，也先生成信号记录，便于观察。
+- 卖出 reason=`metar_release_rotate`；买入 reason=`metar_release`。
+- 每个发布节点只产生一条信号。
+
+#### 兜底 5 分钟保护
+
+- 节点前后各 300 秒内，默认 `fallbackAllowInMetarWindow=false` 时，`planFallbackOrders` 跳过该城市事件组（包括 pending 重试）；
+- 打开按钮后恢复兜底；
+- 无节点常量的城市不受影响；窗口结束后 pending 继续重试。
+
+#### 跟单/跟卖信号
+
+- 仅在 METAR 发布窗口内、当前 run 订阅的天气市场生效。
+- `copyTraderUser` 为主用户；主用户在节点后 `copyTraderFallbackDelaySec` 秒内无动作时，按反应率 > `copyTraderMinReactionRatePct` 的前三玩家依次替补。
+- 只复制交易动作，不复制仓位大小；买入使用本策略 sizing，卖出只跟卖已持有 token；全部走正常风控。
+- 交易去重 `transaction_hash + wallet + token + side`。
+
+
 
 ### 3.1 前置与价格保护
 

@@ -344,6 +344,8 @@ feesPaid == Σ trade.fee                     # 含全部已成交买/卖/无结�
 | AC-39 | 流动性分两个口径：`bookDepthUsd`=top10 bid+ask 总深度（市场质量/排序）；`executableDepthUsd`=目标方向（BUY asks / SELL bids、保护价内、top10）可成交深度，`minLiquidityUsd` 使用后者（`tests/engine.test.js`、`tests/market-time.test.js`） |
 | AC-40 | 兜底买 YES 要求 `rank-1 概率 − rank-2 概率 ≥ execution.fallbackMinTopGapPct`（默认 40 个百分点，0=关闭）；不满足时不买 YES，rank-3 NO 不受影响（`tests/engine.test.js`） |
 | AC-41 | 新 Trade 持久化 `city/bracket/endDate/question/eventSlug`；停止/重启后的旧运行通过 `GET /api/markets/:id` 从 Gamma 懒加载缺失元数据，成交/持仓不再回退显示裸 marketId（看板 `enrichMissingMarketMeta`） |
+| AC-42 | 每个城市本地日 00:10 只刷新该城市前一天的 METAR 节点；香港不刷新；同日重复检查不重复请求；发布节点窗口/概率阈值/上涨开关均由用户配置；兜底在节点 ±5 分钟内默认暂停（`tests/metar-release*.test.js`） |
+| AC-43 | 发布信号在兜底之后执行，使用正常风控；目标卖出 target NO/同组其它 YES，买入 target YES；跟单/跟卖在 METAR 窗口内使用主用户 + 前三反应率替补，复制动作不复制仓位（`tests/metar-release.test.js`、`tests/copy-trade.test.js`） |
 
 ### 7.2 MVP 与 roadmap
 | 范围 | 内容 |

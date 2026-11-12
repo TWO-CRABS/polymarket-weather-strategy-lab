@@ -34,6 +34,8 @@ import {
   settleMarket,
   tryEntry,
 } from "./runTrading.js";
+import { processMetarRelease } from "./metarRelease.js";
+import { processCopyTrades } from "./copyTrade.js";
 
 const TERMINAL_STATUSES = new Set(["stopped", "ended", "error"]);
 const EQUITY_POINT_CAP = 20_000;
@@ -108,6 +110,11 @@ export class Run {
     this._fallbackNextAt = null;
     /** 兜底失败 leg：key -> {eventKey,marketId,outcome,rank,...}，每窗口重试直到成交/截止 */
     this._fallbackPending = new Map();
+    this._metarReleaseState = new Map();
+    this._metarReleaseLockedGroups = new Set();
+    this._copyTradeSeen = new Set();
+    this._copyTradeLastPoll = 0;
+    this._copyPrimaryNode = null;
     /** @type {((marketId:string)=>Promise<any>)|null} */
     this.resolutionProvider = cfg.resolutionProvider ?? null;
   }
@@ -332,6 +339,10 @@ export class Run {
       this._refreshMarks();
       await this._handleSettlements(now);
       await this._processMarkets(now);
+      // Release signal runs after fallback/momentum so fallback always gets
+      // first chance; it may rotate positions created on this same tick.
+      await processMetarRelease(this, now);
+      await processCopyTrades(this, now);
       this._refreshMarks();
       const equity = this.portfolio.equity();
       this.peakEquity = Math.max(this.peakEquity, equity);

@@ -322,6 +322,9 @@ export async function mount(root, ctx) {
   const TRADE_REASON_NOTES = {
     signal: "价格动量信号触发入场。",
     fallback_entry: "每周期兜底建仓：城市事件内按 YES 概率第 1 高买 YES、第 3 高买 NO；被价格带/流动性/点差拒绝时不会顺延。",
+    metar_release: "METAR 温度发布窗口：概率上涨且超过阈值的市场买入 YES。",
+    metar_release_rotate: "METAR 温度发布轮换：卖出目标市场 NO 和同城市/同日期其它市场 YES。",
+    copy_trade: "跟随指定钱包在已订阅天气市场的公开交易；仍走正常风控。",
     take_profit: "达到止盈阈值后卖出。",
     stop_loss: "达到止损阈值后卖出。",
     max_hold: "超过最大持有时间后卖出。",

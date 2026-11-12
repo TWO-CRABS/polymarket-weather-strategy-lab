@@ -155,7 +155,7 @@
 | `referenceMid?` | 可选：成交时中间价，用于点差成本归因（向后兼容，可缺省） |
 | `spreadCost?` | 可选：`shares × \|参考对手价 − referenceMid\|`，点差成本（USDC，向后兼容） |
 | `signalId` | 关联信号，可为 null |
-| `reason` | `signal` / `take_profit` / `stop_loss` / `max_hold` / `opposite_signal` / `hold_to_resolution` / `resolution` / `manual` / `risk_kill_switch` |
+| `reason` | `signal` / `fallback_entry` / `metar_release` / `metar_release_rotate` / `copy_trade` / `take_profit` / `stop_loss` / `max_hold` / `opposite_signal` / `hold_to_resolution` / `resolution` / `manual` / `risk_kill_switch` |
 | `status` | `filled` / `partial` / `rejected` |
 | `rejectReason` | 见 `REJECT_REASONS`，仅 rejected |
 | `marketSnapshot?` | rejected 时记录：`{impliedProbability, spread, liquidityUsd, bookDepthUsd, quotes:{YES,NO}, tradingCutoff, stale, acceptingOrders, closed}`，为**拒单瞬间**快照；成交/旧记录可为 null |
@@ -247,8 +247,7 @@
 | `meta` | `{cities, presets, feeModel, marketCount}` | 可选，连上后发送 |
 | `markets` | `{markets:[MarketSnapshot]}` | 启动/刷新时批量快照 |
 | `market` | `{market: MarketSnapshot}` | 单市场盘口更新 |
-| `signal` | `{signal: Signal}` | 信号触发 |
-| `trade` | `{trade: Trade, position?: Position}` | 成交（含拒单记录） |
+| `signal` | `{signal: Signal}` | 信号触发 || `trade` | `{trade: Trade, position?: Position}` | 成交（含拒单记录） |
 | `positions` | `{positions:[Position], positionsValue}` | 持仓刷新 |
 | `equity` | `{point: EquityPoint, metrics: Metrics}` | 权益与指标采样 |
 | `metrics` | `{metrics: Metrics}` | 指标更新 |

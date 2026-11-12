@@ -96,7 +96,7 @@ export const RUN_STATUSES = Object.freeze([
 ]);
 export const EXIT_REASONS = Object.freeze([
   "take_profit", "stop_loss", "max_hold", "opposite_signal", "hold_to_resolution",
-  "resolution", "manual", "risk_kill_switch",
+  "resolution", "manual", "risk_kill_switch", "metar_release_rotate",
 ]);
 export const REJECT_REASONS = Object.freeze([
   "no_liquidity", "spread_too_wide", "liquidity_too_low", "below_min_order", "insufficient_cash",
@@ -121,6 +121,10 @@ export const LIMITS = Object.freeze({
     confirmationTicks: [1, 30],
     cooldownSec: [0, 86_400],
     maxSignalsPerMarket: [1, 100],
+    metarReleaseWindowSec: [10, 600],
+    metarReleaseMinProbabilityPct: [1, 99],
+    copyTraderFallbackDelaySec: [0, 300],
+    copyTraderMinReactionRatePct: [0, 100],
   },
   execution: {
     sizingValue: [1, 100_000],
@@ -177,6 +181,16 @@ export const DEFAULT_STRATEGY = Object.freeze({
     requireSpreadOk: true,
     /** 动量成立但价格带/点差不允许入场时，记录不可交易的观察信号 */
     recordObservation: true,
+    /** METAR 温度发布窗口信号 */
+    metarReleaseEnabled: true,
+    metarReleaseWindowSec: 120,
+    metarReleaseMinProbabilityPct: 50,
+    metarReleaseRequireRising: true,
+    /** 跟买/跟卖某个公开钱包；替补使用 reaction leaderboard 前三 */
+    copyTraderEnabled: false,
+    copyTraderUser: "",
+    copyTraderFallbackDelaySec: 30,
+    copyTraderMinReactionRatePct: 90,
   },
   execution: {
     orderType: "market",
@@ -191,6 +205,8 @@ export const DEFAULT_STRATEGY = Object.freeze({
     fallbackBuyEachWindow: false,
     /** 兜底买 YES 的最低概率差（百分点）：rank1 - rank2 >= 该值才买。 */
     fallbackMinTopGapPct: 40,
+    /** METAR 发布节点前后 5 分钟默认禁止兜底建仓。 */
+    fallbackAllowInMetarWindow: false,
   },
   exit: {
     takeProfitPct: 50,
@@ -290,12 +306,25 @@ export function normalizeStrategy(input = {}) {
     : [];
 
   // 布尔开关：兼容从 JSON 表单传入的 "true"/"false"
+  const coerceBool = (value, fallback = false) => {
+    if (typeof value === "boolean") return value;
+    if (value === "false" || value === 0 || value === "0") return false;
+    if (value === "true" || value === 1 || value === "1") return true;
+    return value === undefined || value === null ? fallback : Boolean(value);
+  };
   if (typeof merged.execution.fallbackBuyEachWindow !== "boolean") {
-    merged.execution.fallbackBuyEachWindow = Boolean(merged.execution.fallbackBuyEachWindow);
+    merged.execution.fallbackBuyEachWindow = coerceBool(merged.execution.fallbackBuyEachWindow);
   }
+  merged.execution.fallbackAllowInMetarWindow = coerceBool(merged.execution.fallbackAllowInMetarWindow);
   if (typeof merged.signal.recordObservation !== "boolean") {
-    const raw = merged.signal.recordObservation;
-    merged.signal.recordObservation = raw === "false" || raw === 0 ? false : Boolean(raw ?? true);
+    merged.signal.recordObservation = coerceBool(merged.signal.recordObservation, true);
+  }
+  merged.signal.metarReleaseEnabled = coerceBool(merged.signal.metarReleaseEnabled, true);
+  merged.signal.metarReleaseRequireRising = coerceBool(merged.signal.metarReleaseRequireRising, true);
+  merged.signal.copyTraderEnabled = coerceBool(merged.signal.copyTraderEnabled, false);
+  merged.signal.copyTraderUser = String(merged.signal.copyTraderUser || "").trim().toLowerCase();
+  if (merged.signal.copyTraderUser && !/^0x[a-f0-9]{40}$/.test(merged.signal.copyTraderUser)) {
+    merged.signal.copyTraderUser = "";
   }
 
   // sim.mode is validated by validateStrategy (invalid values must be rejected,
@@ -355,6 +384,13 @@ export function validateStrategy(input = {}) {
   inRange(s.confirmationTicks, LIMITS.signal.confirmationTicks, "signal.confirmationTicks");
   inRange(s.cooldownSec, LIMITS.signal.cooldownSec, "signal.cooldownSec");
   inRange(s.maxSignalsPerMarket, LIMITS.signal.maxSignalsPerMarket, "signal.maxSignalsPerMarket");
+  inRange(s.metarReleaseWindowSec, LIMITS.signal.metarReleaseWindowSec, "signal.metarReleaseWindowSec");
+  inRange(s.metarReleaseMinProbabilityPct, LIMITS.signal.metarReleaseMinProbabilityPct, "signal.metarReleaseMinProbabilityPct");
+  inRange(s.copyTraderFallbackDelaySec, LIMITS.signal.copyTraderFallbackDelaySec, "signal.copyTraderFallbackDelaySec");
+  inRange(s.copyTraderMinReactionRatePct, LIMITS.signal.copyTraderMinReactionRatePct, "signal.copyTraderMinReactionRatePct");
+  if (s.copyTraderEnabled && s.copyTraderUser && !/^0x[a-fA-F0-9]{40}$/.test(s.copyTraderUser)) {
+    err(`signal.copyTraderUser 必须为空或 0x 开头的 40 字节钱包地址，当前为 ${s.copyTraderUser}`);
+  }
 
   inRange(e.sizingValue, LIMITS.execution.sizingValue, "execution.sizingValue");
   inRange(e.maxPositionUsd, LIMITS.execution.maxPositionUsd, "execution.maxPositionUsd");
@@ -634,6 +670,9 @@ export const EXIT_REASON_LABELS = Object.freeze({
   manual: "手动平仓",
   risk_kill_switch: "风控熔断",
   fallback_entry: "兜底建仓", // 入场原因：周期空仓兜底（第 1 高 YES / 第 3 高 NO）
+  metar_release: "温度发布信号",
+  metar_release_rotate: "温度发布轮换卖出",
+  copy_trade: "跟单交易",
   rejected: "订单被拒",
 });
 

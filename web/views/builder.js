@@ -74,6 +74,14 @@ const GROUP_DEFS = [
       { path: "signal.maxSignalsPerMarket", label: "单市场最大信号数", unit: "次", min: LIM.signal.maxSignalsPerMarket[0], max: LIM.signal.maxSignalsPerMarket[1], step: 1 },
       { path: "signal.requireSpreadOk", kind: "toggle", label: "点差超限时跳过信号", help: "真实成交成本的一部分，建议保持开启" },
       { path: "signal.recordObservation", kind: "toggle", label: "记录价格带外观测信号", help: "动量成立但价格带/点差不允许入场时，在信号流中标记为“观察·不可交易”，不会下单" },
+      { path: "signal.metarReleaseEnabled", kind: "toggle", label: "METAR 温度发布窗口信号", help: "城市本地温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES；卖出目标 NO 和同城市/同日期其它 YES。兜底建仓始终先执行" },
+      { path: "signal.metarReleaseWindowSec", label: "发布窗口前后", unit: "秒", min: LIM.signal.metarReleaseWindowSec[0], max: LIM.signal.metarReleaseWindowSec[1], step: 10, help: "默认 120 秒 = 节点前后各 2 分钟" },
+      { path: "signal.metarReleaseMinProbabilityPct", label: "最低概率", unit: "%", min: LIM.signal.metarReleaseMinProbabilityPct[0], max: LIM.signal.metarReleaseMinProbabilityPct[1], step: 1, help: "严格大于该值才触发；默认 50" },
+      { path: "signal.metarReleaseRequireRising", kind: "toggle", label: "要求概率相对发布前上涨", help: "开启时要求当前概率高于节点前基准；关闭则只看是否超过最低概率" },
+      { path: "signal.copyTraderEnabled", kind: "toggle", label: "跟买/跟卖信号", help: "在 METAR 发布窗口内跟随指定钱包在已订阅天气市场的公开交易；主用户 30 秒无动作后用反应率前三替补" },
+      { path: "signal.copyTraderUser", kind: "text", label: "跟单钱包地址", placeholder: "0x...（留空则不跟单）", help: "proxy wallet 地址；只复制动作，不复制仓位大小，仍走正常风控" },
+      { path: "signal.copyTraderFallbackDelaySec", label: "替补等待", unit: "秒", min: LIM.signal.copyTraderFallbackDelaySec[0], max: LIM.signal.copyTraderFallbackDelaySec[1], step: 1, help: "主用户在该节点窗口内无动作后，等待多久启用前三替补" },
+      { path: "signal.copyTraderMinReactionRatePct", label: "替补最低反应率", unit: "%", min: LIM.signal.copyTraderMinReactionRatePct[0], max: LIM.signal.copyTraderMinReactionRatePct[1], step: 1, help: "榜单 Wilson 下界高于该值才纳入替补；默认 90" },
     ],
   },
   {
@@ -92,6 +100,7 @@ const GROUP_DEFS = [
       { path: "execution.slippageBufferBps", label: "滑点保护", unit: "bps", min: LIM.execution.slippageBufferBps[0], max: LIM.execution.slippageBufferBps[1], step: 1, help: "允许超出买一价的最大比例" },
       { path: "execution.fallbackBuyEachWindow", kind: "toggle", label: "每周期空仓兜底建仓（按城市独立）", help: "每个城市/日期组独立：每满一个观察窗口，无持仓时买组内概率第 1 高 YES + 第 3 高 NO（不足 3 个只买第 1）；若第 1 高没有 YES 卖盘（ask=0）则整组跳过，不降级买下一档；失败 leg 每窗口按当前排名重试，排名变化后丢弃旧目标" },
       { path: "execution.fallbackMinTopGapPct", label: "兜底 YES 最低概率差", unit: "%", min: LIM.execution.fallbackMinTopGapPct[0], max: LIM.execution.fallbackMinTopGapPct[1], step: 1, help: "仅兜底买 YES：第一高概率 − 第二高概率 ≥ 该百分点才买；0 = 不限制" },
+      { path: "execution.fallbackAllowInMetarWindow", kind: "toggle", label: "节点窗口内允许兜底建仓", help: "默认关闭：METAR 发布节点前后各 5 分钟内不建仓/不重试兜底；打开后恢复兜底" },
     ],
   },
   {
@@ -167,6 +176,15 @@ const FIELD_TIPS = {
   "signal.maxSignalsPerMarket": "整个运行期间该市场最多触发几次信号。",
   "signal.requireSpreadOk": "实时点差超过『最大点差』时跳过本次信号，避免在流动性差的时刻成交。建议保持开启。",
   "signal.recordObservation": "动量成立但最新价已在价格带外（或点差超限）时，不产生入场单，只在信号流记录一条“观察·不可交易”信号，便于分析概率坍缩。默认开启，不产生成交。",
+  "signal.metarReleaseEnabled": "城市本地 METAR 温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES，并卖出目标 NO、同城市/同日期其它 YES。执行顺序固定：兜底建仓先执行，发布信号后执行；仍走正常风控。",
+  "signal.metarReleaseWindowSec": "发布节点前后各多少秒内视为窗口，默认 120 秒（前后各 2 分钟）。",
+  "signal.metarReleaseMinProbabilityPct": "当前 YES 概率必须严格大于该百分比才触发；默认 50。",
+  "signal.metarReleaseRequireRising": "开启时要求当前概率高于节点前基准；关闭时只看是否超过最低概率。",
+  "signal.copyTraderEnabled": "开启后在 METAR 发布窗口内跟随指定钱包在当前订阅天气市场的公开交易；买入跟买、卖出只跟卖已持有仓位。",
+  "signal.copyTraderUser": "要跟随的 Polymarket proxy wallet（0x 开头 40 字节）。留空则不跟单。",
+  "signal.copyTraderFallbackDelaySec": "主用户在该发布窗口内无动作时，等待多少秒后按反应率前三替补依次尝试。",
+  "signal.copyTraderMinReactionRatePct": "替补候选的最低优先市场反应率（Wilson 下界）；默认 90%。",
+  "execution.fallbackAllowInMetarWindow": "默认关闭：METAR 发布节点前后各 5 分钟内不新建/不重试兜底仓位；打开后恢复兜底建仓。",
   "execution.orderType": "系统只模拟市价单（IOC/FAK）：立即按真实盘口成交，不挂单等待。",
   "execution.sizingMode": "固定名义金额：每次固定下单多少 USD 名义额；按权益百分比：每次用当前总权益的百分之几。",
   "execution.sizingValue": "每次下单的目标名义额（fixed_stake 为 USD，pct_equity 为 %）。市价 BUY 最低 $1 名义额；手续费从现金另扣，不占这里的预算。若设为 $1：因份额按 0.01 股取整，成交名义额可能略高于 $1（<1¢，例如 95¢ 时 1.06 股 = $1.007），这是交易所最小额与份额精度共同决定的。",
@@ -617,6 +635,15 @@ export async function mount(root, ctx) {
         <input class="range" type="range" id="${id}" data-path="${field.path}" data-kind="range"
           min="${field.min}" max="${field.max}" step="${field.step}" value="${value}" style="--pct:${pct}%">
         <div class="range-scale"><span>${fmtScale(field.min)}</span><span>${fmtScale(mid)}</span><span>${fmtScale(field.max)}</span></div>
+        ${help}
+      </div>`;
+    }
+
+    if (field.kind === "text") {
+      return `<div class="field">
+        <label class="field-label" for="${id}">${label}${unit}${dot}</label>
+        <input class="input" type="text" id="${id}" data-path="${field.path}" data-kind="text"
+          value="${escapeAttr(value ?? "")}" placeholder="${escapeAttr(field.placeholder || "")}">
         ${help}
       </div>`;
     }
