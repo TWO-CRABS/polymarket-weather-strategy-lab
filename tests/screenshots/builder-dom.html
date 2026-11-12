@@ -25,7 +25,7 @@
     <div class="top-stats">
       <div class="top-stat">
         <span class="top-label">服务端时间 · Asia/Shanghai</span>
-        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">19:01:46</strong>
+        <strong class="num" id="serverClock" title="服务端时间（Asia/Shanghai）">20:22:37</strong>
       </div>
       <div class="top-stat">
         <span class="top-label">行情延迟</span>
@@ -236,9 +236,9 @@
         </label>
         <p class="hint"><button type="button" class="help-dot" data-tip="城市本地 METAR 温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES，并卖出目标 NO、同城市/同日期其它 YES。执行顺序固定：兜底建仓先执行，发布信号后执行；仍走正常风控。" aria-label="说明：城市本地 METAR 温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES，并卖出目标 NO、同城市/同日期其它 YES。执行顺序固定：兜底建仓先执行，发布信号后执行；仍走正常风控。">?</button>城市本地温度发布节点前后窗口内，概率上涨且超过阈值的括号买入 YES；卖出目标 NO 和同城市/同日期其它 YES。兜底建仓始终先执行</p>
       </div></div><div class="field-row field-row-4"><div class="field">
-      <label class="field-label" for="f-signal-metarReleaseWindowSec">发布窗口前后 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="发布节点前后各多少秒内视为窗口，默认 120 秒（前后各 2 分钟）。" aria-label="说明：发布节点前后各多少秒内视为窗口，默认 120 秒（前后各 2 分钟）。">?</button></label>
-      <input class="input num" type="number" id="f-signal-metarReleaseWindowSec" data-path="signal.metarReleaseWindowSec" data-kind="number" data-min="10" data-max="600" data-step="10" min="10" max="600" step="10" value="120" inputmode="decimal">
-      <span class="field-help">默认 120 秒 = 节点前后各 2 分钟</span>
+      <label class="field-label" for="f-signal-metarReleaseWindowSec">发布窗口前后 <span class="hint">秒</span><button type="button" class="help-dot" data-tip="发布节点前后各多少秒内视为窗口，默认 300 秒（前后各 5 分钟）。" aria-label="说明：发布节点前后各多少秒内视为窗口，默认 300 秒（前后各 5 分钟）。">?</button></label>
+      <input class="input num" type="number" id="f-signal-metarReleaseWindowSec" data-path="signal.metarReleaseWindowSec" data-kind="number" data-min="10" data-max="600" data-step="10" min="10" max="600" step="10" value="300" inputmode="decimal">
+      <span class="field-help">默认 300 秒 = 节点前后各 5 分钟</span>
     </div><div class="field">
       <label class="field-label" for="f-signal-metarReleaseMinProbabilityPct">最低概率 <span class="hint">%</span><button type="button" class="help-dot" data-tip="当前 YES 概率必须严格大于该百分比才触发；默认 50。" aria-label="说明：当前 YES 概率必须严格大于该百分比才触发；默认 50。">?</button></label>
       <input class="input num" type="number" id="f-signal-metarReleaseMinProbabilityPct" data-path="signal.metarReleaseMinProbabilityPct" data-kind="number" data-min="1" data-max="99" data-step="1" min="1" max="99" step="1" value="50" inputmode="decimal">

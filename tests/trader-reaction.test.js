@@ -212,7 +212,7 @@ test("baselineAt returns the newest point at or before the target", () => {
   assert.equal(baselineAt(null, 100), null);
 });
 
-test("findReprice uses max(minMove, 2 ticks), first qualifying point after the node", () => {
+test("findReprice uses max(minMove, 1 tick), first qualifying point after the node", () => {
   const point = (ts, price) => ({ ts, price });
   const nodeTs = 1000;
   const points = [
@@ -228,11 +228,12 @@ test("findReprice uses max(minMove, 2 ticks), first qualifying point after the n
   assert.equal(reprice.direction, "up");
   approx(reprice.threshold, 0.05, 1e-9);
 
-  // 2 ticks dominate when they are larger than minMove
-  const ticksNull = findReprice({ points: [point(1100, 0.26)], nodeTs, baselinePrice: 0.30, tickSize: 0.03, minMove: 0.001 });
-  assert.equal(ticksNull, null, "0.03 tick × 2 = 0.06 > 0.04 move");
+  // one tick dominates when it is larger than minMove
+  const tickOnly = findReprice({ points: [point(1100, 0.26)], nodeTs, baselinePrice: 0.30, tickSize: 0.03, minMove: 0.001 });
+  approx(tickOnly.threshold, 0.03, 1e-9, "0.03 tick × 1 = 0.03 <= 0.04 move");
+  assert.equal(tickOnly.ts, 1100);
   const ticksHit = findReprice({ points: [point(1100, 0.38)], nodeTs, baselinePrice: 0.30, tickSize: 0.03, minMove: 0.001 });
-  assert.equal(ticksHit.threshold, 0.06);
+  approx(ticksHit.threshold, 0.03, 1e-9);
   approx(ticksHit.move, 0.08, 1e-9);
 
   // downward reprices count too
@@ -467,6 +468,31 @@ test("computeTraderReactionStats eligibility thresholds are configurable", () =>
   }
 });
 
+test("pre-positioned target YES holder counts as ahead without an in-window fill", () => {
+  const { nodes, priceByToken } = nodeFixtures();
+  const pre = {
+    proxy_wallet: "0xpre",
+    side: "BUY",
+    token_id: "yes-a",
+    condition_id: "cond-a",
+    size: 10,
+    price: 0.25,
+    timestamp: 800,
+    outcome: "Yes",
+    pseudonym: "Pre",
+  };
+  const stats = computeFixed({
+    warmingNodes: nodes,
+    targetMarketTrades: [...tradeFixtures(), pre],
+    priceByToken,
+  });
+  const user = stats.users.find((item) => item.wallet === "0xpre");
+  assert.ok(user, "pre-positioned holder must be in numerator/denominator population");
+  assert.equal(user.ahead, 1);
+  assert.equal(user.involved, 1);
+  assert.equal(user.reactionRate, 1);
+});
+
 test("baseline quality gates disqualify sentinel/absent baselines", () => {
   const { nodes } = nodeFixtures();
   const trades = tradeFixtures();
@@ -499,6 +525,8 @@ test("computeTraderReactionStats is deterministic and defaults are exposed", () 
   assert.deepEqual(run(), run());
   assert.equal(REACTION_DEFAULTS.preWindowSec, 300);
   assert.equal(REACTION_DEFAULTS.postWindowSec, 300);
+  assert.equal(REACTION_DEFAULTS.tickMultiplier, 1);
+  assert.equal(REACTION_DEFAULTS.maxRepriceWaitSec, 300);
   assert.equal(REACTION_DEFAULTS.minMove, 0.05);
   assert.equal(REACTION_DEFAULTS.eligibleMinQualified, 100);
   assert.equal(REACTION_DEFAULTS.eligibleMinWilson, 0.9);

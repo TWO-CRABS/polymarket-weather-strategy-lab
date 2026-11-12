@@ -416,7 +416,7 @@ async function main() {
     ` * warming nodes: ${aggregate.totals.warmingNodes} found, ${aggregate.qualifiedWarmingNodes} qualified (baseline + reprice)`,
     ` * users: ${aggregate.users.length} wallets with >=1 qualified observation; eligible: ${aggregate.users.filter((user) => user.eligible).length}`,
     " * definition: ahead = direction-correct trade (BUY YES or SELL NO target) inside",
-    " * node ±120s and strictly before the first >= max(0.05, 2 ticks) target reprice;",
+    " * node ±300s and strictly before the first >= max(0.05, 1 tick) target reprice;",
     " * qualified (per wallet) = number of qualified nodes where the wallet traded the",
     " * target at all (shown as `involved`); reactionRate denominator = all qualified nodes.",
     " */",

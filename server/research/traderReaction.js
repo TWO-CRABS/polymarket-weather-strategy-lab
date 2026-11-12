@@ -22,14 +22,17 @@
  * ----------------------
  * - nodeTs            epoch seconds of the METAR report that entered a new bracket.
  *                     reaction window is ±300s (±5 min) by default.
- * - baseline          target YES mid at `nodeTs - 120s` (latest known before the node).
+ * - baseline          target YES mid at `nodeTs - preWindowSec` (default 300s).
  * - reprice           first target YES mid after `nodeTs` whose absolute move vs
- *                     baseline is >= max(minMove, 2 × tickSize); sign is recorded
- *                     (`direction: "up" | "down"`) but either sign counts as a reprice.
- * - direction-correct (BUY, YES) or (SELL, NO) on the target market's own tokens.
- * - ahead             direction-correct trade with ts < reprice.ts, inside the window.
- * - qualified (user)  a wallet's denominator: qualified warming nodes where that
- *                     wallet traded the target market at all inside the window.
+ *                     baseline is >= max(minMove, 1 × tickSize), searched for at
+ *                     most maxRepriceWaitSec (default 300s); sign is recorded.
+ * - direction-correct (BUY, YES) or (SELL, NO) on the target market's own tokens;
+ *                     a wallet already net long target YES / short NO before the
+ *                     node also counts as ahead (pre-positioned holder).
+ * - ahead             pre-positioned holder, or direction-correct trade with
+ *                     ts < reprice.ts inside the ±pre/post window.
+ * - qualified (user)  denominator is ALL qualified warming nodes; `involved`
+ *                     records how many of them the wallet participated in.
  * - eligible          qualified >= 100 AND wilsonLower > 0.9 (per Lead contract).
  */
 
@@ -41,14 +44,14 @@ export const REACTION_DEFAULTS = Object.freeze({
   postWindowSec: 300,
   /** baseline/reprice tolerance */
   minMove: 0.05,
-  /** price ticks used in max(minMove, 2 ticks) */
-  tickMultiplier: 2,
+  /** price ticks used in max(minMove, 1 tick) */
+  tickMultiplier: 1,
   /** lowest usable baseline mid (midpoint sentinels like 0.0005 are not tradeable) */
   minBaselineMid: 0.01,
   /** highest usable baseline mid */
   maxBaselineMid: 0.99,
   /** give up looking for a reprice after this long (seconds) */
-  maxRepriceWaitSec: 6 * 3600,
+  maxRepriceWaitSec: 5 * 60,
   /** Wilson z-score for a 95% two-sided interval */
   wilsonZ: 1.96,
   /** eligibility thresholds from the task contract */
@@ -455,6 +458,7 @@ export function computeTraderReactionStats(input) {
       aheadTrades: 0,
       aheadWallets: [],
       involvedWallets: [],
+      prePositionedWallets: [],
     };
 
     const tokenTrades = tradesByToken.get(yesToken) ?? [];
@@ -475,6 +479,33 @@ export function computeTraderReactionStats(input) {
       // "ahead" only exists once a reprice happened; after it the info is public.
       if (!reprice || trade.ts >= reprice.ts) continue;
       nodeResult.aheadWallets.push(trade.wallet);
+    }
+
+    // A user who already held the target YES (or was short NO) before the
+    // METAR node was already positioned for the warming outcome. Count that as
+    // an ahead observation even when there is no fill inside the ±window.
+    if (nodeResult.qualified && nodeTs !== null) {
+      const netYes = new Map();
+      for (const trade of [...tokenTrades, ...noTokenTrades]) {
+        if (trade.ts >= nodeTs) continue;
+        if (trade.tokenId !== yesToken && trade.tokenId !== noTokenStr) continue;
+        const size = Number(trade.size) || 0;
+        if (!(size > 0)) continue;
+        const side = String(trade.side || "").toUpperCase();
+        const sign = trade.tokenId === yesToken
+          ? (side === "BUY" ? 1 : side === "SELL" ? -1 : 0)
+          : (side === "SELL" ? 1 : side === "BUY" ? -1 : 0);
+        if (!sign) continue;
+        const entry = involved.get(trade.wallet) ?? { wallet: trade.wallet, pseudonym: trade.pseudonym };
+        if (trade.pseudonym && !entry.pseudonym) entry.pseudonym = trade.pseudonym;
+        involved.set(trade.wallet, entry);
+        netYes.set(trade.wallet, (netYes.get(trade.wallet) ?? 0) + sign * size);
+      }
+      for (const [wallet, net] of netYes) {
+        if (!(net > 0)) continue;
+        nodeResult.prePositionedWallets.push(wallet);
+        nodeResult.aheadWallets.push(wallet);
+      }
     }
 
     // dedupe per wallet/node: one ahead event even with multiple fills
