@@ -174,10 +174,22 @@ async function fetchAllTrades(clob, eventId) {
 
 async function fetchPrices(tokenId, startSec, endSec) {
   const url = `${DATA}/v2/prices-history?token_id=${encodeURIComponent(tokenId)}&start=${startSec}&end=${endSec}&bucket_seconds=60`;
-  const json = await cachedJson(url, `prices ${tokenId.slice(0, 10)}`);
-  return (Array.isArray(json?.data) ? json.data : [])
-    .map((row) => ({ ts: Number(row.timestamp), price: Number(row.price) }))
+  let json = await cachedJson(url, `prices ${tokenId.slice(0, 10)}`);
+  let rows = Array.isArray(json?.data) ? json.data : [];
+  // Data API v2 history only covers a rolling ~15-day window. Older events
+  // (the October backfill) need the CLOB legacy max-history endpoint.
+  if (!rows.length) {
+    const legacyUrl = `https://clob.polymarket.com/prices-history?market=${encodeURIComponent(tokenId)}&interval=max&fidelity=1`;
+    json = await cachedJson(legacyUrl, `legacy prices ${tokenId.slice(0, 10)}`);
+    rows = Array.isArray(json?.history) ? json.history : Array.isArray(json?.data) ? json.data : [];
+  }
+  return rows
+    .map((row) => ({
+      ts: Number(row.t ?? row.timestamp),
+      price: Number(row.p ?? row.price),
+    }))
     .filter((p) => Number.isFinite(p.ts) && Number.isFinite(p.price) && p.price > 0 && p.price < 1)
+    .filter((p) => p.ts >= startSec && p.ts <= endSec)
     .sort((a, b) => a.ts - b.ts);
 }
 
