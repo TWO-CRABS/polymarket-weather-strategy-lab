@@ -185,7 +185,7 @@ async function fetchPriceHistory(tokenId, startSec, endSec) {
   const rows = Array.isArray(json?.data) ? json.data : [];
   const points = rows
     .map((row) => ({ ts: Number(row.timestamp), price: Number(row.price) }))
-    .filter((point) => Number.isFinite(point.ts) && Number.isFinite(point.price) && point.price >= 0 && point.price <= 1)
+    .filter((row) => Number.isFinite(row.ts) && Number.isFinite(row.price) && row.price > 0 && row.price < 1)
     .sort((a, b) => a.ts - b.ts);
   pricesCache.set(key, points);
   return points;

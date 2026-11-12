@@ -291,6 +291,7 @@ export function findReprice(args) {
   let best = null;
   for (const point of points) {
     if (!isFiniteNumber(point?.ts) || !isFiniteNumber(point?.price)) continue;
+    if (!(point.price > 0 && point.price < 1)) continue;
     if (point.ts <= nodeTs || point.ts > deadline) continue;
     const move = point.price - baselinePrice;
     if (Math.abs(move) < threshold) continue;

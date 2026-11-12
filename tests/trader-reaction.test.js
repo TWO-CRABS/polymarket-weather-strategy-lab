@@ -246,6 +246,11 @@ test("findReprice uses max(minMove, 1 tick), first qualifying point after the no
     findReprice({ points: [point(1000 + 7000, 0.6)], nodeTs, baselinePrice: 0.30, maxWaitSec: 3600 }),
     null,
   );
+  // terminal 0/1 ticks are settlement, not a tradeable reprice
+  assert.equal(
+    findReprice({ points: [point(1100, 0)], nodeTs, baselinePrice: 0.30, tickSize: 0.001 }),
+    null,
+  );
   // no baseline => null
   assert.equal(findReprice({ points, nodeTs, baselinePrice: NaN }), null);
 });
