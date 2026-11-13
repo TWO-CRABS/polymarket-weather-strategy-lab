@@ -1214,6 +1214,7 @@ export async function mount(root, ctx) {
           <span>${ui.escapeHtml(priceText(signal.toPrice))}</span>
           <span class="${ui.dirClass(direction)}">${ui.escapeHtml(ui.fmtPct(num(signal.changePct) !== null ? signal.changePct : direction * 0))}</span>
           <span>窗口 ${ui.escapeHtml(String(signal.windowSec || "—"))}s</span>
+          ${signal.reason === "copy_trade" ? `<span class="sig-copy-source">跟单 ${ui.escapeHtml(signal.copySource === "primary" ? "主钱包" : signal.copySubstituteRank ? `替补#${signal.copySubstituteRank}` : "替补")} · ${ui.escapeHtml(signal.copyTraderLabel || signal.copyTraderWallet || "—")}</span>` : ""}
         </div>
         <div class="sig-foot">
           <span class="sig-reason">${observation ? `<b class="sig-observation">观察 · 不可交易</b> · ${ui.escapeHtml(blockLabel)}` : `${ui.escapeHtml(ui.reasonLabel(signal.reason || "signal"))} · ${ui.escapeHtml(signal.priceField || "mid")}`}</span>

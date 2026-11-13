@@ -41,24 +41,34 @@ function leaderboardSubstitutes(city, minRatePct, count = 3) {
     .filter((user) => user.eligible === true)
     .filter((user) => Number(user.reactionRate) * 100 >= minRatePct)
     .slice(0, Math.max(1, Math.min(10, Number(count) || 3)))
-    .map((user) => normalizedWallet(user.wallet))
-    .filter(Boolean);
+    .map((user, index) => ({
+      wallet: normalizedWallet(user.wallet),
+      label: user.pseudonym || "",
+      rank: index + 1,
+    }))
+    .filter((user) => user.wallet);
 }
 
 function candidateWallets(run, city, opts = {}) {
   const cfg = run.config.signal;
   const primary = normalizedWallet(cfg.copyTraderUser);
   const subs = Array.isArray(opts.substitutes)
-    ? opts.substitutes.map(normalizedWallet).filter(Boolean)
+    ? opts.substitutes.map((value) => (
+      typeof value === "string"
+        ? { wallet: normalizedWallet(value), label: "", rank: null }
+        : { ...value, wallet: normalizedWallet(value.wallet) }
+    )).filter((user) => user.wallet)
     : leaderboardSubstitutes(
       city,
       Number(cfg.copyTraderMinReactionRatePct) || 90,
       Number(cfg.copyTraderSubstituteCount) || 3,
     );
   const all = [];
-  if (primary) all.push({ wallet: primary, source: "primary" });
-  for (const wallet of subs) {
-    if (!all.some((item) => item.wallet === wallet)) all.push({ wallet, source: "substitute" });
+  if (primary) all.push({ wallet: primary, source: "primary", label: "", rank: null });
+  for (const sub of subs) {
+    if (!all.some((item) => item.wallet === sub.wallet)) {
+      all.push({ wallet: sub.wallet, source: "substitute", label: sub.label || "", rank: sub.rank ?? null });
+    }
   }
   return all;
 }
@@ -124,7 +134,7 @@ function marketForTrade(run, trade, active) {
   return null;
 }
 
-function tradeSignal(run, market, trade, source, now) {
+function tradeSignal(run, market, trade, candidate, now) {
   const outcome = String(trade.outcome || "").toLowerCase().startsWith("y") ? "YES" : "NO";
   const tokenId = outcome === "YES" ? market.tokens?.yesTokenId : market.tokens?.noTokenId;
   return {
@@ -146,12 +156,14 @@ function tradeSignal(run, market, trade, source, now) {
     kind: "entry",
     tradable: true,
     reason: "copy_trade",
-    copyTraderWallet: normalizedWallet(trade.proxy_wallet),
-    copySource: source,
+    copyTraderWallet: normalizedWallet(candidate.wallet || trade.proxy_wallet),
+    copyTraderLabel: candidate.label || "",
+    copySource: candidate.source,
+    copySubstituteRank: candidate.rank ?? null,
   };
 }
 
-async function copyOneTrade(run, market, trade, source, now) {
+async function copyOneTrade(run, market, trade, candidate, now) {
   const side = String(trade.side || "").toUpperCase();
   const tradeKey = `${trade.transaction_hash || ""}|${trade.proxy_wallet || ""}|${trade.token_id || ""}|${side}|${trade.timestamp || ""}`;
   if (run._copyTradeSeen.has(tradeKey)) return false;
@@ -161,7 +173,7 @@ async function copyOneTrade(run, market, trade, source, now) {
   if (!tokenId) return false;
   if (side === "BUY") {
     if (run.portfolio.positionsForMarket(market.id).some((p) => p.tokenId === tokenId)) return false;
-    const signal = tradeSignal(run, market, trade, source, now);
+    const signal = tradeSignal(run, market, trade, candidate, now);
     run.signals.push(signal);
     run.store.appendRecord(run.id, "signal", signal);
     run.sse.broadcast("signal", { signal }, run.id);
@@ -191,17 +203,17 @@ export async function processCopyTrades(run, now, opts = {}) {
   const active = activeReleaseWindow(run, now, opts.store);
   if (!active) return;
   if (!run._copyPrimaryNodes) run._copyPrimaryNodes = new Map();
+  if (!run._copyNodeDone) run._copyNodeDone = new Map();
   const hasPrimary = active.groups.some((group) => candidateWallets(run, group.city, opts).some((candidate) => candidate.source === "primary"));
   const fallbackDelayMs = hasPrimary
     ? Math.max(0, Number(cfg.copyTraderFallbackDelaySec) || 0) * 1000
     : 0;
 
   for (const group of active.groups) {
+    if (run._copyNodeDone.get(group.city) === group.node.nodeTs) continue;
     const candidates = candidateWallets(run, group.city, opts);
     if (!candidates.length) continue;
-    const primaryDone = run._copyPrimaryNodes.get(group.city) === group.node.nodeTs;
-    const tryList = primaryDone ? [] : candidates;
-    for (const candidate of tryList) {
+    candidateLoop: for (const candidate of candidates) {
       if (candidate.source === "substitute" && now < group.node.nodeTs + fallbackDelayMs) continue;
       const trades = await fetchUserTrades(run, candidate.wallet, now, group.node.nodeTs);
       if (!trades.length) continue;
@@ -219,10 +231,11 @@ export async function processCopyTrades(run, now, opts = {}) {
           allowedMarketIds: new Set(group.markets.keys()),
         });
         if (!market) continue;
-        const copied = await copyOneTrade(run, market, trade, candidate.source, now);
+        const copied = await copyOneTrade(run, market, trade, candidate, now);
         if (copied) {
+          run._copyNodeDone.set(group.city, group.node.nodeTs);
           if (candidate.source === "primary") run._copyPrimaryNodes.set(group.city, group.node.nodeTs);
-          break;
+          break candidateLoop;
         }
       }
     }
