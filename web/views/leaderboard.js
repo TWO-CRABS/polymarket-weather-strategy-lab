@@ -444,7 +444,7 @@ export async function mount(root, ctx = {}) {
           <thead><tr><th>成交时间</th><th>方向</th><th class="num-col">数量</th><th class="num-col">价格</th><th class="num-col">金额</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
-        <p class="muted">交易金额 = 该用户在此目标市场的累计成交额；盈利按最终结算计算，未扣手续费。方向列只显示 ahead 相关的最新一笔，本表列出该市场全部成交。</p>
+        <p class="muted">交易金额 = 该用户在此目标市场的累计成交额；盈利按最终结算计算，未扣手续费。方向列只显示 ahead 相关的最新一笔，本表列出该市场全部成交；其它温度市场的 SELL YES 不计入当前 ahead 统计。</p>
       </div>`;
     document.body.appendChild(dialog);
     dialog.querySelector("[data-close]")?.addEventListener("click", () => dialog.close());
