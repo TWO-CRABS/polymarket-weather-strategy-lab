@@ -1802,3 +1802,6 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .lb-table thead th { text-align: left; }
 .lb-table thead th.num-col { text-align: right; }
 .lb-table thead th:first-child { text-align: right; }
+
+.lb-user-link { color: var(--text-1); text-decoration: none; border-bottom: 1px dotted rgba(34, 211, 238, 0.5); }
+.lb-user-link:hover { color: var(--cyan-text); border-bottom-style: solid; }

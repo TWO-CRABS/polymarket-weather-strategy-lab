@@ -41,6 +41,26 @@ function userLabel(user) {
   return user.pseudonym || user.wallet || "—";
 }
 
+function profileUrl(wallet) {
+  const value = String(wallet || "").trim();
+  return value ? `https://polymarket.com/profile/${encodeURIComponent(value)}` : "";
+}
+
+function marketQuestion(event, fallbackCity = "") {
+  if (!event) return "";
+  const bracket = String(event.bracket || "").trim();
+  const city = String(event.city || fallbackCity || "").trim();
+  const date = new Date(`${event.eventDate || ""}T00:00:00Z`);
+  if (!bracket || !city || !Number.isFinite(date.getTime())) return "";
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const month = months[date.getUTCMonth()];
+  const day = date.getUTCDate();
+  return `Will the highest temperature in ${city} be ${bracket} on ${month} ${day}?`;
+}
+
 function eventRows(user) {
   const events = Array.isArray(user.events) ? user.events : [];
   if (!events.length) {
@@ -190,9 +210,14 @@ export async function mount(root, ctx = {}) {
             <tbody>
               ${users.slice(0, maxShow).map((user, index) => {
                 const expanded = state.expanded.has(user.wallet);
+                const profile = profileUrl(user.wallet);
+                const question = marketQuestion((user.events || [])[0], state.city);
+                const nameHtml = profile
+                  ? `<a class="lb-user-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开 Polymarket 主页并复制该用户首个 ahead 市场">${ui.escapeHtml(userLabel(user))}</a>`
+                  : `<b>${ui.escapeHtml(userLabel(user))}</b>`;
                 return `<tr class="lb-user-row" data-wallet="${ui.escapeHtml(user.wallet)}" tabindex="0">
                   <td class="num-col">${index + 1}</td>
-                  <td><b>${ui.escapeHtml(userLabel(user))}</b></td>
+                  <td>${nameHtml}</td>
                   <td class="mono muted">${ui.escapeHtml(user.wallet || "—")} <button class="btn-link" data-copy-wallet="${ui.escapeHtml(user.wallet || "")}" type="button">复制</button></td>
                   <td>${user.eligible ? '<span class="badge badge-up">达标</span>' : '<span class="badge badge-ghost">未达标</span>'}</td>
                   <td class="num-col">${user.ahead}/${user.qualified}</td>
@@ -226,6 +251,20 @@ export async function mount(root, ctx = {}) {
       state.toDate = event.target.value;
       state.expanded.clear();
       await loadCity();
+    });
+    body.querySelectorAll("[data-profile-link]").forEach((link) => {
+      link.addEventListener("click", () => {
+        const text = link.dataset.marketText || "";
+        if (!text) return;
+        try {
+          navigator.clipboard.writeText(text).then(
+            () => ui.toast(`已复制市场：${text}`, { type: "info", timeout: 2400 }),
+            () => ui.toast(`市场：${text}`, { type: "info", timeout: 3200 }),
+          );
+        } catch {
+          ui.toast(`市场：${text}`, { type: "info", timeout: 3200 });
+        }
+      });
     });
     body.querySelectorAll("[data-expand]").forEach((button) => {
       button.addEventListener("click", (event) => {
