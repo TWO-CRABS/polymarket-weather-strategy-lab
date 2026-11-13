@@ -189,10 +189,12 @@ export const DEFAULT_STRATEGY = Object.freeze({
     metarReleaseRequireRising: true,
     /** 跟买/跟卖某个公开钱包；替补使用 reaction leaderboard 前三 */
     copyTraderEnabled: false,
+    copyTraderMode: "release",
     copyTraderUser: "",
     copyTraderFallbackDelaySec: 30,
     copyTraderMinReactionRatePct: 90,
     copyTraderSubstituteCount: 3,
+    mirrorTakerOnly: true,
   },
   execution: {
     orderType: "market",
@@ -324,6 +326,8 @@ export function normalizeStrategy(input = {}) {
   merged.signal.metarReleaseEnabled = coerceBool(merged.signal.metarReleaseEnabled, true);
   merged.signal.metarReleaseRequireRising = coerceBool(merged.signal.metarReleaseRequireRising, true);
   merged.signal.copyTraderEnabled = coerceBool(merged.signal.copyTraderEnabled, false);
+  merged.signal.copyTraderMode = String(merged.signal.copyTraderMode || "release").trim().toLowerCase();
+  merged.signal.mirrorTakerOnly = coerceBool(merged.signal.mirrorTakerOnly, true);
   merged.signal.copyTraderUser = String(merged.signal.copyTraderUser || "").trim().toLowerCase();
   if (merged.signal.copyTraderUser && !/^0x[a-f0-9]{40}$/.test(merged.signal.copyTraderUser)) {
     merged.signal.copyTraderUser = "";
@@ -393,6 +397,9 @@ export function validateStrategy(input = {}) {
   inRange(s.copyTraderSubstituteCount, LIMITS.signal.copyTraderSubstituteCount, "signal.copyTraderSubstituteCount");
   if (s.copyTraderEnabled && s.copyTraderUser && !/^0x[a-fA-F0-9]{40}$/.test(s.copyTraderUser)) {
     err(`signal.copyTraderUser 必须为空或 0x 开头的 40 字节钱包地址，当前为 ${s.copyTraderUser}`);
+  }
+  if (!["release", "mirror"].includes(s.copyTraderMode)) {
+    err(`signal.copyTraderMode 必须是 release 或 mirror，当前为 ${s.copyTraderMode}`);
   }
 
   inRange(e.sizingValue, LIMITS.execution.sizingValue, "execution.sizingValue");
@@ -676,6 +683,7 @@ export const EXIT_REASON_LABELS = Object.freeze({
   metar_release: "温度发布信号",
   metar_release_rotate: "温度发布轮换卖出",
   copy_trade: "跟单交易",
+  mirror_trade: "镜像跟单",
   rejected: "订单被拒",
 });
 

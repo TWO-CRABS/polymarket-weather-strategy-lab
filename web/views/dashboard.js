@@ -345,6 +345,7 @@ export async function mount(root, ctx) {
     metar_release: "METAR 温度发布窗口：概率上涨且超过阈值的市场买入 YES。",
     metar_release_rotate: "METAR 温度发布轮换：卖出目标市场 NO 和同城市/同日期其它市场 YES。",
     copy_trade: "跟随指定钱包在已订阅天气市场的公开交易；仍走正常风控。",
+    mirror_trade: "镜像模式连续跟随目标钱包在已选天气市场的买卖成交；仍走正常风控。",
     take_profit: "达到止盈阈值后卖出。",
     stop_loss: "达到止损阈值后卖出。",
     max_hold: "超过最大持有时间后卖出。",
@@ -1194,7 +1195,7 @@ export async function mount(root, ctx) {
       .filter((signal) => {
         const kind = signal.kind === "observation"
           ? "observation"
-          : signal.reason === "copy_trade"
+          : signal.reason === "copy_trade" || signal.reason === "mirror_trade"
             ? "copy"
             : "entry";
         return state.signalFilter === "all" || kind === state.signalFilter;
@@ -1241,7 +1242,7 @@ export async function mount(root, ctx) {
           <span>${ui.escapeHtml(priceText(signal.toPrice))}</span>
           <span class="${ui.dirClass(direction)}">${ui.escapeHtml(ui.fmtPct(num(signal.changePct) !== null ? signal.changePct : direction * 0))}</span>
           <span>窗口 ${ui.escapeHtml(String(signal.windowSec || "—"))}s</span>
-          ${signal.reason === "copy_trade" ? `<span class="sig-copy-source">跟单 ${ui.escapeHtml(signal.copySource === "primary" ? "主钱包" : signal.copySubstituteRank ? `替补#${signal.copySubstituteRank}` : "替补")} · ${ui.escapeHtml(signal.copyTraderLabel || signal.copyTraderWallet || "—")}</span>` : ""}
+          ${signal.reason === "copy_trade" || signal.reason === "mirror_trade" ? `<span class="sig-copy-source">${signal.reason === "mirror_trade" ? "镜像跟单" : "跟单"} ${ui.escapeHtml(signal.reason === "mirror_trade" ? (signal.mirrorTraderWallet || "—") : (signal.copySource === "primary" ? "主钱包" : signal.copySubstituteRank ? `替补#${signal.copySubstituteRank}` : "替补"))} · ${ui.escapeHtml(signal.reason === "mirror_trade" ? (signal.mirrorTraderWallet || "—") : (signal.copyTraderLabel || signal.copyTraderWallet || "—"))}</span>` : ""}
         </div>
         <div class="sig-foot">
           <span class="sig-reason">${observation ? `<b class="sig-observation">观察 · 不可交易</b> · ${ui.escapeHtml(blockLabel)}` : `${ui.escapeHtml(ui.reasonLabel(signal.reason || "signal"))} · ${ui.escapeHtml(signal.priceField || "mid")}`}</span>

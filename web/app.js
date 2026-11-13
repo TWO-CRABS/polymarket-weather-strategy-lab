@@ -20,6 +20,7 @@ import * as dashboardView from "/web/views/dashboard.js";
 import * as historyView from "/web/views/history.js";
 import * as libraryView from "/web/views/library.js";
 import * as leaderboardView from "/web/views/leaderboard.js";
+import * as mirrorView from "/web/views/mirror.js";
 
 const LAST_RUN_KEY = "polytemp.lastRunId";
 
@@ -90,6 +91,7 @@ const VIEWS = {
   history: historyView,
   library: libraryView,
   leaderboard: leaderboardView,
+  mirror: mirrorView,
 };
 
 const VIEW_TITLES = {
@@ -98,6 +100,7 @@ const VIEW_TITLES = {
   history: "运行历史",
   library: "策略库",
   leaderboard: "交易员榜单",
+  mirror: "镜像跟单",
 };
 
 const VALID_ROUTES = Object.keys(VIEWS);

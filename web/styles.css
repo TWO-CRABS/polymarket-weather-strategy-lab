@@ -1831,3 +1831,15 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .sig-copy-source { color: var(--cyan-text); }
 
 .trade-local-time { font-size: 10px; color: var(--text-3); white-space: nowrap; margin-top: 2px; }
+
+.mirror-panel { max-width: 980px; }
+.mirror-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.mirror-field-wide { grid-column: 1 / -1; }
+.mirror-field .field-label { display: block; margin-bottom: 6px; }
+.mirror-field .input { width: 100%; }
+.mirror-field p { margin-top: 6px; font-size: var(--fs-11); line-height: 1.5; }
+.mirror-check { display: flex; align-items: center; gap: 8px; min-height: 36px; color: var(--text-1); font-size: var(--fs-13); }
+.mirror-check input { width: 16px; height: 16px; accent-color: var(--cyan); }
+.mirror-actions { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.mirror-error { grid-column: 1 / -1; color: var(--down-text); background: var(--down-bg); border: 1px solid rgba(240,80,106,.3); border-radius: var(--radius-sm); padding: 8px 10px; }
+@media (max-width: 760px) { .mirror-form { grid-template-columns: 1fr; } }

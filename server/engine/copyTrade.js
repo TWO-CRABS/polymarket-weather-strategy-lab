@@ -200,6 +200,7 @@ async function copyOneTrade(run, market, trade, candidate, now, nodeTs) {
 export async function processCopyTrades(run, now, opts = {}) {
   const cfg = run.config.signal;
   if (!cfg?.copyTraderEnabled) return;
+  if (cfg.copyTraderMode === "mirror") return;
   if (run.mode === "replay") return;
   if (!(now - (run._copyTradeLastPoll || 0) >= POLL_MS)) return;
   run._copyTradeLastPoll = now;

@@ -36,6 +36,7 @@ import {
 } from "./runTrading.js";
 import { processMetarRelease } from "./metarRelease.js";
 import { processCopyTrades } from "./copyTrade.js";
+import { processMirrorTrades } from "./mirrorTrade.js";
 
 const TERMINAL_STATUSES = new Set(["stopped", "ended", "error"]);
 const EQUITY_POINT_CAP = 20_000;
@@ -342,7 +343,11 @@ export class Run {
       // Release signal runs after fallback/momentum so fallback always gets
       // first chance; it may rotate positions created on this same tick.
       await processMetarRelease(this, now);
-      await processCopyTrades(this, now);
+      if (this.config.signal.copyTraderMode === "mirror") {
+        await processMirrorTrades(this, now);
+      } else {
+        await processCopyTrades(this, now);
+      }
       this._refreshMarks();
       const equity = this.portfolio.equity();
       this.peakEquity = Math.max(this.peakEquity, equity);
