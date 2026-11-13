@@ -142,6 +142,7 @@ function eventRows(user) {
             <td>${ui.escapeHtml(trade.outcome || "—")}</td>
             <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
             <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+            <td class="num-col">${Number.isFinite(Number(trade.price)) ? Number(trade.price).toFixed(4) : "—"}</td>
             <td class="num-col">${usd(trade.amount)}</td>
             <td>${ui.escapeHtml(type)}</td>
             ${settlementCell}
@@ -162,6 +163,7 @@ function eventRows(user) {
           <td>—</td><td>—</td><td>—</td>
           <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
           <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+          <td class="num-col">—</td>
           <td class="num-col">—</td>
           <td>节点前已持仓</td>
           ${settlementCell}
@@ -195,7 +197,7 @@ function eventRows(user) {
       <table class="lb-detail-table">
         <thead><tr>
           <th>节点时间</th><th>节点温度</th><th>成交时间</th><th>动作</th><th>交易市场</th><th>方向</th>
-          <th class="num-col">Baseline</th><th class="num-col">重定价</th><th class="num-col">交易金额</th><th>类型</th>
+          <th class="num-col">Baseline</th><th class="num-col">重定价</th><th class="num-col">交易价格</th><th class="num-col">交易金额</th><th>类型</th>
           <th>结算温度</th><th class="num-col">盈利金额</th><th>市场核验</th><th>用户主页</th>
         </tr></thead>
         <tbody>${orderedRows.join("")}</tbody>
