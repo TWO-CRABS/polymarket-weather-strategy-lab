@@ -129,7 +129,9 @@ export function createApiHandler(deps) {
 
     if (method === "GET" && pathname === "/api/trader-profile") {
       const wallet = url.searchParams.get("wallet") || "";
-      sendJson(res, 200, await getPublicProfile(wallet));
+      sendJson(res, 200, await getPublicProfile(wallet, {
+        cacheFile: path.join(config.dataDir, "trader-profiles.json"),
+      }));
       return true;
     }
 
