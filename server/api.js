@@ -20,6 +20,7 @@ import path from "node:path";
 import { queryCityLeaderboard } from "./research/leaderboardQuery.js";
 import { getEventTradeMetrics } from "./research/eventTradeMetrics.js";
 import { getPublicProfile } from "./research/profileResolver.js";
+import { getMonthlyPnl } from "./research/userPnl.js";
 
 const MAX_LIMIT = 500;
 
@@ -131,6 +132,14 @@ export function createApiHandler(deps) {
       const wallet = url.searchParams.get("wallet") || "";
       sendJson(res, 200, await getPublicProfile(wallet, {
         cacheFile: path.join(config.dataDir, "trader-profiles.json"),
+      }));
+      return true;
+    }
+
+    if (method === "GET" && pathname === "/api/trader-pnl") {
+      const wallet = url.searchParams.get("wallet") || "";
+      sendJson(res, 200, await getMonthlyPnl(wallet, {
+        cacheFile: path.join(config.dataDir, "trader-pnl.json"),
       }));
       return true;
     }

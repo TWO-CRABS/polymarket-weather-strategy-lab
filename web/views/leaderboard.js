@@ -109,7 +109,7 @@ function fmtDateTime(ts) {
 function eventRows(user) {
   const events = Array.isArray(user.events) ? user.events : [];
   if (!events.length) {
-    return '<tr class="lb-detail-row"><td colspan="8" class="muted lb-detail-empty">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
+    return '<tr class="lb-detail-row"><td colspan="9" class="muted lb-detail-empty">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
   }
   const rows = [];
   for (const event of events) {
@@ -193,7 +193,7 @@ function eventRows(user) {
           : row.html
       ));
     });
-  return `<tr class="lb-detail-row"><td colspan="8">
+  return `<tr class="lb-detail-row"><td colspan="9">
     <div class="lb-detail">
       <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟；只列 ahead 方向交易，不等同于 Polymarket 账户持仓/全部盈亏）</div>
       <table class="lb-detail-table">
@@ -221,6 +221,7 @@ export async function mount(root, ctx = {}) {
     takerOnly: false,
     metricsCache: new Map(),
     profileCache: new Map(),
+    pnlCache: new Map(),
     loadSeq: 0,
     expanded: new Set(),
     loading: true,
@@ -328,7 +329,7 @@ export async function mount(root, ctx = {}) {
         <div class="table-wrap lb-table-wrap">
           <table class="table lb-table">
             <thead><tr>
-              <th>#</th><th>用户</th><th>钱包</th><th>状态</th><th class="num-col">Ahead / 参与节点</th>
+              <th>#</th><th>用户</th><th class="num-col">月盈亏</th><th>钱包</th><th>状态</th><th class="num-col">Ahead / 参与节点</th>
               <th class="num-col">反应率</th><th class="num-col">Wilson 下界</th><th>Ahead 事件</th>
             </tr></thead>
             <tbody>
@@ -342,6 +343,7 @@ export async function mount(root, ctx = {}) {
                 return `<tr class="lb-user-row" data-wallet="${ui.escapeHtml(user.wallet)}" tabindex="0">
                   <td class="num-col">${index + 1}</td>
                   <td>${nameHtml}</td>
+                  <td class="num-col lb-month-pnl" data-pnl-wallet="${ui.escapeHtml(user.wallet || "")}">…</td>
                   <td class="mono muted">${ui.escapeHtml(user.wallet || "—")} <button class="btn-link" data-copy-wallet="${ui.escapeHtml(user.wallet || "")}" type="button">复制</button></td>
                   <td>${user.eligible ? '<span class="badge badge-up">达标</span>' : '<span class="badge badge-ghost">未达标</span>'}</td>
                   <td class="num-col">${user.ahead}/${user.qualified}</td>
@@ -349,7 +351,7 @@ export async function mount(root, ctx = {}) {
                   <td class="num-col">${pct(user.wilsonLower, 3)}</td>
                   <td>${(user.events || []).length} 个 <button class="btn-link" data-expand="${ui.escapeHtml(user.wallet)}" type="button">${expanded ? "收起" : "查看"}</button></td>
                 </tr>${expanded ? eventRows(user) : ""}`;
-              }).join("") || `<tr><td colspan="8" class="muted">${state.eligibleOnly ? "当前没有达标用户；切换「全部」可查看相对更高的未达标用户。" : "没有匹配用户"}</td></tr>`}
+              }).join("") || `<tr><td colspan="9" class="muted">${state.eligibleOnly ? "当前没有达标用户；切换「全部」可查看相对更高的未达标用户。" : "没有匹配用户"}</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -441,6 +443,40 @@ export async function mount(root, ctx = {}) {
     void loadSettlementTemps();
     void loadDetailMetrics();
     void resolveMissingNames();
+    void resolveMonthlyPnls();
+  }
+
+  async function resolveMonthlyPnls() {
+    const cells = [...body.querySelectorAll(".lb-month-pnl[data-pnl-wallet]")];
+    await Promise.all(cells.map(async (cell) => {
+      const wallet = cell.dataset.pnlWallet;
+      if (!wallet) {
+        cell.textContent = "—";
+        return;
+      }
+      let value = state.pnlCache.get(wallet);
+      if (!value) {
+        try {
+          const res = await fetch(`/api/trader-pnl?wallet=${encodeURIComponent(wallet)}`, { cache: "no-store" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          value = await res.json();
+          state.pnlCache.set(wallet, value);
+        } catch {
+          value = { monthPnl: null };
+          state.pnlCache.set(wallet, value);
+        }
+      }
+      if (state.destroyed || !cell.isConnected) return;
+      const pnl = Number(value.monthPnl);
+      if (Number.isFinite(pnl)) {
+        cell.textContent = money(pnl, true);
+        cell.classList.toggle("lb-profit-up", pnl > 0);
+        cell.classList.toggle("lb-profit-down", pnl < 0);
+        cell.title = "过去 30 天 Polymarket 账户盈亏（Data API v2 user-pnl）";
+      } else {
+        cell.textContent = "—";
+      }
+    }));
   }
 
   async function resolveMissingNames() {
