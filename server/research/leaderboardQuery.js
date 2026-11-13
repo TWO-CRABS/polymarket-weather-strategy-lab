@@ -26,7 +26,8 @@ export async function queryCityLeaderboard({
   eventsDir = DEFAULT_EVENTS_DIR,
 } = {}) {
   const wantedCity = String(city || "").trim();
-  if (!wantedCity) throw new Error("city is required");
+  const allCities = !wantedCity || ["__all__", "all", "*"].includes(wantedCity.toLowerCase());
+  if (!allCities && !wantedCity) throw new Error("city is required");
   const type = ["all", "trade", "pre"].includes(String(eventType || "all")) ? String(eventType || "all") : "all";
   let files = [];
   try {
@@ -44,7 +45,8 @@ export async function queryCityLeaderboard({
     } catch {
       continue;
     }
-    if (!fact || fact.city !== wantedCity || !fact.eventDate) continue;
+    if (!fact || !fact.eventDate) continue;
+    if (!allCities && fact.city !== wantedCity) continue;
     if (availableFrom === null || fact.eventDate < availableFrom) availableFrom = fact.eventDate;
     if (availableTo === null || fact.eventDate > availableTo) availableTo = fact.eventDate;
     if (!dateInRange(fact.eventDate, fromDate, toDate)) continue;
@@ -129,7 +131,8 @@ export async function queryCityLeaderboard({
   ));
 
   return {
-    city: wantedCity,
+    city: allCities ? "__all__" : wantedCity,
+    cityLabel: allCities ? "所有城市" : wantedCity,
     fromDate: fromDate || availableFrom || "",
     toDate: toDate || availableTo || "",
     availableFrom,

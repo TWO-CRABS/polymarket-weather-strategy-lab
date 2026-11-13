@@ -127,7 +127,6 @@ export function createApiHandler(deps) {
 
     if (method === "GET" && pathname === "/api/trader-leaderboards") {
       const city = url.searchParams.get("city") || "";
-      if (!city) throw new AppError(400, "INVALID_CITY", "缺少 city 参数");
       const data = await queryCityLeaderboard({
         city,
         fromDate: url.searchParams.get("from") || "",

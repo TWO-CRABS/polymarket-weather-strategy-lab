@@ -129,10 +129,12 @@ export async function mount(root, ctx = {}) {
       const qb = data.cities[b].qualifiedWarmingNodes || 0;
       return qb - qa || a.localeCompare(b);
     });
-    if (!state.city || !data.cities[state.city]) state.city = cities[0] || "";
+    if (!state.city || (state.city !== "__all__" && !data.cities[state.city])) state.city = cities[0] || "";
     const city = state.cityData && state.cityData.city === state.city
       ? state.cityData
-      : data.cities[state.city];
+      : state.city === "__all__"
+        ? null
+        : data.cities[state.city];
     if (!city) {
       body.innerHTML = '<div class="empty-state">暂无城市数据。</div>';
       return;
@@ -147,6 +149,7 @@ export async function mount(root, ctx = {}) {
     body.innerHTML = `
       <div class="panel lb-summary">
         <div class="panel-body lb-summary-row">
+          <div class="lb-stat"><span>范围</span><b>${ui.escapeHtml(city.cityLabel || state.city)}</b></div>
           <div class="lb-stat"><span>统计区间</span><b>${ui.escapeHtml(state.fromDate || data.fromDate)} → ${ui.escapeHtml(state.toDate || data.toDate)}</b></div>
           <div class="lb-stat"><span>合格节点</span><b>${city.qualifiedWarmingNodes}</b></div>
           <div class="lb-stat"><span>事件数</span><b>${city.eventCount ?? "—"}</b></div>
@@ -158,6 +161,7 @@ export async function mount(root, ctx = {}) {
       <div class="lb-toolbar">
         <label class="field-label" for="lbCity">城市</label>
         <select class="input" id="lbCity">
+          <option value="__all__" ${state.city === "__all__" ? "selected" : ""}>所有城市 · ${data.qualifiedWarmingNodes} 节点</option>
           ${cities.map((name) => `<option value="${ui.escapeHtml(name)}" ${name === state.city ? "selected" : ""}>${ui.escapeHtml(name)} · ${data.cities[name].qualifiedWarmingNodes} 节点</option>`).join("")}
         </select>
         <label class="field-label" for="lbFrom">从</label>

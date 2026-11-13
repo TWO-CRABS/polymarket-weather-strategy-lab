@@ -63,6 +63,11 @@ test("per-city date filter recomputes denominator and user rates", async () => {
     assert.equal(trade.users.find((u) => u.wallet === "0xabc").ahead, 1);
     const pre = await queryCityLeaderboard({ city: "TestCity", eventType: "pre", eventsDir: dir });
     assert.equal(pre.userCount, 0);
+
+    const allCities = await queryCityLeaderboard({ city: "__all__", eventsDir: dir });
+    assert.equal(allCities.city, "__all__");
+    assert.equal(allCities.cityLabel, "所有城市");
+    assert.equal(allCities.qualifiedWarmingNodes, 2);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }
