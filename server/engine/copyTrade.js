@@ -115,7 +115,7 @@ async function fetchUserTrades(run, wallet, now, nodeTs) {
       limit: 200,
       start: Math.floor(start / 1000),
       end,
-      takerOnly: false,
+      takerOnly: true,
     });
     return Array.isArray(result?.data) ? result.data : [];
   } catch {

@@ -78,7 +78,7 @@ const GROUP_DEFS = [
       { path: "signal.metarReleaseWindowSec", label: "发布窗口前后", unit: "秒", min: LIM.signal.metarReleaseWindowSec[0], max: LIM.signal.metarReleaseWindowSec[1], step: 10, help: "默认 300 秒 = 节点前后各 5 分钟" },
       { path: "signal.metarReleaseMinProbabilityPct", label: "最低概率", unit: "%", min: LIM.signal.metarReleaseMinProbabilityPct[0], max: LIM.signal.metarReleaseMinProbabilityPct[1], step: 1, help: "严格大于该值才触发；默认 50" },
       { path: "signal.metarReleaseRequireRising", kind: "toggle", label: "要求概率相对发布前上涨", help: "开启时要求当前概率高于节点前基准；关闭则只看是否超过最低概率" },
-      { path: "signal.copyTraderEnabled", kind: "toggle", label: "跟买/跟卖信号", help: "在 METAR 发布窗口内跟随指定钱包在已订阅天气市场的公开交易；地址留空时只跟随该城市榜单替补前三" },
+      { path: "signal.copyTraderEnabled", kind: "toggle", label: "跟买/跟卖信号", help: "在 METAR 发布窗口内跟随指定钱包在已订阅天气市场的主动成交（Taker）；被动挂单成交不跟；地址留空时只跟随该城市榜单替补" },
       { path: "signal.copyTraderUser", kind: "text", label: "跟单钱包地址", placeholder: "0x...（留空则只跟榜单替补）", help: "proxy wallet 地址；留空时自动跟随该城市榜单中满足条件的替补，仍走正常风控" },
       { path: "signal.copyTraderFallbackDelaySec", label: "替补等待", unit: "秒", min: LIM.signal.copyTraderFallbackDelaySec[0], max: LIM.signal.copyTraderFallbackDelaySec[1], step: 1, help: "主用户在该节点窗口内无动作后，等待多久启用替补" },
       { path: "signal.copyTraderSubstituteCount", label: "替补数量", unit: "个", min: LIM.signal.copyTraderSubstituteCount[0], max: LIM.signal.copyTraderSubstituteCount[1], step: 1, help: "地址为空或主钱包无动作时，最多尝试该城市榜单前 N 名；默认 3" },
