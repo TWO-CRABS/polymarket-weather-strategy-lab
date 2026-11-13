@@ -70,9 +70,9 @@ function profileUrl(wallet) {
   return value ? `https://polymarket.com/profile/${encodeURIComponent(value)}` : "";
 }
 
-function marketQuestion(event, fallbackCity = "") {
+function marketQuestion(event, fallbackCity = "", bracketOverride = "") {
   if (!event) return "";
-  const bracket = String(event.bracket || "").trim();
+  const bracket = String(bracketOverride || event.bracket || "").trim();
   const city = String(event.city || fallbackCity || "").trim();
   const date = new Date(`${event.eventDate || ""}T00:00:00Z`);
   if (!bracket || !city || !Number.isFinite(date.getTime())) return "";
@@ -118,10 +118,12 @@ function eventRows(user) {
       ? `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开事件 ↗</a>`
       : "—";
     const profile = profileUrl(user.wallet);
-    const question = marketQuestion(event);
-    const profileLink = profile
-      ? `<a class="mkt-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开该用户主页并复制此市场">打开用户主页 ↗</a>`
-      : "—";
+    const profileLinkFor = (bracket) => {
+      const question = marketQuestion(event, event.city, bracket);
+      return profile
+        ? `<a class="mkt-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开该用户主页并复制实际交易市场的问题">打开用户主页 ↗</a>`
+        : "—";
+    };
     const trades = Array.isArray(event.trades) ? event.trades : [];
     const tradeKey = `${event.eventSlug}|${user.wallet}|${event.nodeTs}`;
     tradeSnapshots.set(tradeKey, { event, user });
@@ -148,7 +150,7 @@ function eventRows(user) {
             ${settlementCell}
             <td class="num-col lb-metric-profit ${Number(trade.pnl) > 0 ? "lb-profit-up" : Number(trade.pnl) < 0 ? "lb-profit-down" : ""}" data-trade-key="${ui.escapeHtml(tradeKey)}">${usd(trade.pnl, true)}</td>
             <td>${link}</td>
-            <td>${profileLink}</td>
+            <td>${profileLinkFor(trade.marketBracket || event.bracket)}</td>
           </tr>`,
         });
       }
@@ -169,7 +171,7 @@ function eventRows(user) {
           ${settlementCell}
           <td class="num-col lb-metric-profit" data-trade-key="${ui.escapeHtml(tradeKey)}">—</td>
           <td>${link}</td>
-          <td>${profileLink}</td>
+          <td>${profileLinkFor(event.bracket)}</td>
         </tr>`,
       });
     }
