@@ -44,7 +44,7 @@ function userLabel(user) {
 function eventRows(user) {
   const events = Array.isArray(user.events) ? user.events : [];
   if (!events.length) {
-    return '<tr class="lb-detail-row"><td colspan="7" class="muted">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
+    return '<tr class="lb-detail-row"><td colspan="8" class="muted">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
   }
   return events.map((event) => {
     const url = eventUrl(event);
@@ -68,6 +68,7 @@ export async function mount(root, ctx = {}) {
     data: null,
     city: String((ctx.params && ctx.params.city) || localStorage.getItem("polytemp.leaderboardCity") || ""),
     search: "",
+    eligibleOnly: false,
     expanded: new Set(),
     loading: true,
     error: null,
@@ -120,6 +121,7 @@ export async function mount(root, ctx = {}) {
     }
     const query = state.search.trim().toLowerCase();
     const users = (city.users || []).filter((user) => {
+      if (state.eligibleOnly && !user.eligible) return false;
       if (!query) return true;
       return `${user.pseudonym || ""} ${user.wallet || ""}`.toLowerCase().includes(query);
     });
@@ -140,13 +142,17 @@ export async function mount(root, ctx = {}) {
           ${cities.map((name) => `<option value="${ui.escapeHtml(name)}" ${name === state.city ? "selected" : ""}>${ui.escapeHtml(name)} · ${data.cities[name].qualifiedWarmingNodes} 节点</option>`).join("")}
         </select>
         <input class="input" id="lbSearch" type="search" placeholder="搜索伪名 / 钱包" value="${ui.escapeHtml(state.search)}">
-        <span class="muted">显示前 ${Math.min(users.length, maxShow)} / ${city.userCount ?? city.users.length} 名</span>
+        <div class="segmented segmented-sm" role="group" aria-label="榜单筛选">
+          <button class="seg ${state.eligibleOnly ? "" : "is-active"}" type="button" data-lb-filter="all">全部</button>
+          <button class="seg ${state.eligibleOnly ? "is-active" : ""}" type="button" data-lb-filter="eligible">仅达标</button>
+        </div>
+        <span class="muted">显示前 ${Math.min(users.length, maxShow)} / ${city.userCount ?? city.users.length} 名（默认包含未达标用户）</span>
       </div>
       <div class="panel">
         <div class="table-wrap lb-table-wrap">
           <table class="table lb-table">
             <thead><tr>
-              <th>#</th><th>用户</th><th>钱包</th><th class="num-col">Ahead / 节点</th>
+              <th>#</th><th>用户</th><th>钱包</th><th>状态</th><th class="num-col">Ahead / 节点</th>
               <th class="num-col">反应率</th><th class="num-col">Wilson 下界</th><th>Ahead 事件</th>
             </tr></thead>
             <tbody>
@@ -154,14 +160,15 @@ export async function mount(root, ctx = {}) {
                 const expanded = state.expanded.has(user.wallet);
                 return `<tr class="lb-user-row" data-wallet="${ui.escapeHtml(user.wallet)}" tabindex="0">
                   <td class="num-col">${index + 1}</td>
-                  <td><b>${ui.escapeHtml(userLabel(user))}</b> ${user.eligible ? '<span class="badge badge-up">替补</span>' : ""}</td>
-                  <td class="mono muted">${ui.escapeHtml(user.wallet || "—")}</td>
+                  <td><b>${ui.escapeHtml(userLabel(user))}</b></td>
+                  <td class="mono muted">${ui.escapeHtml(user.wallet || "—")} <button class="btn-link" data-copy-wallet="${ui.escapeHtml(user.wallet || "")}" type="button">复制</button></td>
+                  <td>${user.eligible ? '<span class="badge badge-up">达标</span>' : '<span class="badge badge-ghost">未达标</span>'}</td>
                   <td class="num-col">${user.ahead}/${user.qualified}</td>
                   <td class="num-col">${pct(user.reactionRate)}</td>
                   <td class="num-col">${pct(user.wilsonLower, 3)}</td>
                   <td>${(user.events || []).length} 个 <button class="btn-link" data-expand="${ui.escapeHtml(user.wallet)}" type="button">${expanded ? "收起" : "查看"}</button></td>
                 </tr>${expanded ? eventRows(user) : ""}`;
-              }).join("") || '<tr><td colspan="7" class="muted">没有匹配用户</td></tr>'}
+              }).join("") || `<tr><td colspan="8" class="muted">${state.eligibleOnly ? "当前没有达标用户；切换「全部」可查看相对更高的未达标用户。" : "没有匹配用户"}</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -184,6 +191,25 @@ export async function mount(root, ctx = {}) {
         const wallet = button.dataset.expand;
         if (state.expanded.has(wallet)) state.expanded.delete(wallet);
         else state.expanded.add(wallet);
+        render();
+      });
+    });
+    body.querySelectorAll("[data-copy-wallet]").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const wallet = button.dataset.copyWallet || "";
+        try {
+          await navigator.clipboard.writeText(wallet);
+          ui.toast("钱包地址已复制，可粘贴到策略构建器的跟单钱包", { type: "info", timeout: 1800 });
+        } catch {
+          ui.toast(`钱包地址：${wallet}`, { type: "info", timeout: 3000 });
+        }
+      });
+    });
+    body.querySelectorAll("[data-lb-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.eligibleOnly = button.dataset.lbFilter === "eligible";
+        state.expanded.clear();
         render();
       });
     });
