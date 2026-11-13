@@ -193,7 +193,7 @@ function eventRows(user) {
     });
   return `<tr class="lb-detail-row"><td colspan="8">
     <div class="lb-detail">
-      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟；节点温度是节点，交易市场是实际成交市场）</div>
+      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟；只列 ahead 方向交易，不等同于 Polymarket 账户持仓/全部盈亏）</div>
       <table class="lb-detail-table">
         <thead><tr>
           <th>节点时间</th><th>节点温度</th><th>成交时间</th><th>动作</th><th>交易市场</th><th>方向</th>
