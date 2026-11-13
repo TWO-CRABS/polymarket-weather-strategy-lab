@@ -131,3 +131,14 @@ test("substitute is used after primary silence delay", async () => {
   assert.equal(run.signals.length, 1);
   assert.equal(run.signals[0].copySource, "substitute");
 });
+
+test("only one substitute is copied for the same city node", async () => {
+  const other = "0x3333333333333333333333333333333333333333";
+  const run = makeRun({
+    copyUser: "",
+    trades: [trade({ wallet: SUB }), trade({ wallet: other })],
+  });
+  await processCopyTrades(run, NODE_NOW, { store: FAKE_STORE, substitutes: [SUB, other] });
+  assert.equal(run.signals.length, 1);
+  assert.equal(run.signals[0].copyNodeTs, Math.floor(NODE_NOW / 1000) * 1000);
+});

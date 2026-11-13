@@ -165,6 +165,8 @@ function tradeSignal(run, market, trade, candidate, now, nodeTs) {
 }
 
 async function copyOneTrade(run, market, trade, candidate, now, nodeTs) {
+  const nodeKey = nodeTs ? `${market.city || ""}|${Number(nodeTs)}` : "";
+  if (nodeKey && run._copyNodeSignals?.has(nodeKey)) return false;
   const side = String(trade.side || "").toUpperCase();
   const tradeKey = `${trade.transaction_hash || ""}|${trade.proxy_wallet || ""}|${trade.token_id || ""}|${side}|${trade.timestamp || ""}`;
   if (run._copyTradeSeen.has(tradeKey)) return false;
@@ -175,6 +177,7 @@ async function copyOneTrade(run, market, trade, candidate, now, nodeTs) {
   if (side === "BUY") {
     if (run.portfolio.positionsForMarket(market.id).some((p) => p.tokenId === tokenId)) return false;
     const signal = tradeSignal(run, market, trade, candidate, now, nodeTs);
+    if (nodeKey) run._copyNodeSignals.add(nodeKey);
     run.signals.push(signal);
     run.store.appendRecord(run.id, "signal", signal);
     run.sse.broadcast("signal", { signal }, run.id);
@@ -205,13 +208,19 @@ export async function processCopyTrades(run, now, opts = {}) {
   if (!active) return;
   if (!run._copyPrimaryNodes) run._copyPrimaryNodes = new Map();
   if (!run._copyNodeDone) run._copyNodeDone = new Map();
+  if (!run._copyNodeSignals) run._copyNodeSignals = new Set();
   const hasPrimary = active.groups.some((group) => candidateWallets(run, group.city, opts).some((candidate) => candidate.source === "primary"));
   const fallbackDelayMs = hasPrimary
     ? Math.max(0, Number(cfg.copyTraderFallbackDelaySec) || 0) * 1000
     : 0;
 
   for (const group of active.groups) {
+    const nodeKey = `${group.city || ""}|${Number(group.node.nodeTs)}`;
     if (run._copyNodeDone.get(group.city) === group.node.nodeTs) continue;
+    if (run._copyNodeSignals.has(nodeKey)) {
+      run._copyNodeDone.set(group.city, group.node.nodeTs);
+      continue;
+    }
     const alreadySignaled = (run.signals || []).some((signal) => (
       signal.reason === "copy_trade"
       && signal.city === group.city
@@ -219,6 +228,7 @@ export async function processCopyTrades(run, now, opts = {}) {
     ));
     if (alreadySignaled) {
       run._copyNodeDone.set(group.city, group.node.nodeTs);
+      run._copyNodeSignals.add(nodeKey);
       continue;
     }
     const candidates = candidateWallets(run, group.city, opts);
@@ -243,6 +253,7 @@ export async function processCopyTrades(run, now, opts = {}) {
         if (!market) continue;
         const copied = await copyOneTrade(run, market, trade, candidate, now, group.node.nodeTs);
         if (copied) {
+          if (nodeKey) run._copyNodeSignals.add(nodeKey);
           run._copyNodeDone.set(group.city, group.node.nodeTs);
           if (candidate.source === "primary") run._copyPrimaryNodes.set(group.city, group.node.nodeTs);
           break candidateLoop;
