@@ -66,8 +66,19 @@ const MAX_EVENTS = Number(getArg("max-events", 0)) || 0;
 const log = (...parts) => console.log(...parts);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function dateRange(from, to) {
-  const out = [];
+function eventDateFromSlug(slug, fallback) {
+  const months = {
+    january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
+    july: "07", august: "08", september: "09", october: "10", november: "11", december: "12",
+  };
+  const match = /-on-([a-z]+)-(\d{1,2})-(\d{4})$/i.exec(String(slug || ""));
+  if (!match) return fallback;
+  const month = months[match[1].toLowerCase()];
+  if (!month) return fallback;
+  return `${match[3]}-${month}-${String(match[2]).padStart(2, "0")}`;
+}
+
+function dateRange(from, to) {  const out = [];
   const start = new Date(`${from}T00:00:00Z`);
   const end = new Date(`${to}T00:00:00Z`);
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) throw new Error("bad date range");
@@ -229,7 +240,10 @@ async function analyzeEvent(event, clob) {
     await sleep(100);
   }
   const stats = computeTraderReactionStats({ warmingNodes: nodes, targetMarketTrades: trades, priceByToken });
-  const eventDate = new Date(resolution.anchorSec * 1000).toISOString().slice(0, 10);
+  const eventDate = eventDateFromSlug(
+    event.slug,
+    new Date(resolution.anchorSec * 1000).toISOString().slice(0, 10),
+  );
   return {
     status: "ok",
     slug: event.slug,
