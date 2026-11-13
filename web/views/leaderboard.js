@@ -219,6 +219,7 @@ export async function mount(root, ctx = {}) {
     eligibleOnly: false,
     eventType: "all",
     metricsCache: new Map(),
+    profileCache: new Map(),
     loadSeq: 0,
     expanded: new Set(),
     loading: true,
@@ -329,8 +330,9 @@ export async function mount(root, ctx = {}) {
               ${users.slice(0, maxShow).map((user, index) => {
                 const expanded = state.expanded.has(user.wallet);
                 const profile = profileUrl(user.wallet);
+                const needsProfile = !user.pseudonym || /^0x/i.test(String(user.pseudonym));
                 const nameHtml = profile
-                  ? `<a class="lb-user-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" title="打开该用户 Polymarket 主页">${ui.escapeHtml(userLabel(user))}</a>`
+                  ? `<a class="lb-user-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-wallet="${ui.escapeHtml(user.wallet)}" ${needsProfile ? 'data-needs-profile="1"' : ""} title="打开该用户 Polymarket 主页">${ui.escapeHtml(userLabel(user))}</a>`
                   : `<b>${ui.escapeHtml(userLabel(user))}</b>`;
                 return `<tr class="lb-user-row" data-wallet="${ui.escapeHtml(user.wallet)}" tabindex="0">
                   <td class="num-col">${index + 1}</td>
@@ -426,6 +428,33 @@ export async function mount(root, ctx = {}) {
     });
     void loadSettlementTemps();
     void loadDetailMetrics();
+    void resolveMissingNames();
+  }
+
+  async function resolveMissingNames() {
+    const links = [...body.querySelectorAll(".lb-user-link[data-needs-profile='1']")];
+    await Promise.all(links.map(async (link) => {
+      const wallet = link.dataset.profileWallet;
+      if (!wallet) return;
+      let profile = state.profileCache.get(wallet);
+      if (!profile) {
+        try {
+          const res = await fetch(`/api/trader-profile?wallet=${encodeURIComponent(wallet)}`, { cache: "no-store" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          profile = await res.json();
+          state.profileCache.set(wallet, profile);
+        } catch {
+          return;
+        }
+      }
+      if (state.destroyed || !link.isConnected) return;
+      const label = profile?.name || profile?.pseudonym;
+      if (label) link.textContent = label;
+      if (profile?.name) {
+        link.href = `https://polymarket.com/zh/@${encodeURIComponent(profile.name)}?tab=activity`;
+      }
+      link.removeAttribute("data-needs-profile");
+    }));
   }
 
   function money(value, signed = false) {

@@ -19,6 +19,7 @@ import { extractCity, fetchMarketById } from "./data/gamma.js";
 import path from "node:path";
 import { queryCityLeaderboard } from "./research/leaderboardQuery.js";
 import { getEventTradeMetrics } from "./research/eventTradeMetrics.js";
+import { getPublicProfile } from "./research/profileResolver.js";
 
 const MAX_LIMIT = 500;
 
@@ -123,6 +124,12 @@ export function createApiHandler(deps) {
 
     if (method === "GET" && pathname === "/api/meta") {
       sendJson(res, 200, metaPayload());
+      return true;
+    }
+
+    if (method === "GET" && pathname === "/api/trader-profile") {
+      const wallet = url.searchParams.get("wallet") || "";
+      sendJson(res, 200, await getPublicProfile(wallet));
       return true;
     }
 
