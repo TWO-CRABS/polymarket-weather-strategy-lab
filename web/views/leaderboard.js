@@ -131,6 +131,7 @@ function eventRows(user) {
         const isTarget = Boolean(trade.target);
         const type = event.prePositioned ? "节点前持仓 + 窗口成交" : "窗口内成交";
         rows.push({
+          nodeKey: tradeKey,
           sortTs: Number(trade.ts) || 0,
           html: `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
             <td class="mono">${ui.escapeHtml(fmtDateTime(event.nodeTs))}</td>
@@ -152,6 +153,7 @@ function eventRows(user) {
       }
     } else {
       rows.push({
+        nodeKey: tradeKey,
         sortTs: Number(event.nodeTs) || 0,
         html: `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
           <td class="mono">${ui.escapeHtml(fmtDateTime(event.nodeTs))}</td>
@@ -170,7 +172,23 @@ function eventRows(user) {
       });
     }
   }
-  rows.sort((a, b) => b.sortTs - a.sortTs);
+  const groups = new Map();
+  for (const row of rows) {
+    if (!groups.has(row.nodeKey)) groups.set(row.nodeKey, { rows: [], lastTs: 0 });
+    const group = groups.get(row.nodeKey);
+    group.rows.push(row);
+    group.lastTs = Math.max(group.lastTs, row.sortTs);
+  }
+  const orderedRows = [...groups.values()]
+    .sort((a, b) => b.lastTs - a.lastTs)
+    .flatMap((group) => {
+      group.rows.sort((a, b) => b.sortTs - a.sortTs);
+      return group.rows.map((row, index) => (
+        index === 0
+          ? row.html.replace('<tr class="lb-trade-row"', '<tr class="lb-trade-row lb-node-first"')
+          : row.html
+      ));
+    });
   return `<tr class="lb-detail-row"><td colspan="8">
     <div class="lb-detail">
       <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟；节点温度是节点，交易市场是实际成交市场）</div>
@@ -180,7 +198,7 @@ function eventRows(user) {
           <th class="num-col">Baseline</th><th class="num-col">重定价</th><th class="num-col">交易金额</th><th>类型</th>
           <th>结算温度</th><th class="num-col">盈利金额</th><th>市场核验</th><th>用户主页</th>
         </tr></thead>
-        <tbody>${rows.map((row) => row.html).join("")}</tbody>
+        <tbody>${orderedRows.join("")}</tbody>
       </table>
     </div>
   </td></tr>`;

@@ -1824,3 +1824,6 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .lb-trade-table { width: 100%; min-width: 0; }
 .lb-trade-table th, .lb-trade-table td { padding: 5px 8px; white-space: nowrap; }
 .lb-modal-body > p { margin-top: var(--sp-3); line-height: 1.6; }
+
+.lb-detail-table .lb-trade-row.lb-node-first td { border-top: 1px solid rgba(255, 255, 255, 0.16); }
+.lb-detail-table .lb-trade-row.lb-node-first td:first-child { box-shadow: inset 2px 0 0 rgba(34, 211, 238, 0.45); }
