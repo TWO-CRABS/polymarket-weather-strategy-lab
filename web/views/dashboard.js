@@ -20,6 +20,7 @@ import {
 import * as api from "/web/api.js";
 import * as ui from "/web/components/ui.js";
 import { createLineChart, drawSparkline } from "/web/components/charts.js";
+import { localDateTimeForTimeZone, timezoneForCity } from "/shared/cityTimezones.js";
 
 const MODE_LABELS = { live: "实时", replay: "回放" };
 const ACTIVE_STATUSES = new Set(["created", "starting", "running", "paused", "stopping"]);
@@ -1578,9 +1579,14 @@ export async function mount(root, ctx) {
       const pnl = num(trade.realizedPnl);
       const selected = state.selectedMarketId && trade.marketId === state.selectedMarketId;
       const bracketText = [bracket, date].filter(Boolean).join(" · ");
+      const cityZone = timezoneForCity(city);
+      const cityLocalTime = cityZone ? localDateTimeForTimeZone(cityZone, new Date(trade.ts)) : "";
       const tipAttr = ui.escapeHtml(buildTradeTip({ trade, market, city, bracket, date, reason })).replace(/\n/g, "&#10;");
       return `<tr class="${rejected ? "row-rejected" : ""}${selected ? " is-selected-row" : ""}" data-market-id="${ui.escapeHtml(trade.marketId || "")}" tabindex="0">
-        <td class="num-col cell-dim">${ui.escapeHtml(ui.fmtTime(trade.ts))}</td>
+        <td class="num-col cell-dim">
+          <div>${ui.escapeHtml(ui.fmtTime(trade.ts))}</div>
+          ${cityLocalTime ? `<div class="trade-local-time" title="${ui.escapeHtml(cityZone)}">本地 ${ui.escapeHtml(cityLocalTime)}</div>` : ""}
+        </td>
         <td>${marketLinkHtml(market, city, bracketText)}</td>
         <td><span class="side-badge ${trade.side === "SELL" ? "sell" : "buy"}">${ui.escapeHtml(trade.side || "—")}</span> ${ui.outcomeBadge(trade.outcome)}</td>
         <td class="num-col">${ui.escapeHtml(ui.fmtShares(trade.shares, 2))}</td>
