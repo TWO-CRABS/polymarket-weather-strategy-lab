@@ -135,6 +135,18 @@ export async function getEventTradeMetrics({ slug, wallet, bracket, nodeTs, mode
   const winning = outcomeYes(market);
   const payout = winning === null ? null : winning ? 1 : 0;
   const profit = payout === null ? null : cash + shares * payout;
+  const payoutAmount = payout === null ? null : shares * payout;
+  const tradeDetails = userTrades
+    .slice()
+    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+    .map((trade) => ({
+      ts: Number(trade.timestamp),
+      side: String(trade.side || "").toUpperCase(),
+      outcome: String(trade.outcome || "").toUpperCase(),
+      size: Number(trade.size) || 0,
+      price: Number(trade.price) || 0,
+      amount: Number(((Number(trade.size) || 0) * (Number(trade.price) || 0)).toFixed(2)),
+    }));
   let relevant = userTrades;
   if (Number.isFinite(node) && node > 0) {
     if (isPre) {
@@ -157,6 +169,9 @@ export async function getEventTradeMetrics({ slug, wallet, bracket, nodeTs, mode
     winning,
     shares: Number(shares.toFixed(4)),
     settlementTemp: settlementTemp(event),
+    cashFlow: Number(cash.toFixed(2)),
+    payoutAmount: payoutAmount === null ? null : Number(payoutAmount.toFixed(2)),
+    trades: tradeDetails.slice(0, 200),
     tradeTime: primary ? Number(primary.timestamp) : null,
     side: primary ? String(primary.side || "").toUpperCase() : null,
     outcome: primary ? String(primary.outcome || "").toUpperCase() : null,

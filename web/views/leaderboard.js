@@ -326,6 +326,9 @@ export async function mount(root, ctx = {}) {
         await loadCity();
       });
     });
+    body.querySelectorAll(".lb-metric-profit").forEach((cell) => {
+      cell.addEventListener("click", () => { void openTradeDetails(cell); });
+    });
     void loadDetailMetrics();
   }
 
@@ -336,52 +339,117 @@ export async function mount(root, ctx = {}) {
     return `${sign}$${Math.abs(n).toFixed(2)}`;
   }
 
+  function metricsKey(row) {
+    return [row.dataset.metricSlug, row.dataset.metricWallet, row.dataset.metricBracket, row.dataset.metricNode, row.dataset.metricMode].join("|");
+  }
+
+  async function metricsForRow(row) {
+    const slug = row.dataset.metricSlug;
+    const wallet = row.dataset.metricWallet;
+    const bracket = row.dataset.metricBracket;
+    if (!slug || !wallet) return null;
+    const key = metricsKey(row);
+    if (state.metricsCache.has(key)) return state.metricsCache.get(key);
+    try {
+      const params = new URLSearchParams({
+        slug,
+        wallet,
+        bracket,
+        nodeTs: row.dataset.metricNode || "",
+        mode: row.dataset.metricMode || "",
+      });
+      const res = await fetch(`/api/trader-event-metrics?${params.toString()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const metrics = await res.json();
+      state.metricsCache.set(key, metrics);
+      return metrics;
+    } catch {
+      return { tradeAmount: null, profit: null, trades: [] };
+    }
+  }
+
+  function applyMetrics(row, metrics) {
+    const tradeCell = row.querySelector(".lb-metric-trade");
+    const profitCell = row.querySelector(".lb-metric-profit");
+    const settlementCell = row.querySelector(".lb-settlement-temp");
+    const sideCell = row.querySelector(".lb-trade-side");
+    const timeCell = row.querySelector(".lb-trade-time");
+    if (tradeCell) tradeCell.textContent = money(metrics.tradeAmount);
+    if (settlementCell) settlementCell.textContent = metrics.settlementTemp || "—";
+    if (sideCell) sideCell.textContent = metrics.side ? `${metrics.side} ${metrics.outcome || ""}`.trim() : "—";
+    if (timeCell) timeCell.textContent = fmtTradeTime(metrics.tradeTime);
+    if (profitCell) {
+      const value = Number(metrics.profit);
+      profitCell.textContent = money(value, true);
+      profitCell.classList.toggle("lb-profit-up", Number.isFinite(value) && value > 0);
+      profitCell.classList.toggle("lb-profit-down", Number.isFinite(value) && value < 0);
+      profitCell.dataset.metricKey = metricsKey(row);
+      profitCell.classList.add("lb-profit-link");
+      if (Number.isFinite(value) && metrics.tradeCount !== undefined) {
+        profitCell.title = `目标市场成交 ${metrics.tradeCount} 笔；点击查看每笔交易`;
+      }
+    }
+  }
+
   async function loadDetailMetrics() {
     const rows = [...body.querySelectorAll(".lb-metric-row")];
     await Promise.all(rows.map(async (row) => {
-      const slug = row.dataset.metricSlug;
-      const wallet = row.dataset.metricWallet;
-      const bracket = row.dataset.metricBracket;
-      if (!slug || !wallet) return;
-      const key = `${slug}|${wallet}|${bracket}`;
-      let metrics = state.metricsCache.get(key);
-      if (!metrics) {
-        try {
-          const params = new URLSearchParams({
-            slug,
-            wallet,
-            bracket,
-            nodeTs: row.dataset.metricNode || "",
-            mode: row.dataset.metricMode || "",
-          });
-          const res = await fetch(`/api/trader-event-metrics?${params.toString()}`, { cache: "no-store" });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          metrics = await res.json();
-          state.metricsCache.set(key, metrics);
-        } catch {
-          metrics = { tradeAmount: null, profit: null };
-        }
-      }
-      if (state.destroyed || !row.isConnected) return;
-      const tradeCell = row.querySelector(".lb-metric-trade");
-      const profitCell = row.querySelector(".lb-metric-profit");
-      const settlementCell = row.querySelector(".lb-settlement-temp");
-      const sideCell = row.querySelector(".lb-trade-side");
-      const timeCell = row.querySelector(".lb-trade-time");
-      if (tradeCell) tradeCell.textContent = money(metrics.tradeAmount);
-      if (settlementCell) settlementCell.textContent = metrics.settlementTemp || "—";
-      if (sideCell) sideCell.textContent = metrics.side ? `${metrics.side} ${metrics.outcome || ""}`.trim() : "—";
-      if (timeCell) timeCell.textContent = fmtTradeTime(metrics.tradeTime);
-      if (profitCell) {
-        const value = Number(metrics.profit);
-        profitCell.textContent = money(value, true);
-        profitCell.classList.toggle("lb-profit-up", Number.isFinite(value) && value > 0);
-        profitCell.classList.toggle("lb-profit-down", Number.isFinite(value) && value < 0);
-        if (Number.isFinite(value) && metrics.tradeCount !== undefined) {
-          profitCell.title = `目标市场成交 ${metrics.tradeCount} 笔，按最终结算计算`;
-        }
-      }
+      const metrics = await metricsForRow(row);
+      if (state.destroyed || !row.isConnected || !metrics) return;
+      applyMetrics(row, metrics);
     }));
+  }
+
+  async function openTradeDetails(cell) {
+    const row = cell.closest(".lb-metric-row");
+    if (!row) return;
+    let metrics = state.metricsCache.get(metricsKey(row));
+    if (!metrics) {
+      cell.textContent = "加载中…";
+      metrics = await metricsForRow(row);
+      if (metrics) applyMetrics(row, metrics);
+    }
+    if (!metrics) return;
+    const trades = Array.isArray(metrics.trades) ? metrics.trades : [];
+    const winner = metrics.winning === true ? "YES" : metrics.winning === false ? "NO" : "未结算";
+    const rowsHtml = trades.length
+      ? trades.map((trade) => `<tr>
+          <td class="mono">${ui.escapeHtml(fmtTradeTime(trade.ts))}</td>
+          <td>${ui.escapeHtml(`${trade.side} ${trade.outcome}`)}</td>
+          <td class="num-col">${ui.escapeHtml(String(trade.size))}</td>
+          <td class="num-col">${ui.escapeHtml(String(trade.price))}</td>
+          <td class="num-col">${money(trade.amount)}</td>
+        </tr>`).join("")
+      : '<tr><td colspan="5" class="muted">该用户在这个市场没有成交记录</td></tr>';
+    const pnl = Number(metrics.profit);
+    const dialog = document.createElement("dialog");
+    dialog.className = "lb-modal";
+    dialog.innerHTML = `
+      <div class="lb-modal-head">
+        <div>
+          <div class="eyebrow">TRADE DETAILS</div>
+          <h2>${ui.escapeHtml(row.querySelector("td:nth-child(4)")?.textContent || "")} · ${ui.escapeHtml(row.querySelector(".lb-trade-side")?.textContent || "")}</h2>
+        </div>
+        <button class="btn btn-ghost" type="button" data-close>关闭</button>
+      </div>
+      <div class="lb-modal-body">
+        <div class="lb-trade-summary">
+          <div><span>交易金额</span><b>${money(metrics.tradeAmount)}</b></div>
+          <div><span>净 YES 份额</span><b>${metrics.shares ?? "—"}</b></div>
+          <div><span>结算</span><b>${ui.escapeHtml(metrics.settlementTemp || "—")} ${winner}</b></div>
+          <div><span>结算赔付</span><b>${money(metrics.payoutAmount)}</b></div>
+          <div><span>盈利金额</span><b class="${pnl > 0 ? "lb-profit-up" : pnl < 0 ? "lb-profit-down" : ""}">${money(pnl, true)}</b></div>
+        </div>
+        <table class="table lb-trade-table">
+          <thead><tr><th>成交时间</th><th>方向</th><th class="num-col">数量</th><th class="num-col">价格</th><th class="num-col">金额</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <p class="muted">交易金额 = 该用户在此目标市场的累计成交额；盈利按最终结算计算，未扣手续费。方向列只显示 ahead 相关的最新一笔，本表列出该市场全部成交。</p>
+      </div>`;
+    document.body.appendChild(dialog);
+    dialog.querySelector("[data-close]")?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => dialog.remove());
+    dialog.showModal();
   }
 
   async function loadCity() {
