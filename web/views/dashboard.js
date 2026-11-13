@@ -20,7 +20,7 @@ import {
 import * as api from "/web/api.js";
 import * as ui from "/web/components/ui.js";
 import { createLineChart, drawSparkline } from "/web/components/charts.js";
-import { localDateTimeForTimeZone, timezoneForCity } from "/shared/cityTimezones.js";
+import { timezoneForCity } from "/shared/cityTimezones.js";
 
 const MODE_LABELS = { live: "实时", replay: "回放" };
 const ACTIVE_STATUSES = new Set(["created", "starting", "running", "paused", "stopping"]);
@@ -98,6 +98,25 @@ function shortDate(iso) {
   if (!Number.isFinite(ts)) return "";
   const date = new Date(ts);
   return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatCityLocalTime(timeZone, ts) {
+  const value = Number(ts);
+  if (!timeZone || !Number.isFinite(value)) return "";
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(value));
+    const pick = (type) => parts.find((part) => part.type === type)?.value || "";
+    return `${pick("month")}/${pick("day")} ${pick("hour")}:${pick("minute")}`;
+  } catch {
+    return "";
+  }
 }
 
 function quoteOf(market, side = "YES") {
@@ -1579,8 +1598,9 @@ export async function mount(root, ctx) {
       const pnl = num(trade.realizedPnl);
       const selected = state.selectedMarketId && trade.marketId === state.selectedMarketId;
       const bracketText = [bracket, date].filter(Boolean).join(" · ");
-      const cityZone = timezoneForCity(city);
-      const cityLocalTime = cityZone ? localDateTimeForTimeZone(cityZone, new Date(trade.ts)) : "";
+      const cityBase = String(city || "").split("·")[0].split(" - ")[0].trim();
+      const cityZone = timezoneForCity(cityBase) || timezoneForCity(city);
+      const cityLocalTime = cityZone ? formatCityLocalTime(cityZone, trade.ts) : "";
       const tipAttr = ui.escapeHtml(buildTradeTip({ trade, market, city, bracket, date, reason })).replace(/\n/g, "&#10;");
       return `<tr class="${rejected ? "row-rejected" : ""}${selected ? " is-selected-row" : ""}" data-market-id="${ui.escapeHtml(trade.marketId || "")}" tabindex="0">
         <td class="num-col cell-dim">
