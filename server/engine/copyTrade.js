@@ -33,14 +33,14 @@ function normalizedWallet(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function leaderboardSubstitutes(city, minRatePct) {
+function leaderboardSubstitutes(city, minRatePct, count = 3) {
   const cityUsers = cityLeaderboards()?.cities?.[city]?.users;
   const users = Array.isArray(cityUsers) ? cityUsers : [];
   return users
     .filter((user) => user && user.wallet)
     .filter((user) => user.eligible === true)
     .filter((user) => Number(user.reactionRate) * 100 >= minRatePct)
-    .slice(0, 3)
+    .slice(0, Math.max(1, Math.min(10, Number(count) || 3)))
     .map((user) => normalizedWallet(user.wallet))
     .filter(Boolean);
 }
@@ -50,7 +50,11 @@ function candidateWallets(run, city, opts = {}) {
   const primary = normalizedWallet(cfg.copyTraderUser);
   const subs = Array.isArray(opts.substitutes)
     ? opts.substitutes.map(normalizedWallet).filter(Boolean)
-    : leaderboardSubstitutes(city, Number(cfg.copyTraderMinReactionRatePct) || 90);
+    : leaderboardSubstitutes(
+      city,
+      Number(cfg.copyTraderMinReactionRatePct) || 90,
+      Number(cfg.copyTraderSubstituteCount) || 3,
+    );
   const all = [];
   if (primary) all.push({ wallet: primary, source: "primary" });
   for (const wallet of subs) {

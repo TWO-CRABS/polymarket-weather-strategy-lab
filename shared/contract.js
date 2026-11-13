@@ -125,6 +125,7 @@ export const LIMITS = Object.freeze({
     metarReleaseMinProbabilityPct: [1, 99],
     copyTraderFallbackDelaySec: [0, 300],
     copyTraderMinReactionRatePct: [0, 100],
+    copyTraderSubstituteCount: [1, 10],
   },
   execution: {
     sizingValue: [1, 100_000],
@@ -191,6 +192,7 @@ export const DEFAULT_STRATEGY = Object.freeze({
     copyTraderUser: "",
     copyTraderFallbackDelaySec: 30,
     copyTraderMinReactionRatePct: 90,
+    copyTraderSubstituteCount: 3,
   },
   execution: {
     orderType: "market",
@@ -388,6 +390,7 @@ export function validateStrategy(input = {}) {
   inRange(s.metarReleaseMinProbabilityPct, LIMITS.signal.metarReleaseMinProbabilityPct, "signal.metarReleaseMinProbabilityPct");
   inRange(s.copyTraderFallbackDelaySec, LIMITS.signal.copyTraderFallbackDelaySec, "signal.copyTraderFallbackDelaySec");
   inRange(s.copyTraderMinReactionRatePct, LIMITS.signal.copyTraderMinReactionRatePct, "signal.copyTraderMinReactionRatePct");
+  inRange(s.copyTraderSubstituteCount, LIMITS.signal.copyTraderSubstituteCount, "signal.copyTraderSubstituteCount");
   if (s.copyTraderEnabled && s.copyTraderUser && !/^0x[a-fA-F0-9]{40}$/.test(s.copyTraderUser)) {
     err(`signal.copyTraderUser 必须为空或 0x 开头的 40 字节钱包地址，当前为 ${s.copyTraderUser}`);
   }
