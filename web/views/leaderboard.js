@@ -141,10 +141,10 @@ function eventRows(user) {
   }).join("");
   return `<tr class="lb-detail-row"><td colspan="8">
     <div class="lb-detail">
-      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟）</div>
+      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟；目标括号是节点，交易市场是实际成交市场）</div>
       <table class="lb-detail-table">
         <thead><tr>
-          <th>日期</th><th>方向</th><th>成交时间</th><th>温度括号</th><th>结算温度</th><th>发布节点时间</th><th>交易市场</th><th class="num-col">Baseline</th>
+          <th>日期</th><th>方向</th><th>成交时间</th><th title="发布节点对应的目标温度括号">目标括号</th><th>结算温度</th><th>发布节点时间</th><th title="该笔成交实际所在的温度市场">交易市场</th><th class="num-col">Baseline</th>
           <th class="num-col">重定价</th><th>类型</th><th>市场核验</th><th>用户主页</th>
           <th class="num-col">交易金额</th><th class="num-col">盈利金额</th>
         </tr></thead>
