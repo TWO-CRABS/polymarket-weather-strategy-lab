@@ -187,7 +187,10 @@ export async function processCopyTrades(run, now, opts = {}) {
   const active = activeReleaseWindow(run, now, opts.store);
   if (!active) return;
   if (!run._copyPrimaryNodes) run._copyPrimaryNodes = new Map();
-  const fallbackDelayMs = Math.max(0, Number(cfg.copyTraderFallbackDelaySec) || 0) * 1000;
+  const hasPrimary = active.groups.some((group) => candidateWallets(run, group.city, opts).some((candidate) => candidate.source === "primary"));
+  const fallbackDelayMs = hasPrimary
+    ? Math.max(0, Number(cfg.copyTraderFallbackDelaySec) || 0) * 1000
+    : 0;
 
   for (const group of active.groups) {
     const candidates = candidateWallets(run, group.city, opts);
