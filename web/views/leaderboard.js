@@ -76,7 +76,7 @@ export async function mount(root, ctx = {}) {
   };
 
   root.innerHTML = `
-    <section class="view">
+    <section class="view is-active">
       <div class="view-head">
         <div>
           <div class="eyebrow">TRADER REACTION / CITY INDEPENDENT</div>
