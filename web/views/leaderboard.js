@@ -76,7 +76,7 @@ function eventRows(user) {
     const profileLink = profile
       ? `<a class="mkt-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开该用户主页并复制此市场">打开用户主页 ↗</a>`
       : "—";
-    return `<tr>
+    return `<tr class="lb-metric-row" data-metric-slug="${ui.escapeHtml(event.eventSlug || "")}" data-metric-wallet="${ui.escapeHtml(user.wallet || "")}" data-metric-bracket="${ui.escapeHtml(event.bracket || "")}">
       <td>${ui.escapeHtml(event.eventDate || "—")}</td>
       <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
       <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
@@ -85,6 +85,8 @@ function eventRows(user) {
       <td>${event.prePositioned ? "节点前已持仓" : "窗口内成交"}</td>
       <td>${link}</td>
       <td>${profileLink}</td>
+      <td class="num-col lb-metric-trade" title="该用户在这个目标市场的累计成交额">…</td>
+      <td class="num-col lb-metric-profit" title="按该市场最终结算计算的盈亏">…</td>
     </tr>`;
   }).join("");
   return `<tr class="lb-detail-row"><td colspan="8">
@@ -94,6 +96,7 @@ function eventRows(user) {
         <thead><tr>
           <th>日期</th><th>温度括号</th><th>发布节点时间</th><th class="num-col">Baseline</th>
           <th class="num-col">重定价</th><th>类型</th><th>市场核验</th><th>用户主页</th>
+          <th class="num-col">交易金额</th><th class="num-col">盈利金额</th>
         </tr></thead>
         <tbody>${body}</tbody>
       </table>
@@ -111,6 +114,8 @@ export async function mount(root, ctx = {}) {
     search: "",
     eligibleOnly: false,
     eventType: "all",
+    metricsCache: new Map(),
+    loadSeq: 0,
     expanded: new Set(),
     loading: true,
     error: null,
@@ -302,10 +307,55 @@ export async function mount(root, ctx = {}) {
         await loadCity();
       });
     });
+    void loadDetailMetrics();
+  }
+
+  function money(value, signed = false) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    const sign = n < 0 ? "-" : signed && n > 0 ? "+" : "";
+    return `${sign}$${Math.abs(n).toFixed(2)}`;
+  }
+
+  async function loadDetailMetrics() {
+    const rows = [...body.querySelectorAll(".lb-metric-row")];
+    await Promise.all(rows.map(async (row) => {
+      const slug = row.dataset.metricSlug;
+      const wallet = row.dataset.metricWallet;
+      const bracket = row.dataset.metricBracket;
+      if (!slug || !wallet) return;
+      const key = `${slug}|${wallet}|${bracket}`;
+      let metrics = state.metricsCache.get(key);
+      if (!metrics) {
+        try {
+          const params = new URLSearchParams({ slug, wallet, bracket });
+          const res = await fetch(`/api/trader-event-metrics?${params.toString()}`, { cache: "no-store" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          metrics = await res.json();
+          state.metricsCache.set(key, metrics);
+        } catch {
+          metrics = { tradeAmount: null, profit: null };
+        }
+      }
+      if (state.destroyed || !row.isConnected) return;
+      const tradeCell = row.querySelector(".lb-metric-trade");
+      const profitCell = row.querySelector(".lb-metric-profit");
+      if (tradeCell) tradeCell.textContent = money(metrics.tradeAmount);
+      if (profitCell) {
+        const value = Number(metrics.profit);
+        profitCell.textContent = money(value, true);
+        profitCell.classList.toggle("lb-profit-up", Number.isFinite(value) && value > 0);
+        profitCell.classList.toggle("lb-profit-down", Number.isFinite(value) && value < 0);
+        if (Number.isFinite(value) && metrics.tradeCount !== undefined) {
+          profitCell.title = `目标市场成交 ${metrics.tradeCount} 笔，按最终结算计算`;
+        }
+      }
+    }));
   }
 
   async function loadCity() {
     if (!state.city) return;
+    const seq = ++state.loadSeq;
     state.loading = true;
     state.error = null;
     render();
@@ -313,15 +363,20 @@ export async function mount(root, ctx = {}) {
       const params = new URLSearchParams({ city: state.city, from: state.fromDate, to: state.toDate, limit: "100", type: state.eventType });
       const res = await fetch(`/api/trader-leaderboards?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      state.cityData = await res.json();
+      const data = await res.json();
+      if (seq !== state.loadSeq) return;
+      state.cityData = data;
       if (!state.fromDate) state.fromDate = state.cityData.fromDate || state.fromDate;
       if (!state.toDate) state.toDate = state.cityData.toDate || state.toDate;
     } catch (error) {
+      if (seq !== state.loadSeq) return;
       state.cityData = null;
       state.error = `榜单区间查询失败：${error.message}`;
     } finally {
-      state.loading = false;
-      render();
+      if (seq === state.loadSeq) {
+        state.loading = false;
+        render();
+      }
     }
   }
 

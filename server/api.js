@@ -18,6 +18,7 @@ import { AppError, UpstreamError, nowMs, roundTo, utcDateKey } from "./util.js";
 import { extractCity, fetchMarketById } from "./data/gamma.js";
 import path from "node:path";
 import { queryCityLeaderboard } from "./research/leaderboardQuery.js";
+import { getEventTradeMetrics } from "./research/eventTradeMetrics.js";
 
 const MAX_LIMIT = 500;
 
@@ -122,6 +123,16 @@ export function createApiHandler(deps) {
 
     if (method === "GET" && pathname === "/api/meta") {
       sendJson(res, 200, metaPayload());
+      return true;
+    }
+
+    if (method === "GET" && pathname === "/api/trader-event-metrics") {
+      const metrics = await getEventTradeMetrics({
+        slug: url.searchParams.get("slug") || "",
+        wallet: url.searchParams.get("wallet") || "",
+        bracket: url.searchParams.get("bracket") || "",
+      });
+      sendJson(res, 200, metrics);
       return true;
     }
 
