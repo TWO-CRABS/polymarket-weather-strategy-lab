@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { wilsonLowerBound } from "./traderReaction.js";
 
-export const CITY_ELIGIBLE_MIN_QUALIFIED = 20;
+export const CITY_ELIGIBLE_MIN_QUALIFIED = 10;
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_EVENTS_DIR = path.join(PROJECT_ROOT, "data", "trader-reactions", "events");
 
@@ -122,7 +122,7 @@ export async function queryCityLeaderboard({
       qualified: qualifiedWarmingNodes,
       involved: involvedCount,
       wilsonLower: Number(wilson.toFixed(6)),
-      eligible: qualifiedWarmingNodes >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.9,
+      eligible: qualifiedWarmingNodes >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.5,
       events: (eventsByWallet.get(wallet) || []).sort((a, b) => a.nodeTs - b.nodeTs),
     };
   }).sort((a, b) => (
@@ -140,6 +140,7 @@ export async function queryCityLeaderboard({
     availableTo,
     qualifiedWarmingNodes,
     eligibleMin: CITY_ELIGIBLE_MIN_QUALIFIED,
+    eligibleRatePct: 50,
     eventCount: facts.length,
     eventType: type,
     userCount: users.length,

@@ -45,7 +45,7 @@ const METAR = "https://aviationweather.gov/api/data/metar";
 const TAG = 104596;
 const SIGNATURE = JSON.stringify({ v: 3, ...REACTION_DEFAULTS });
 const START_DATE = "2026-10-23";
-const CITY_ELIGIBLE_MIN_QUALIFIED = 20;
+const CITY_ELIGIBLE_MIN_QUALIFIED = 10;
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback = null) => {
@@ -354,12 +354,12 @@ function aggregateFacts(facts, nowIso) {
         involved: involvedCount,
         wilsonLower: Number(wilson.toFixed(6)),
         eligible: cityName
-          ? qualifiedWarmingNodes >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.9
+          ? qualifiedWarmingNodes >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.5
           : qualifiedWarmingNodes >= eligibleMin && wilson > REACTION_DEFAULTS.eligibleMinWilson,
         events: includeEvents ? (eventsByWallet.get(wallet) || []).sort((a, b) => a.nodeTs - b.nodeTs) : undefined,
       };
     }).sort((a, b) => b.wilsonLower - a.wilsonLower || b.ahead - a.ahead || a.wallet.localeCompare(b.wallet));
-    return { city: cityName, qualifiedWarmingNodes, eligibleMin, users };
+    return { city: cityName, qualifiedWarmingNodes, eligibleMin, eligibleRatePct: 50, users };
   };
   const cityPayload = {};
   for (const [city, info] of [...cities.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
@@ -391,6 +391,7 @@ async function writeLeaderboards(payload) {
           city,
           qualifiedWarmingNodes: info.qualifiedWarmingNodes,
           eligibleMin: info.eligibleMin,
+          eligibleRatePct: info.eligibleRatePct,
           userCount: info.users.length,
           eligibleCount: info.users.filter((user) => user.eligible).length,
           users: info.users.slice(0, 100).map((user) => ({

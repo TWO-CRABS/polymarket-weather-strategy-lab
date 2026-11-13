@@ -293,7 +293,7 @@ export async function mount(root, ctx = {}) {
           <div class="lb-stat"><span>合格节点</span><b>${city.qualifiedWarmingNodes}</b></div>
           <div class="lb-stat"><span>事件数</span><b>${city.eventCount ?? "—"}</b></div>
           <div class="lb-stat"><span>用户数</span><b>${city.userCount ?? users.length}</b></div>
-          <div class="lb-stat"><span>替补门槛</span><b>${city.eligibleMin} 节点 · 反应率 &gt; 90%</b></div>
+          <div class="lb-stat"><span>替补门槛</span><b>${city.eligibleMin} 节点 · 反应率 &gt; ${city.eligibleRatePct ?? 50}%</b></div>
           <div class="lb-stat"><span>当前可用替补</span><b>${city.users.filter((u) => u.eligible).length}</b></div>
         </div>
       </div>
