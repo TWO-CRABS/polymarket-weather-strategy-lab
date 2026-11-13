@@ -328,9 +328,13 @@ export async function mount(root, ctx = {}) {
             <tbody>
               ${users.slice(0, maxShow).map((user, index) => {
                 const expanded = state.expanded.has(user.wallet);
+                const profile = profileUrl(user.wallet);
+                const nameHtml = profile
+                  ? `<a class="lb-user-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" title="打开该用户 Polymarket 主页">${ui.escapeHtml(userLabel(user))}</a>`
+                  : `<b>${ui.escapeHtml(userLabel(user))}</b>`;
                 return `<tr class="lb-user-row" data-wallet="${ui.escapeHtml(user.wallet)}" tabindex="0">
                   <td class="num-col">${index + 1}</td>
-                  <td><b>${ui.escapeHtml(userLabel(user))}</b></td>
+                  <td>${nameHtml}</td>
                   <td class="mono muted">${ui.escapeHtml(user.wallet || "—")} <button class="btn-link" data-copy-wallet="${ui.escapeHtml(user.wallet || "")}" type="button">复制</button></td>
                   <td>${user.eligible ? '<span class="badge badge-up">达标</span>' : '<span class="badge badge-ghost">未达标</span>'}</td>
                   <td class="num-col">${user.ahead}/${user.qualified}</td>
