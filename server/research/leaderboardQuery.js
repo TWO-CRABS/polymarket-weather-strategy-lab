@@ -103,6 +103,7 @@ export async function queryCityLeaderboard({
         repriceTs: node.repriceTs,
         repricePrice: node.repricePrice,
         repriceDirection: node.repriceDirection,
+        trades: (node.aheadTrades || []).filter((trade) => trade.wallet === wallet),
       });
       eventsByWallet.set(wallet, list);
     }

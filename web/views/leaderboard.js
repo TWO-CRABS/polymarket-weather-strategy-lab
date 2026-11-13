@@ -8,6 +8,14 @@
 import * as ui from "/web/components/ui.js";
 
 const DATA_URL = "/shared/traderReactionLeaderboards.json";
+const tradeSnapshots = new Map();
+
+function usd(value, signed = false) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  const sign = n < 0 ? "-" : signed && n > 0 ? "+" : "";
+  return `${sign}$${Math.abs(n).toFixed(2)}`;
+}
 
 function fmtNodeTime(ts) {
   const value = Number(ts);
@@ -92,28 +100,51 @@ function eventRows(user) {
     const profileLink = profile
       ? `<a class="mkt-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开该用户主页并复制此市场">打开用户主页 ↗</a>`
       : "—";
-    return `<tr class="lb-metric-row" data-metric-slug="${ui.escapeHtml(event.eventSlug || "")}" data-metric-wallet="${ui.escapeHtml(user.wallet || "")}" data-metric-bracket="${ui.escapeHtml(event.bracket || "")}" data-metric-node="${ui.escapeHtml(String(event.nodeTs ?? ""))}" data-metric-mode="${event.prePositioned ? "pre" : "trade"}">
-      <td>${ui.escapeHtml(event.eventDate || "—")}</td>
-      <td class="lb-trade-side">…</td>
-      <td class="mono lb-trade-time">…</td>
-      <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
-      <td class="lb-settlement-temp">…</td>
-      <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
-      <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
-      <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
-      <td>${event.prePositioned ? "节点前已持仓" : "窗口内成交"}</td>
-      <td>${link}</td>
-      <td>${profileLink}</td>
-      <td class="num-col lb-metric-trade" title="该用户在这个目标市场的累计成交额">…</td>
-      <td class="num-col lb-metric-profit" title="按该市场最终结算计算的盈亏">…</td>
-    </tr>`;
+    const trades = Array.isArray(event.trades) ? event.trades : [];
+    const tradeKey = `${event.eventSlug}|${user.wallet}|${event.nodeTs}`;
+    tradeSnapshots.set(tradeKey, { event, user });
+    const rows = trades.length
+      ? trades.map((trade) => {
+          const isTarget = Boolean(trade.target);
+          const type = event.prePositioned ? "节点前持仓 + 窗口成交" : "窗口内成交";
+          return `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
+            <td>${ui.escapeHtml(event.eventDate || "—")}</td>
+            <td>${ui.escapeHtml(`${trade.side} ${trade.outcome}`)}</td>
+            <td class="mono">${ui.escapeHtml(fmtTradeTime(trade.ts))}</td>
+            <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
+            <td class="lb-settlement-temp" data-settlement-slug="${ui.escapeHtml(event.eventSlug || "")}" data-settlement-wallet="${ui.escapeHtml(user.wallet || "")}" data-settlement-bracket="${ui.escapeHtml(event.bracket || "")}" data-settlement-node="${ui.escapeHtml(String(event.nodeTs ?? ""))}">…</td>
+            <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
+            <td>${ui.escapeHtml(`${isTarget ? "目标" : "其它"} ${trade.marketBracket || ""}`.trim())}</td>
+            <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
+            <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+            <td>${ui.escapeHtml(type)}</td>
+            <td>${link}</td>
+            <td>${profileLink}</td>
+            <td class="num-col">${usd(trade.amount)}</td>
+            <td class="num-col lb-metric-profit ${Number(trade.pnl) > 0 ? "lb-profit-up" : Number(trade.pnl) < 0 ? "lb-profit-down" : ""}" data-trade-key="${ui.escapeHtml(tradeKey)}">${usd(trade.pnl, true)}</td>
+          </tr>`;
+        }).join("")
+      : `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
+            <td>${ui.escapeHtml(event.eventDate || "—")}</td>
+            <td>—</td><td class="mono">—</td>
+            <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
+            <td class="lb-settlement-temp" data-settlement-slug="${ui.escapeHtml(event.eventSlug || "")}" data-settlement-wallet="${ui.escapeHtml(user.wallet || "")}" data-settlement-bracket="${ui.escapeHtml(event.bracket || "")}" data-settlement-node="${ui.escapeHtml(String(event.nodeTs ?? ""))}">…</td>
+            <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
+            <td>—</td>
+            <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
+            <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+            <td>节点前已持仓</td><td>${link}</td><td>${profileLink}</td>
+            <td class="num-col">—</td>
+            <td class="num-col lb-metric-profit" data-trade-key="${ui.escapeHtml(tradeKey)}">—</td>
+          </tr>`;
+    return rows;
   }).join("");
   return `<tr class="lb-detail-row"><td colspan="8">
     <div class="lb-detail">
-      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间）</div>
+      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟）</div>
       <table class="lb-detail-table">
         <thead><tr>
-          <th>日期</th><th>方向</th><th>成交时间</th><th>温度括号</th><th>结算温度</th><th>发布节点时间</th><th class="num-col">Baseline</th>
+          <th>日期</th><th>方向</th><th>成交时间</th><th>温度括号</th><th>结算温度</th><th>发布节点时间</th><th>交易市场</th><th class="num-col">Baseline</th>
           <th class="num-col">重定价</th><th>类型</th><th>市场核验</th><th>用户主页</th>
           <th class="num-col">交易金额</th><th class="num-col">盈利金额</th>
         </tr></thead>
@@ -161,6 +192,9 @@ export async function mount(root, ctx = {}) {
 
   function render() {
     if (state.destroyed) return;
+    const previousTable = body.querySelector(".lb-table-wrap");
+    const previousTableScroll = previousTable?.scrollTop || 0;
+    const previousPageScroll = window.scrollY;
     if (state.loading) {
       body.innerHTML = '<div class="empty-state">加载榜单…</div>';
       return;
@@ -326,9 +360,13 @@ export async function mount(root, ctx = {}) {
         await loadCity();
       });
     });
+    const nextTable = body.querySelector(".lb-table-wrap");
+    if (nextTable) nextTable.scrollTop = previousTableScroll;
+    window.scrollTo(0, previousPageScroll);
     body.querySelectorAll(".lb-metric-profit").forEach((cell) => {
-      cell.addEventListener("click", () => { void openTradeDetails(cell); });
+      cell.addEventListener("click", () => { void openTradeSnapshot(cell); });
     });
+    void loadSettlementTemps();
     void loadDetailMetrics();
   }
 
@@ -389,6 +427,79 @@ export async function mount(root, ctx = {}) {
         profitCell.title = `目标市场成交 ${metrics.tradeCount} 笔；点击查看每笔交易`;
       }
     }
+  }
+
+  async function loadSettlementTemps() {
+    const cells = [...body.querySelectorAll(".lb-settlement-temp[data-settlement-slug]")];
+    const byKey = new Map();
+    for (const cell of cells) {
+      const key = [cell.dataset.settlementSlug, cell.dataset.settlementWallet, cell.dataset.settlementBracket, cell.dataset.settlementNode].join("|");
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(cell);
+    }
+    await Promise.all([...byKey.entries()].map(async ([key, group]) => {
+      const [slug, wallet, bracket, nodeTs] = key.split("|");
+      if (!slug || !wallet) return;
+      try {
+        const params = new URLSearchParams({ slug, wallet, bracket, nodeTs, mode: "trade" });
+        const res = await fetch(`/api/trader-event-metrics?${params.toString()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const metrics = await res.json();
+        for (const cell of group) {
+          if (cell.isConnected) cell.textContent = metrics.settlementTemp || "—";
+        }
+      } catch {
+        for (const cell of group) if (cell.isConnected) cell.textContent = "—";
+      }
+    }));
+  }
+
+  async function openTradeSnapshot(cell) {
+    const key = cell.dataset.tradeKey;
+    const snapshot = tradeSnapshots.get(key);
+    if (!snapshot) return;
+    const { event, user } = snapshot;
+    const trades = Array.isArray(event.trades) ? event.trades : [];
+    const settlement = cell.closest(".lb-trade-row")?.querySelector(".lb-settlement-temp")?.textContent || "—";
+    const rowsHtml = trades.length
+      ? trades.map((trade) => `<tr>
+          <td class="mono">${ui.escapeHtml(fmtTradeTime(trade.ts))}</td>
+          <td>${ui.escapeHtml(`${trade.side} ${trade.outcome}`)}</td>
+          <td>${ui.escapeHtml(`${trade.target ? "目标" : "其它"} ${trade.marketBracket || ""}`.trim())}</td>
+          <td class="num-col">${ui.escapeHtml(String(trade.size))}</td>
+          <td class="num-col">${ui.escapeHtml(String(trade.price))}</td>
+          <td class="num-col">${usd(trade.amount)}</td>
+          <td class="num-col ${Number(trade.pnl) < 0 ? "lb-profit-down" : Number(trade.pnl) > 0 ? "lb-profit-up" : ""}">${usd(trade.pnl, true)}</td>
+        </tr>`).join("")
+      : '<tr><td colspan="7" class="muted">该节点窗口内无成交，用户属于节点前已持仓。</td></tr>';
+    const totalPnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+    const dialog = document.createElement("dialog");
+    dialog.className = "lb-modal";
+    dialog.innerHTML = `
+      <div class="lb-modal-head">
+        <div>
+          <div class="eyebrow">NODE TRADE DETAILS</div>
+          <h2>${ui.escapeHtml(event.city || "")} ${ui.escapeHtml(event.eventDate || "")} · ${ui.escapeHtml(event.bracket || "")}</h2>
+          <div class="view-sub">${ui.escapeHtml(userLabel(user))} · 节点 ${ui.escapeHtml(fmtNodeTime(event.nodeTs))} · 结算 ${ui.escapeHtml(settlement)}</div>
+        </div>
+        <button class="btn btn-ghost" type="button" data-close>关闭</button>
+      </div>
+      <div class="lb-modal-body">
+        <table class="table lb-trade-table">
+          <thead><tr><th>成交时间</th><th>方向</th><th>交易市场</th><th class="num-col">数量</th><th class="num-col">价格</th><th class="num-col">金额</th><th class="num-col">单笔盈亏</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <div class="lb-trade-summary" style="margin-top:16px">
+          <div><span>窗口内成交笔数</span><b>${trades.length}</b></div>
+          <div><span>窗口内合计盈亏</span><b class="${totalPnl < 0 ? "lb-profit-down" : totalPnl > 0 ? "lb-profit-up" : ""}">${usd(totalPnl, true)}</b></div>
+          <div><span>Ahead 计数</span><b>1 / 节点</b></div>
+        </div>
+        <p class="muted">范围：节点前后 5 分钟，包含当前市场 BUY YES / SELL NO，以及其它市场 BUY NO / SELL YES。同一节点的多笔成交只计一次 ahead；每笔盈亏按该笔交易所属市场的最终结算单独计算，不扣手续费。</p>
+      </div>`;
+    document.body.appendChild(dialog);
+    dialog.querySelector("[data-close]")?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => dialog.remove());
+    dialog.showModal();
   }
 
   async function loadDetailMetrics() {
