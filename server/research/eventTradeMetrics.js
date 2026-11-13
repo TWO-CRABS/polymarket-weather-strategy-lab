@@ -69,6 +69,24 @@ function outcomeYes(market) {
   return null;
 }
 
+function settlementTemp(event) {
+  const markets = Array.isArray(event?.markets) ? event.markets : [];
+  for (const market of markets) {
+    let prices;
+    try {
+      prices = JSON.parse(market.outcomePrices ?? "[]");
+    } catch {
+      continue;
+    }
+    if (Number(prices[0]) <= 0.5) continue;
+    const label = String(market.groupItemTitle || market.question || "").trim();
+    const bracket = /(-?\d+(?:\.\d+)?)\s*°\s*[CF]/i.exec(label);
+    if (bracket) return `${bracket[1]}°${bracket[0].includes("F") || bracket[0].includes("f") ? "F" : "C"}`;
+    return label || null;
+  }
+  return null;
+}
+
 export async function getEventTradeMetrics({ slug, wallet, bracket } = {}) {
   const eventSlug = String(slug || "").trim();
   const user = String(wallet || "").trim().toLowerCase();
@@ -121,5 +139,6 @@ export async function getEventTradeMetrics({ slug, wallet, bracket } = {}) {
     tradeCount: userTrades.length,
     winning,
     shares: Number(shares.toFixed(4)),
+    settlementTemp: settlementTemp(event),
   };
 }

@@ -79,6 +79,7 @@ function eventRows(user) {
     return `<tr class="lb-metric-row" data-metric-slug="${ui.escapeHtml(event.eventSlug || "")}" data-metric-wallet="${ui.escapeHtml(user.wallet || "")}" data-metric-bracket="${ui.escapeHtml(event.bracket || "")}">
       <td>${ui.escapeHtml(event.eventDate || "—")}</td>
       <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
+      <td class="lb-settlement-temp">…</td>
       <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
       <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
       <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
@@ -94,7 +95,7 @@ function eventRows(user) {
       <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间）</div>
       <table class="lb-detail-table">
         <thead><tr>
-          <th>日期</th><th>温度括号</th><th>发布节点时间</th><th class="num-col">Baseline</th>
+          <th>日期</th><th>温度括号</th><th>结算温度</th><th>发布节点时间</th><th class="num-col">Baseline</th>
           <th class="num-col">重定价</th><th>类型</th><th>市场核验</th><th>用户主页</th>
           <th class="num-col">交易金额</th><th class="num-col">盈利金额</th>
         </tr></thead>
@@ -340,7 +341,9 @@ export async function mount(root, ctx = {}) {
       if (state.destroyed || !row.isConnected) return;
       const tradeCell = row.querySelector(".lb-metric-trade");
       const profitCell = row.querySelector(".lb-metric-profit");
+      const settlementCell = row.querySelector(".lb-settlement-temp");
       if (tradeCell) tradeCell.textContent = money(metrics.tradeAmount);
+      if (settlementCell) settlementCell.textContent = metrics.settlementTemp || "—";
       if (profitCell) {
         const value = Number(metrics.profit);
         profitCell.textContent = money(value, true);
