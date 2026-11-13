@@ -154,6 +154,7 @@ export function createApiHandler(deps) {
         fromDate: url.searchParams.get("from") || "",
         toDate: url.searchParams.get("to") || "",
         eventType: url.searchParams.get("type") || "all",
+        takerOnly: url.searchParams.get("takerOnly") === "1" || url.searchParams.get("takerOnly") === "true",
         limit: parseLimit(url, 100, 500),
         eventsDir: path.join(config.dataDir, "trader-reactions", "events"),
       });

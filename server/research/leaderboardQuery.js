@@ -23,12 +23,14 @@ export async function queryCityLeaderboard({
   toDate = "",
   limit = 100,
   eventType = "all",
+  takerOnly = false,
   eventsDir = DEFAULT_EVENTS_DIR,
 } = {}) {
   const wantedCity = String(city || "").trim();
   const allCities = !wantedCity || ["__all__", "all", "*"].includes(wantedCity.toLowerCase());
   if (!allCities && !wantedCity) throw new Error("city is required");
   const type = ["all", "trade", "pre"].includes(String(eventType || "all")) ? String(eventType || "all") : "all";
+  const onlyTaker = Boolean(takerOnly);
   let files = [];
   try {
     files = (await fs.readdir(eventsDir)).filter((name) => name.endsWith(".json"));
@@ -76,9 +78,13 @@ export async function queryCityLeaderboard({
   const listed = new Set();
   const eventsByWallet = new Map();
   for (const node of nodes) {
+    const nodeAheadTrades = (node.aheadTrades || []).filter((trade) => !onlyTaker || trade.taker === true);
+    const tradeAheadWallets = new Set(nodeAheadTrades.map((trade) => trade.wallet).filter(Boolean));
+    const rawAheadWallets = onlyTaker ? [...tradeAheadWallets] : (node.aheadWallets || []);
     for (const wallet of node.involvedWallets || []) involved.set(wallet, (involved.get(wallet) || 0) + 1);
     const preSet = new Set(node.prePositionedWallets || []);
-    const matchingAhead = (node.aheadWallets || []).filter((wallet) => {
+    const matchingAhead = rawAheadWallets.filter((wallet) => {
+      if (onlyTaker && type === "pre") return false;
       const pre = preSet.has(wallet);
       if (type === "pre") return pre;
       if (type === "trade") return !pre;
@@ -105,7 +111,7 @@ export async function queryCityLeaderboard({
         repriceTs: node.repriceTs,
         repricePrice: node.repricePrice,
         repriceDirection: node.repriceDirection,
-        trades: (node.aheadTrades || []).filter((trade) => trade.wallet === wallet),
+        trades: nodeAheadTrades.filter((trade) => trade.wallet === wallet),
       });
       eventsByWallet.set(wallet, list);
     }
@@ -145,6 +151,7 @@ export async function queryCityLeaderboard({
     qualifiedWarmingNodes,
     eligibleMin: CITY_ELIGIBLE_MIN_QUALIFIED,
     eligibleRatePct: 50,
+    takerOnly: onlyTaker,
     eventCount: facts.length,
     eventType: type,
     userCount: users.length,
