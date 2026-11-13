@@ -66,7 +66,10 @@ function eventRows(user) {
 export async function mount(root, ctx = {}) {
   const state = {
     data: null,
+    cityData: null,
     city: String((ctx.params && ctx.params.city) || localStorage.getItem("polytemp.leaderboardCity") || ""),
+    fromDate: "",
+    toDate: "",
     search: "",
     eligibleOnly: false,
     expanded: new Set(),
@@ -114,7 +117,9 @@ export async function mount(root, ctx = {}) {
       return qb - qa || a.localeCompare(b);
     });
     if (!state.city || !data.cities[state.city]) state.city = cities[0] || "";
-    const city = data.cities[state.city];
+    const city = state.cityData && state.cityData.city === state.city
+      ? state.cityData
+      : data.cities[state.city];
     if (!city) {
       body.innerHTML = '<div class="empty-state">暂无城市数据。</div>';
       return;
@@ -129,8 +134,9 @@ export async function mount(root, ctx = {}) {
     body.innerHTML = `
       <div class="panel lb-summary">
         <div class="panel-body lb-summary-row">
-          <div class="lb-stat"><span>统计区间</span><b>${ui.escapeHtml(data.fromDate)} → ${ui.escapeHtml(data.toDate)}</b></div>
+          <div class="lb-stat"><span>统计区间</span><b>${ui.escapeHtml(state.fromDate || data.fromDate)} → ${ui.escapeHtml(state.toDate || data.toDate)}</b></div>
           <div class="lb-stat"><span>合格节点</span><b>${city.qualifiedWarmingNodes}</b></div>
+          <div class="lb-stat"><span>事件数</span><b>${city.eventCount ?? "—"}</b></div>
           <div class="lb-stat"><span>用户数</span><b>${city.userCount ?? users.length}</b></div>
           <div class="lb-stat"><span>替补门槛</span><b>${city.eligibleMin} 节点 · 反应率 &gt; 90%</b></div>
           <div class="lb-stat"><span>当前可用替补</span><b>${city.users.filter((u) => u.eligible).length}</b></div>
@@ -141,6 +147,10 @@ export async function mount(root, ctx = {}) {
         <select class="input" id="lbCity">
           ${cities.map((name) => `<option value="${ui.escapeHtml(name)}" ${name === state.city ? "selected" : ""}>${ui.escapeHtml(name)} · ${data.cities[name].qualifiedWarmingNodes} 节点</option>`).join("")}
         </select>
+        <label class="field-label" for="lbFrom">从</label>
+        <input class="input" id="lbFrom" type="date" min="${ui.escapeHtml(data.fromDate || "")}" max="${ui.escapeHtml(data.toDate || "")}" value="${ui.escapeHtml(state.fromDate || data.fromDate || "")}">
+        <label class="field-label" for="lbTo">到</label>
+        <input class="input" id="lbTo" type="date" min="${ui.escapeHtml(data.fromDate || "")}" max="${ui.escapeHtml(data.toDate || "")}" value="${ui.escapeHtml(state.toDate || data.toDate || "")}">
         <input class="input" id="lbSearch" type="search" placeholder="搜索伪名 / 钱包" value="${ui.escapeHtml(state.search)}">
         <div class="segmented segmented-sm" role="group" aria-label="榜单筛选">
           <button class="seg ${state.eligibleOnly ? "" : "is-active"}" type="button" data-lb-filter="all">全部</button>
@@ -174,16 +184,26 @@ export async function mount(root, ctx = {}) {
         </div>
       </div>`;
 
-    body.querySelector("#lbCity")?.addEventListener("change", (event) => {
+    body.querySelector("#lbCity")?.addEventListener("change", async (event) => {
       state.city = event.target.value;
       state.expanded.clear();
       try { localStorage.setItem("polytemp.leaderboardCity", state.city); } catch { /* ignore */ }
-      render();
+      await loadCity();
     });
     body.querySelector("#lbSearch")?.addEventListener("input", (event) => {
       state.search = event.target.value;
       state.expanded.clear();
       render();
+    });
+    body.querySelector("#lbFrom")?.addEventListener("change", async (event) => {
+      state.fromDate = event.target.value;
+      state.expanded.clear();
+      await loadCity();
+    });
+    body.querySelector("#lbTo")?.addEventListener("change", async (event) => {
+      state.toDate = event.target.value;
+      state.expanded.clear();
+      await loadCity();
     });
     body.querySelectorAll("[data-expand]").forEach((button) => {
       button.addEventListener("click", (event) => {
@@ -215,6 +235,27 @@ export async function mount(root, ctx = {}) {
     });
   }
 
+  async function loadCity() {
+    if (!state.city) return;
+    state.loading = true;
+    state.error = null;
+    render();
+    try {
+      const params = new URLSearchParams({ city: state.city, from: state.fromDate, to: state.toDate, limit: "100" });
+      const res = await fetch(`/api/trader-leaderboards?${params.toString()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      state.cityData = await res.json();
+      if (!state.fromDate) state.fromDate = state.cityData.fromDate || state.fromDate;
+      if (!state.toDate) state.toDate = state.cityData.toDate || state.toDate;
+    } catch (error) {
+      state.cityData = null;
+      state.error = `榜单区间查询失败：${error.message}`;
+    } finally {
+      state.loading = false;
+      render();
+    }
+  }
+
   async function load() {
     state.loading = true;
     state.error = null;
@@ -223,12 +264,20 @@ export async function mount(root, ctx = {}) {
       const res = await fetch(DATA_URL, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       state.data = await res.json();
+      if (!state.city) {
+        const names = Object.keys(state.data.cities || {});
+        names.sort((a, b) => (state.data.cities[b].qualifiedWarmingNodes || 0) - (state.data.cities[a].qualifiedWarmingNodes || 0));
+        state.city = names[0] || "";
+      }
+      if (!state.fromDate) state.fromDate = state.data.fromDate || "";
+      if (!state.toDate) state.toDate = state.data.toDate || "";
     } catch (error) {
       state.error = `榜单加载失败：${error.message}`;
     } finally {
       state.loading = false;
       render();
     }
+    await loadCity();
   }
 
   refreshBtn?.addEventListener("click", load);

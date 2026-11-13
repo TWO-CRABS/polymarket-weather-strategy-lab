@@ -363,47 +363,7 @@ function aggregateFacts(facts, nowIso) {
 }
 
 async function writeLeaderboards(payload) {
-  const cityHeader = [
-    "/**",
-    " * shared/traderReactionLeaderboards.js 鈥?GENERATED FILE, do not edit by hand.",
-    " * City-independent reaction leaderboards from local incremental facts.",
-    ` * generatedAt: ${payload.generatedAt}`,
-    ` * range: ${payload.fromDate} .. ${payload.toDate}`,
-    ` * qualified warming nodes (global): ${payload.qualifiedWarmingNodes}`,
-    " */",
-    "",
-    `export const TRADER_REACTION_LEADERBOARDS = ${JSON.stringify(payload, null, 2)};`,
-    "",
-    "export default TRADER_REACTION_LEADERBOARDS;",
-    "",
-  ].join("\n");
-  await fs.writeFile(CITY_LEADERBOARD_FILE, cityHeader, "utf8");
-
-  const globalHeader = [
-    "/**",
-    " * shared/traderReactionLeaderboard.js 鈥?GENERATED FILE, do not edit by hand.",
-    " * Global compatibility leaderboard; see traderReactionLeaderboards.js for cities.",
-    ` * generatedAt: ${payload.generatedAt}`,
-    ` * range: ${payload.fromDate} .. ${payload.toDate}`,
-    ` * qualified warming nodes: ${payload.qualifiedWarmingNodes}`,
-    " */",
-    "",
-    `export const TRADER_REACTION_LEADERBOARD = ${JSON.stringify({
-      generatedAt: payload.generatedAt,
-      fromDate: payload.fromDate,
-      toDate: payload.toDate,
-      qualifiedWarmingNodes: payload.qualifiedWarmingNodes,
-      users: payload.users,
-    }, null, 2)};`,
-    "",
-    "export default TRADER_REACTION_LEADERBOARD;",
-    "",
-  ].join("\n");
-  await fs.writeFile(GLOBAL_LEADERBOARD_FILE, globalHeader, "utf8");
-
-  // Compact JSON consumed by the web leaderboard view. The generated JS module
-  // above is intentionally complete for research/copy code; this file is capped
-  // so the browser never downloads tens of megabytes.
+  // Compact JSON consumed by the web leaderboard view and copy signal.
   const uiPayload = {
     generatedAt: payload.generatedAt,
     fromDate: payload.fromDate,

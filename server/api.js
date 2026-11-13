@@ -16,6 +16,8 @@ import {
 } from "../shared/contract.js";
 import { AppError, UpstreamError, nowMs, roundTo, utcDateKey } from "./util.js";
 import { extractCity, fetchMarketById } from "./data/gamma.js";
+import path from "node:path";
+import { queryCityLeaderboard } from "./research/leaderboardQuery.js";
 
 const MAX_LIMIT = 500;
 
@@ -120,6 +122,20 @@ export function createApiHandler(deps) {
 
     if (method === "GET" && pathname === "/api/meta") {
       sendJson(res, 200, metaPayload());
+      return true;
+    }
+
+    if (method === "GET" && pathname === "/api/trader-leaderboards") {
+      const city = url.searchParams.get("city") || "";
+      if (!city) throw new AppError(400, "INVALID_CITY", "缺少 city 参数");
+      const data = await queryCityLeaderboard({
+        city,
+        fromDate: url.searchParams.get("from") || "",
+        toDate: url.searchParams.get("to") || "",
+        limit: parseLimit(url, 100, 500),
+        eventsDir: path.join(config.dataDir, "trader-reactions", "events"),
+      });
+      sendJson(res, 200, data);
       return true;
     }
 
