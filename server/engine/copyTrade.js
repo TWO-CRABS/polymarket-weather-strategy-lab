@@ -38,10 +38,7 @@ function leaderboardSubstitutes(city, minRatePct) {
   const users = Array.isArray(cityUsers) ? cityUsers : [];
   return users
     .filter((user) => user && user.wallet)
-    .filter((user) => user.eligible === true || (
-      Number(user.qualified) >= 100 &&
-      Number(user.wilsonLower) > 0.9
-    ))
+    .filter((user) => user.eligible === true)
     .filter((user) => Number(user.reactionRate) * 100 >= minRatePct)
     .slice(0, 3)
     .map((user) => normalizedWallet(user.wallet))

@@ -341,21 +341,22 @@ function aggregateFacts(facts, nowIso) {
     }
     const eligibleMin = cityName ? CITY_ELIGIBLE_MIN_QUALIFIED : REACTION_DEFAULTS.eligibleMinQualified;
     const users = [...involved.entries()].map(([wallet, involvedCount]) => {
-      const aheadCount = Math.min(ahead.get(wallet) || 0, qualifiedWarmingNodes);
-      const rate = qualifiedWarmingNodes > 0 ? aheadCount / qualifiedWarmingNodes : 0;
-      const wilson = wilsonLowerBound(aheadCount, qualifiedWarmingNodes);
+      const aheadCount = Math.min(ahead.get(wallet) || 0, involvedCount);
+      const rate = involvedCount > 0 ? aheadCount / involvedCount : 0;
+      const wilson = wilsonLowerBound(aheadCount, involvedCount);
       return {
         wallet,
         pseudonym: names.get(wallet) || "",
         reactionRate: Number(rate.toFixed(6)),
         per100: Number((rate * 100).toFixed(3)),
         ahead: aheadCount,
-        qualified: qualifiedWarmingNodes,
+        qualified: involvedCount,
         involved: involvedCount,
+        cityQualifiedNodes: qualifiedWarmingNodes,
         wilsonLower: Number(wilson.toFixed(6)),
         eligible: cityName
-          ? qualifiedWarmingNodes >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.5
-          : qualifiedWarmingNodes >= eligibleMin && wilson > REACTION_DEFAULTS.eligibleMinWilson,
+          ? involvedCount >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.5
+          : involvedCount >= eligibleMin && wilson > REACTION_DEFAULTS.eligibleMinWilson,
         events: includeEvents ? (eventsByWallet.get(wallet) || []).sort((a, b) => a.nodeTs - b.nodeTs) : undefined,
       };
     }).sort((a, b) => b.wilsonLower - a.wilsonLower || b.ahead - a.ahead || a.wallet.localeCompare(b.wallet));

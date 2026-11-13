@@ -73,8 +73,10 @@ export async function queryCityLeaderboard({
   const qualifiedWarmingNodes = nodes.length;
   const involved = new Map();
   const ahead = new Map();
+  const listed = new Set();
   const eventsByWallet = new Map();
   for (const node of nodes) {
+    for (const wallet of node.involvedWallets || []) involved.set(wallet, (involved.get(wallet) || 0) + 1);
     const preSet = new Set(node.prePositionedWallets || []);
     const matchingAhead = (node.aheadWallets || []).filter((wallet) => {
       const pre = preSet.has(wallet);
@@ -83,9 +85,9 @@ export async function queryCityLeaderboard({
       return true;
     });
     if (type === "all") {
-      for (const wallet of node.involvedWallets || []) involved.set(wallet, (involved.get(wallet) || 0) + 1);
+      for (const wallet of node.involvedWallets || []) listed.add(wallet);
     } else {
-      for (const wallet of matchingAhead) involved.set(wallet, (involved.get(wallet) || 0) + 1);
+      for (const wallet of matchingAhead) listed.add(wallet);
     }
     for (const wallet of matchingAhead) {
       ahead.set(wallet, (ahead.get(wallet) || 0) + 1);
@@ -109,20 +111,22 @@ export async function queryCityLeaderboard({
     }
   }
 
-  const users = [...involved.entries()].map(([wallet, involvedCount]) => {
-    const aheadCount = Math.min(ahead.get(wallet) || 0, qualifiedWarmingNodes);
-    const rate = qualifiedWarmingNodes > 0 ? aheadCount / qualifiedWarmingNodes : 0;
-    const wilson = wilsonLowerBound(aheadCount, qualifiedWarmingNodes);
+  const users = [...listed].map((wallet) => {
+    const involvedCount = involved.get(wallet) || 0;
+    const aheadCount = Math.min(ahead.get(wallet) || 0, involvedCount);
+    const rate = involvedCount > 0 ? aheadCount / involvedCount : 0;
+    const wilson = wilsonLowerBound(aheadCount, involvedCount);
     return {
       wallet,
       pseudonym: names.get(wallet) || "",
       reactionRate: Number(rate.toFixed(6)),
       per100: Number((rate * 100).toFixed(3)),
       ahead: aheadCount,
-      qualified: qualifiedWarmingNodes,
+      qualified: involvedCount,
       involved: involvedCount,
+      cityQualifiedNodes: qualifiedWarmingNodes,
       wilsonLower: Number(wilson.toFixed(6)),
-      eligible: qualifiedWarmingNodes >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.5,
+      eligible: involvedCount >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.5,
       events: (eventsByWallet.get(wallet) || []).sort((a, b) => a.nodeTs - b.nodeTs),
     };
   }).sort((a, b) => (

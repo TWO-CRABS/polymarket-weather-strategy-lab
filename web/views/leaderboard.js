@@ -293,8 +293,8 @@ export async function mount(root, ctx = {}) {
           <div class="lb-stat"><span>合格节点</span><b>${city.qualifiedWarmingNodes}</b></div>
           <div class="lb-stat"><span>事件数</span><b>${city.eventCount ?? "—"}</b></div>
           <div class="lb-stat"><span>用户数</span><b>${city.userCount ?? users.length}</b></div>
-          <div class="lb-stat"><span>替补门槛</span><b>${city.eligibleMin} 节点 · 反应率 &gt; ${city.eligibleRatePct ?? 50}%</b></div>
-          <div class="lb-stat"><span>当前可用替补</span><b>${city.users.filter((u) => u.eligible).length}</b></div>
+          <div class="lb-stat"><span>替补门槛</span><b>${city.eligibleMin} 个参与节点 · 反应率 &gt; ${city.eligibleRatePct ?? 50}%</b></div>
+          <div class="lb-stat"><span>当前可用替补</span><b>${city.eligibleCount ?? city.users.filter((u) => u.eligible).length}</b></div>
         </div>
       </div>
       <div class="lb-toolbar">
@@ -323,7 +323,7 @@ export async function mount(root, ctx = {}) {
         <div class="table-wrap lb-table-wrap">
           <table class="table lb-table">
             <thead><tr>
-              <th>#</th><th>用户</th><th>钱包</th><th>状态</th><th class="num-col">Ahead / 节点</th>
+              <th>#</th><th>用户</th><th>钱包</th><th>状态</th><th class="num-col">Ahead / 参与节点</th>
               <th class="num-col">反应率</th><th class="num-col">Wilson 下界</th><th>Ahead 事件</th>
             </tr></thead>
             <tbody>
