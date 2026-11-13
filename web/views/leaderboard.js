@@ -71,6 +71,11 @@ function eventRows(user) {
     const link = url
       ? `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开事件 ↗</a>`
       : "—";
+    const profile = profileUrl(user.wallet);
+    const question = marketQuestion(event);
+    const profileLink = profile
+      ? `<a class="mkt-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开该用户主页并复制此市场">打开用户主页 ↗</a>`
+      : "—";
     return `<tr>
       <td>${ui.escapeHtml(event.eventDate || "—")}</td>
       <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
@@ -79,6 +84,7 @@ function eventRows(user) {
       <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
       <td>${event.prePositioned ? "节点前已持仓" : "窗口内成交"}</td>
       <td>${link}</td>
+      <td>${profileLink}</td>
     </tr>`;
   }).join("");
   return `<tr class="lb-detail-row"><td colspan="8">
@@ -87,7 +93,7 @@ function eventRows(user) {
       <table class="lb-detail-table">
         <thead><tr>
           <th>日期</th><th>温度括号</th><th>发布节点时间</th><th class="num-col">Baseline</th>
-          <th class="num-col">重定价</th><th>类型</th><th>市场核验</th>
+          <th class="num-col">重定价</th><th>类型</th><th>市场核验</th><th>用户主页</th>
         </tr></thead>
         <tbody>${body}</tbody>
       </table>
@@ -210,14 +216,9 @@ export async function mount(root, ctx = {}) {
             <tbody>
               ${users.slice(0, maxShow).map((user, index) => {
                 const expanded = state.expanded.has(user.wallet);
-                const profile = profileUrl(user.wallet);
-                const question = marketQuestion((user.events || [])[0], state.city);
-                const nameHtml = profile
-                  ? `<a class="lb-user-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开 Polymarket 主页并复制该用户首个 ahead 市场">${ui.escapeHtml(userLabel(user))}</a>`
-                  : `<b>${ui.escapeHtml(userLabel(user))}</b>`;
                 return `<tr class="lb-user-row" data-wallet="${ui.escapeHtml(user.wallet)}" tabindex="0">
                   <td class="num-col">${index + 1}</td>
-                  <td>${nameHtml}</td>
+                  <td><b>${ui.escapeHtml(userLabel(user))}</b></td>
                   <td class="mono muted">${ui.escapeHtml(user.wallet || "—")} <button class="btn-link" data-copy-wallet="${ui.escapeHtml(user.wallet || "")}" type="button">复制</button></td>
                   <td>${user.eligible ? '<span class="badge badge-up">达标</span>' : '<span class="badge badge-ghost">未达标</span>'}</td>
                   <td class="num-col">${user.ahead}/${user.qualified}</td>
