@@ -5,25 +5,25 @@
   "cities": {
     "Amsterdam": {
       "station": "EHAM",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         25,
         55
       ],
-      "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "samples": 47,
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Ankara": {
       "station": "LTAC",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         20,
         50
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Atlanta": {
       "station": "KATL",
@@ -47,54 +47,54 @@
     },
     "Beijing": {
       "station": "ZBAA",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Buenos Aires": {
       "station": "SAEZ",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Busan": {
       "station": "RKPK",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T15:10:24.819Z"
     },
     "Cape Town": {
       "station": "FACT",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
-      "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "samples": 23,
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Chengdu": {
       "station": "ZUUU",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Chicago": {
       "station": "KORD",
@@ -108,13 +108,13 @@
     },
     "Chongqing": {
       "station": "ZUCK",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Dallas": {
       "station": "KDAL",
@@ -138,25 +138,25 @@
     },
     "Guangzhou": {
       "station": "ZGGG",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Helsinki": {
       "station": "EFHK",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         20,
         50
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Houston": {
       "station": "KHOU",
@@ -170,57 +170,57 @@
     },
     "Istanbul": {
       "station": "LTFM",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         20,
         50
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Jeddah": {
       "station": "OEJN",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Karachi": {
       "station": "OPKC",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Kuala Lumpur": {
       "station": "WMKK",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "London": {
       "station": "EGLC",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         20,
         50
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Los Angeles": {
       "station": "KLAX",
@@ -234,35 +234,35 @@
     },
     "Lucknow": {
       "station": "VILK",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
-      "samples": 49,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "samples": 47,
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Madrid": {
       "station": "LEMD",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Manila": {
       "station": "RPLL",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Mexico City": {
       "station": "MMMX",
@@ -289,36 +289,36 @@
     },
     "Milan": {
       "station": "LIMC",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         20,
         50
       ],
-      "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "samples": 47,
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Moscow": {
       "station": "UUWW",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Munich": {
       "station": "EDDM",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         20,
         50
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "New York City": {
       "station": "KLGA",
@@ -342,24 +342,24 @@
     },
     "Paris": {
       "station": "LFPB",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Qingdao": {
       "station": "ZSQD",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "San Francisco": {
       "station": "KSFO",
@@ -373,13 +373,13 @@
     },
     "São Paulo": {
       "station": "SBGR",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Seattle": {
       "station": "KSEA",
@@ -393,79 +393,79 @@
     },
     "Seoul": {
       "station": "RKSI",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T15:10:24.819Z"
     },
     "Shanghai": {
       "station": "ZSPD",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Shenzhen": {
       "station": "ZGSZ",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Singapore": {
       "station": "WSSS",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Taipei": {
       "station": "RCSS",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 42,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     },
     "Tel Aviv": {
       "station": "LLBG",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         20,
         50
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Tokyo": {
       "station": "RJTT",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T15:10:24.819Z"
     },
     "Toronto": {
       "station": "CYYZ",
@@ -479,14 +479,14 @@
     },
     "Warsaw": {
       "station": "EPWA",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0,
         30
       ],
       "samples": 48,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-13T04:05:03.253Z"
     },
     "Wellington": {
       "station": "NZWN",
@@ -501,13 +501,13 @@
     },
     "Wuhan": {
       "station": "ZHHH",
-      "observationDate": "2026-11-11",
-      "refreshedAtLocalDate": "2026-11-12",
+      "observationDate": "2026-11-12",
+      "refreshedAtLocalDate": "2026-11-13",
       "minuteOffsetsUtc": [
         0
       ],
       "samples": 24,
-      "updatedAt": "2026-11-12T10:38:10.492Z"
+      "updatedAt": "2026-11-12T16:10:25.634Z"
     }
   }
 }

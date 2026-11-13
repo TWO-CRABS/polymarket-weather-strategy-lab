@@ -45,6 +45,7 @@ const METAR = "https://aviationweather.gov/api/data/metar";
 const TAG = 104596;
 const SIGNATURE = JSON.stringify({ v: 3, ...REACTION_DEFAULTS });
 const START_DATE = "2026-10-23";
+const CITY_ELIGIBLE_MIN_QUALIFIED = 20;
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback = null) => {
@@ -281,22 +282,49 @@ function aggregateFacts(facts, nowIso) {
     const city = cities.get(fact.city);
     for (const node of fact.nodes || []) {
       if (!node.qualified) continue;
-      city.nodes.push(node);
-      globalNodes.push(node);
+      const enriched = {
+        ...node,
+        eventSlug: fact.slug,
+        eventDate: fact.eventDate,
+        city: fact.city,
+      };
+      city.nodes.push(enriched);
+      globalNodes.push(enriched);
     }
     for (const [wallet, name] of Object.entries(fact.names || {})) {
       if (name && !city.names.has(wallet)) city.names.set(wallet, name);
       if (name && !globalNames.has(wallet)) globalNames.set(wallet, name);
     }
   }
-  const build = (nodes, names, cityName = null) => {
+  const build = (nodes, names, cityName = null, includeEvents = false) => {
     const qualifiedWarmingNodes = nodes.length;
     const involved = new Map();
     const ahead = new Map();
+    const eventsByWallet = new Map();
     for (const node of nodes) {
       for (const wallet of node.involvedWallets || []) involved.set(wallet, (involved.get(wallet) || 0) + 1);
-      for (const wallet of node.aheadWallets || []) ahead.set(wallet, (ahead.get(wallet) || 0) + 1);
+      for (const wallet of node.aheadWallets || []) {
+        ahead.set(wallet, (ahead.get(wallet) || 0) + 1);
+        if (!includeEvents) continue;
+        const list = eventsByWallet.get(wallet) || [];
+        list.push({
+          eventSlug: node.eventSlug,
+          eventDate: node.eventDate,
+          city: node.city,
+          nodeTs: node.nodeTs,
+          bracket: node.bracket,
+          marketId: node.marketId,
+          ahead: true,
+          prePositioned: (node.prePositionedWallets || []).includes(wallet),
+          baselinePrice: node.baselinePrice,
+          repriceTs: node.repriceTs,
+          repricePrice: node.repricePrice,
+          repriceDirection: node.repriceDirection,
+        });
+        eventsByWallet.set(wallet, list);
+      }
     }
+    const eligibleMin = cityName ? CITY_ELIGIBLE_MIN_QUALIFIED : REACTION_DEFAULTS.eligibleMinQualified;
     const users = [...involved.entries()].map(([wallet, involvedCount]) => {
       const aheadCount = Math.min(ahead.get(wallet) || 0, qualifiedWarmingNodes);
       const rate = qualifiedWarmingNodes > 0 ? aheadCount / qualifiedWarmingNodes : 0;
@@ -310,16 +338,19 @@ function aggregateFacts(facts, nowIso) {
         qualified: qualifiedWarmingNodes,
         involved: involvedCount,
         wilsonLower: Number(wilson.toFixed(6)),
-        eligible: qualifiedWarmingNodes >= REACTION_DEFAULTS.eligibleMinQualified && wilson > REACTION_DEFAULTS.eligibleMinWilson,
+        eligible: cityName
+          ? qualifiedWarmingNodes >= CITY_ELIGIBLE_MIN_QUALIFIED && rate > 0.9
+          : qualifiedWarmingNodes >= eligibleMin && wilson > REACTION_DEFAULTS.eligibleMinWilson,
+        events: includeEvents ? (eventsByWallet.get(wallet) || []).sort((a, b) => a.nodeTs - b.nodeTs) : undefined,
       };
     }).sort((a, b) => b.wilsonLower - a.wilsonLower || b.ahead - a.ahead || a.wallet.localeCompare(b.wallet));
-    return { city: cityName, qualifiedWarmingNodes, users };
+    return { city: cityName, qualifiedWarmingNodes, eligibleMin, users };
   };
   const cityPayload = {};
   for (const [city, info] of [...cities.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    cityPayload[city] = build(info.nodes, info.names, city);
+    cityPayload[city] = build(info.nodes, info.names, city, true);
   }
-  const global = build(globalNodes, globalNames, null);
+  const global = build(globalNodes, globalNames, null, false);
   return {
     generatedAt: nowIso,
     fromDate: FROM,
@@ -369,6 +400,37 @@ async function writeLeaderboards(payload) {
     "",
   ].join("\n");
   await fs.writeFile(GLOBAL_LEADERBOARD_FILE, globalHeader, "utf8");
+
+  // Compact JSON consumed by the web leaderboard view. The generated JS module
+  // above is intentionally complete for research/copy code; this file is capped
+  // so the browser never downloads tens of megabytes.
+  const uiPayload = {
+    generatedAt: payload.generatedAt,
+    fromDate: payload.fromDate,
+    toDate: payload.toDate,
+    qualifiedWarmingNodes: payload.qualifiedWarmingNodes,
+    cities: Object.fromEntries(
+      Object.entries(payload.cities).map(([city, info]) => [
+        city,
+        {
+          city,
+          qualifiedWarmingNodes: info.qualifiedWarmingNodes,
+          eligibleMin: info.eligibleMin,
+          userCount: info.users.length,
+          eligibleCount: info.users.filter((user) => user.eligible).length,
+          users: info.users.slice(0, 100).map((user) => ({
+            ...user,
+            events: Array.isArray(user.events) ? user.events.slice(0, 50) : [],
+          })),
+        },
+      ]),
+    ),
+  };
+  await fs.writeFile(
+    path.join(PROJECT_ROOT, "shared", "traderReactionLeaderboards.json"),
+    `${JSON.stringify(uiPayload)}\n`,
+    "utf8",
+  );
 }
 
 async function acquireLock() {

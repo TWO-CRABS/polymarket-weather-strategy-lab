@@ -1,0 +1,220 @@
+/**
+ * web/views/leaderboard.js — per-city trader reaction leaderboards.
+ *
+ * Data comes from the compact, generated /shared/traderReactionLeaderboards.json.
+ * Each ahead event links to the corresponding Polymarket city/date event so the
+ * user can verify the exact bracket and METAR release node manually.
+ */
+import * as ui from "/web/components/ui.js";
+
+const DATA_URL = "/shared/traderReactionLeaderboards.json";
+
+function fmtNodeTime(ts) {
+  const value = Number(ts);
+  if (!Number.isFinite(value)) return "—";
+  try {
+    return new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date(value * 1000));
+  } catch {
+    return new Date(value * 1000).toISOString();
+  }
+}
+
+function pct(value, digits = 1) {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${(n * 100).toFixed(digits)}%` : "—";
+}
+
+function eventUrl(event) {
+  const slug = String(event?.eventSlug || "").trim();
+  return slug ? `https://polymarket.com/zh/event/${encodeURIComponent(slug)}` : "";
+}
+
+function userLabel(user) {
+  return user.pseudonym || user.wallet || "—";
+}
+
+function eventRows(user) {
+  const events = Array.isArray(user.events) ? user.events : [];
+  if (!events.length) {
+    return '<tr class="lb-detail-row"><td colspan="7" class="muted">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
+  }
+  return events.map((event) => {
+    const url = eventUrl(event);
+    const link = url
+      ? `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开事件 ↗</a>`
+      : "—";
+    return `<tr class="lb-detail-row">
+      <td>${ui.escapeHtml(event.eventDate || "—")}</td>
+      <td>${ui.escapeHtml(event.bracket || "—")}</td>
+      <td>${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
+      <td>${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
+      <td>${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+      <td>${event.prePositioned ? "节点前已持仓" : "窗口内成交"}</td>
+      <td>${link}</td>
+    </tr>`;
+  }).join("");
+}
+
+export async function mount(root, ctx = {}) {
+  const state = {
+    data: null,
+    city: String((ctx.params && ctx.params.city) || localStorage.getItem("polytemp.leaderboardCity") || ""),
+    search: "",
+    expanded: new Set(),
+    loading: true,
+    error: null,
+    destroyed: false,
+  };
+
+  root.innerHTML = `
+    <section class="view">
+      <div class="view-head">
+        <div>
+          <div class="eyebrow">TRADER REACTION / CITY INDEPENDENT</div>
+          <h1>温度发布反应榜</h1>
+          <p class="view-sub">每个城市独立统计：节点前买入 YES / 卖出 NO，且早于市场重定价。点开用户可查看具体节点并跳转 Polymarket 事件核验。</p>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-ghost" id="lbRefresh" type="button">刷新</button>
+        </div>
+      </div>
+      <div id="lbBody"><div class="empty-state">加载榜单…</div></div>
+    </section>`;
+
+  const body = root.querySelector("#lbBody");
+  const refreshBtn = root.querySelector("#lbRefresh");
+
+  function render() {
+    if (state.destroyed) return;
+    if (state.loading) {
+      body.innerHTML = '<div class="empty-state">加载榜单…</div>';
+      return;
+    }
+    if (state.error) {
+      body.innerHTML = `<div class="empty-state">${ui.escapeHtml(state.error)}</div>`;
+      return;
+    }
+    const data = state.data;
+    if (!data || !data.cities) {
+      body.innerHTML = '<div class="empty-state">暂无榜单数据，请等待后台统计完成。</div>';
+      return;
+    }
+    const cities = Object.keys(data.cities).sort((a, b) => {
+      const qa = data.cities[a].qualifiedWarmingNodes || 0;
+      const qb = data.cities[b].qualifiedWarmingNodes || 0;
+      return qb - qa || a.localeCompare(b);
+    });
+    if (!state.city || !data.cities[state.city]) state.city = cities[0] || "";
+    const city = data.cities[state.city];
+    if (!city) {
+      body.innerHTML = '<div class="empty-state">暂无城市数据。</div>';
+      return;
+    }
+    const query = state.search.trim().toLowerCase();
+    const users = (city.users || []).filter((user) => {
+      if (!query) return true;
+      return `${user.pseudonym || ""} ${user.wallet || ""}`.toLowerCase().includes(query);
+    });
+    const maxShow = 100;
+    body.innerHTML = `
+      <div class="panel lb-summary">
+        <div class="panel-body lb-summary-row">
+          <div class="lb-stat"><span>统计区间</span><b>${ui.escapeHtml(data.fromDate)} → ${ui.escapeHtml(data.toDate)}</b></div>
+          <div class="lb-stat"><span>合格节点</span><b>${city.qualifiedWarmingNodes}</b></div>
+          <div class="lb-stat"><span>用户数</span><b>${city.userCount ?? users.length}</b></div>
+          <div class="lb-stat"><span>替补门槛</span><b>${city.eligibleMin} 节点 · 反应率 &gt; 90%</b></div>
+          <div class="lb-stat"><span>当前可用替补</span><b>${city.users.filter((u) => u.eligible).length}</b></div>
+        </div>
+      </div>
+      <div class="lb-toolbar">
+        <label class="field-label" for="lbCity">城市</label>
+        <select class="input" id="lbCity">
+          ${cities.map((name) => `<option value="${ui.escapeHtml(name)}" ${name === state.city ? "selected" : ""}>${ui.escapeHtml(name)} · ${data.cities[name].qualifiedWarmingNodes} 节点</option>`).join("")}
+        </select>
+        <input class="input" id="lbSearch" type="search" placeholder="搜索伪名 / 钱包" value="${ui.escapeHtml(state.search)}">
+        <span class="muted">显示前 ${Math.min(users.length, maxShow)} / ${city.userCount ?? city.users.length} 名</span>
+      </div>
+      <div class="panel">
+        <div class="table-wrap lb-table-wrap">
+          <table class="table lb-table">
+            <thead><tr>
+              <th>#</th><th>用户</th><th>钱包</th><th class="num-col">Ahead / 节点</th>
+              <th class="num-col">反应率</th><th class="num-col">Wilson 下界</th><th>Ahead 事件</th>
+            </tr></thead>
+            <tbody>
+              ${users.slice(0, maxShow).map((user, index) => {
+                const expanded = state.expanded.has(user.wallet);
+                return `<tr class="lb-user-row" data-wallet="${ui.escapeHtml(user.wallet)}" tabindex="0">
+                  <td class="num-col">${index + 1}</td>
+                  <td><b>${ui.escapeHtml(userLabel(user))}</b> ${user.eligible ? '<span class="badge badge-up">替补</span>' : ""}</td>
+                  <td class="mono muted">${ui.escapeHtml(user.wallet || "—")}</td>
+                  <td class="num-col">${user.ahead}/${user.qualified}</td>
+                  <td class="num-col">${pct(user.reactionRate)}</td>
+                  <td class="num-col">${pct(user.wilsonLower, 3)}</td>
+                  <td>${(user.events || []).length} 个 <button class="btn-link" data-expand="${ui.escapeHtml(user.wallet)}" type="button">${expanded ? "收起" : "查看"}</button></td>
+                </tr>${expanded ? eventRows(user) : ""}`;
+              }).join("") || '<tr><td colspan="7" class="muted">没有匹配用户</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    body.querySelector("#lbCity")?.addEventListener("change", (event) => {
+      state.city = event.target.value;
+      state.expanded.clear();
+      try { localStorage.setItem("polytemp.leaderboardCity", state.city); } catch { /* ignore */ }
+      render();
+    });
+    body.querySelector("#lbSearch")?.addEventListener("input", (event) => {
+      state.search = event.target.value;
+      state.expanded.clear();
+      render();
+    });
+    body.querySelectorAll("[data-expand]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const wallet = button.dataset.expand;
+        if (state.expanded.has(wallet)) state.expanded.delete(wallet);
+        else state.expanded.add(wallet);
+        render();
+      });
+    });
+  }
+
+  async function load() {
+    state.loading = true;
+    state.error = null;
+    render();
+    try {
+      const res = await fetch(DATA_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      state.data = await res.json();
+    } catch (error) {
+      state.error = `榜单加载失败：${error.message}`;
+    } finally {
+      state.loading = false;
+      render();
+    }
+  }
+
+  refreshBtn?.addEventListener("click", load);
+  await load();
+  return {
+    destroy() {
+      state.destroyed = true;
+      root.innerHTML = "";
+    },
+  };
+}
+
+export function destroy() {
+  /* mount returns a scoped instance; kept for router API compatibility. */
+}

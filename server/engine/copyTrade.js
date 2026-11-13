@@ -5,20 +5,36 @@
  * it is silent for the configured delay, the top reaction-rate wallets from the
  * static leaderboard are tried in order. All orders use normal risk checks.
  */
+import fs from "node:fs";
 import { newId } from "../util.js";
-import { TRADER_REACTION_LEADERBOARDS } from "../../shared/traderReactionLeaderboards.js";
 import { releaseNodeForCity } from "./metarReleaseWindow.js";
 import { executeExit, tryEntry } from "./runTrading.js";
 
 const POLL_MS = 2_000;
 const TRADE_WINDOW_SEC = 180;
+const CITY_LEADERBOARDS_PATH = new URL("../../shared/traderReactionLeaderboards.json", import.meta.url);
+let cityLeaderboardsCache = null;
+let cityLeaderboardsMtime = 0;
+
+function cityLeaderboards() {
+  try {
+    const stat = fs.statSync(CITY_LEADERBOARDS_PATH);
+    if (!cityLeaderboardsCache || stat.mtimeMs !== cityLeaderboardsMtime) {
+      cityLeaderboardsCache = JSON.parse(fs.readFileSync(CITY_LEADERBOARDS_PATH, "utf8"));
+      cityLeaderboardsMtime = stat.mtimeMs;
+    }
+    return cityLeaderboardsCache;
+  } catch {
+    return null;
+  }
+}
 
 function normalizedWallet(value) {
   return String(value || "").trim().toLowerCase();
 }
 
 function leaderboardSubstitutes(city, minRatePct) {
-  const cityUsers = TRADER_REACTION_LEADERBOARDS?.cities?.[city]?.users;
+  const cityUsers = cityLeaderboards()?.cities?.[city]?.users;
   const users = Array.isArray(cityUsers) ? cityUsers : [];
   return users
     .filter((user) => user && user.wallet)

@@ -19,6 +19,7 @@ import * as builderView from "/web/views/builder.js";
 import * as dashboardView from "/web/views/dashboard.js";
 import * as historyView from "/web/views/history.js";
 import * as libraryView from "/web/views/library.js";
+import * as leaderboardView from "/web/views/leaderboard.js";
 
 const LAST_RUN_KEY = "polytemp.lastRunId";
 
@@ -88,6 +89,7 @@ const VIEWS = {
   dashboard: dashboardView,
   history: historyView,
   library: libraryView,
+  leaderboard: leaderboardView,
 };
 
 const VIEW_TITLES = {
@@ -95,6 +97,7 @@ const VIEW_TITLES = {
   dashboard: "实时看板",
   history: "运行历史",
   library: "策略库",
+  leaderboard: "交易员榜单",
 };
 
 const VALID_ROUTES = Object.keys(VIEWS);
