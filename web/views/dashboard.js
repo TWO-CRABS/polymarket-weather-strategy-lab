@@ -642,6 +642,7 @@ export async function mount(root, ctx) {
                 <div class="segmented segmented-sm signal-filter" role="group" aria-label="信号类型">
                   <button type="button" class="seg is-active" data-signal-filter="all">全部</button>
                   <button type="button" class="seg" data-signal-filter="entry">入场</button>
+                  <button type="button" class="seg" data-signal-filter="copy">跟单</button>
                   <button type="button" class="seg" data-signal-filter="observation">观察</button>
                 </div>
                 <span class="badge badge-ghost" id="signalCountBadge">0 条</span>
@@ -1171,7 +1172,11 @@ export async function mount(root, ctx) {
     const allSignals = state.signals;
     const signals = allSignals
       .filter((signal) => {
-        const kind = signal.kind === "observation" ? "observation" : "entry";
+        const kind = signal.kind === "observation"
+          ? "observation"
+          : signal.reason === "copy_trade"
+            ? "copy"
+            : "entry";
         return state.signalFilter === "all" || kind === state.signalFilter;
       })
       .slice(0, 60);
@@ -1183,7 +1188,9 @@ export async function mount(root, ctx) {
     if (!signals.length) {
       el.signalFeed.innerHTML = state.signalFilter === "observation"
         ? '<div class="sig-empty">暂无观察信号 · 价格带外的动量会记录在这里</div>'
-        : '<div class="sig-empty">暂无信号 · 等待价格动量触发</div>';
+        : state.signalFilter === "copy"
+          ? '<div class="sig-empty">暂无跟单信号 · 等待跟单钱包或替补交易</div>'
+          : '<div class="sig-empty">暂无信号 · 等待价格动量触发</div>';
       return;
     }
     el.signalFeed.innerHTML = signals.map((signal) => {
