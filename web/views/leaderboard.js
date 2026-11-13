@@ -85,12 +85,34 @@ function marketQuestion(event, fallbackCity = "") {
   return `Will the highest temperature in ${city} be ${bracket} on ${month} ${day}?`;
 }
 
+function fmtDateTime(ts) {
+  const value = Number(ts);
+  if (!Number.isFinite(value)) return "—";
+  try {
+    const parts = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(value * 1000));
+    const get = (type) => parts.find((part) => part.type === type)?.value || "";
+    return `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+  } catch {
+    return new Date(value * 1000).toISOString();
+  }
+}
+
 function eventRows(user) {
   const events = Array.isArray(user.events) ? user.events : [];
   if (!events.length) {
     return '<tr class="lb-detail-row"><td colspan="8" class="muted lb-detail-empty">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
   }
-  const body = events.map((event) => {
+  const rows = [];
+  for (const event of events) {
     const url = eventUrl(event);
     const link = url
       ? `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开事件 ↗</a>`
@@ -103,52 +125,62 @@ function eventRows(user) {
     const trades = Array.isArray(event.trades) ? event.trades : [];
     const tradeKey = `${event.eventSlug}|${user.wallet}|${event.nodeTs}`;
     tradeSnapshots.set(tradeKey, { event, user });
-    const rows = trades.length
-      ? trades.map((trade) => {
-          const isTarget = Boolean(trade.target);
-          const type = event.prePositioned ? "节点前持仓 + 窗口成交" : "窗口内成交";
-          return `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
-            <td>${ui.escapeHtml(event.eventDate || "—")}</td>
-            <td>${ui.escapeHtml(`${trade.side} ${trade.outcome}`)}</td>
-            <td class="mono">${ui.escapeHtml(fmtTradeTime(trade.ts))}</td>
+    const settlementCell = `<td class="lb-settlement-temp" data-settlement-slug="${ui.escapeHtml(event.eventSlug || "")}" data-settlement-wallet="${ui.escapeHtml(user.wallet || "")}" data-settlement-bracket="${ui.escapeHtml(event.bracket || "")}" data-settlement-node="${ui.escapeHtml(String(event.nodeTs ?? ""))}">…</td>`;
+    if (trades.length) {
+      for (const trade of trades) {
+        const isTarget = Boolean(trade.target);
+        const type = event.prePositioned ? "节点前持仓 + 窗口成交" : "窗口内成交";
+        rows.push({
+          sortTs: Number(trade.ts) || 0,
+          html: `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
+            <td class="mono">${ui.escapeHtml(fmtDateTime(event.nodeTs))}</td>
             <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
-            <td class="lb-settlement-temp" data-settlement-slug="${ui.escapeHtml(event.eventSlug || "")}" data-settlement-wallet="${ui.escapeHtml(user.wallet || "")}" data-settlement-bracket="${ui.escapeHtml(event.bracket || "")}" data-settlement-node="${ui.escapeHtml(String(event.nodeTs ?? ""))}">…</td>
-            <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
+            <td class="mono">${ui.escapeHtml(fmtDateTime(trade.ts))}</td>
+            <td>${ui.escapeHtml(trade.side || "—")}</td>
             <td>${ui.escapeHtml(`${isTarget ? "目标" : "其它"} ${trade.marketBracket || ""}`.trim())}</td>
+            <td>${ui.escapeHtml(trade.outcome || "—")}</td>
             <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
             <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+            <td class="num-col">${usd(trade.amount)}</td>
             <td>${ui.escapeHtml(type)}</td>
+            ${settlementCell}
+            <td class="num-col lb-metric-profit ${Number(trade.pnl) > 0 ? "lb-profit-up" : Number(trade.pnl) < 0 ? "lb-profit-down" : ""}" data-trade-key="${ui.escapeHtml(tradeKey)}">${usd(trade.pnl, true)}</td>
             <td>${link}</td>
             <td>${profileLink}</td>
-            <td class="num-col">${usd(trade.amount)}</td>
-            <td class="num-col lb-metric-profit ${Number(trade.pnl) > 0 ? "lb-profit-up" : Number(trade.pnl) < 0 ? "lb-profit-down" : ""}" data-trade-key="${ui.escapeHtml(tradeKey)}">${usd(trade.pnl, true)}</td>
-          </tr>`;
-        }).join("")
-      : `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
-            <td>${ui.escapeHtml(event.eventDate || "—")}</td>
-            <td>—</td><td class="mono">—</td>
-            <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
-            <td class="lb-settlement-temp" data-settlement-slug="${ui.escapeHtml(event.eventSlug || "")}" data-settlement-wallet="${ui.escapeHtml(user.wallet || "")}" data-settlement-bracket="${ui.escapeHtml(event.bracket || "")}" data-settlement-node="${ui.escapeHtml(String(event.nodeTs ?? ""))}">…</td>
-            <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
-            <td>—</td>
-            <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
-            <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
-            <td>节点前已持仓</td><td>${link}</td><td>${profileLink}</td>
-            <td class="num-col">—</td>
-            <td class="num-col lb-metric-profit" data-trade-key="${ui.escapeHtml(tradeKey)}">—</td>
-          </tr>`;
-    return rows;
-  }).join("");
+          </tr>`,
+        });
+      }
+    } else {
+      rows.push({
+        sortTs: Number(event.nodeTs) || 0,
+        html: `<tr class="lb-trade-row" data-trade-key="${ui.escapeHtml(tradeKey)}">
+          <td class="mono">${ui.escapeHtml(fmtDateTime(event.nodeTs))}</td>
+          <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
+          <td class="mono">—</td>
+          <td>—</td><td>—</td><td>—</td>
+          <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
+          <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+          <td class="num-col">—</td>
+          <td>节点前已持仓</td>
+          ${settlementCell}
+          <td class="num-col lb-metric-profit" data-trade-key="${ui.escapeHtml(tradeKey)}">—</td>
+          <td>${link}</td>
+          <td>${profileLink}</td>
+        </tr>`,
+      });
+    }
+  }
+  rows.sort((a, b) => b.sortTs - a.sortTs);
   return `<tr class="lb-detail-row"><td colspan="8">
     <div class="lb-detail">
-      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟；目标括号是节点，交易市场是实际成交市场）</div>
+      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间，窗口 ±5 分钟；节点温度是节点，交易市场是实际成交市场）</div>
       <table class="lb-detail-table">
         <thead><tr>
-          <th>日期</th><th>方向</th><th>成交时间</th><th title="发布节点对应的目标温度括号">目标括号</th><th>结算温度</th><th>发布节点时间</th><th title="该笔成交实际所在的温度市场">交易市场</th><th class="num-col">Baseline</th>
-          <th class="num-col">重定价</th><th>类型</th><th>市场核验</th><th>用户主页</th>
-          <th class="num-col">交易金额</th><th class="num-col">盈利金额</th>
+          <th>节点时间</th><th>节点温度</th><th>成交时间</th><th>动作</th><th>交易市场</th><th>方向</th>
+          <th class="num-col">Baseline</th><th class="num-col">重定价</th><th class="num-col">交易金额</th><th>类型</th>
+          <th>结算温度</th><th class="num-col">盈利金额</th><th>市场核验</th><th>用户主页</th>
         </tr></thead>
-        <tbody>${body}</tbody>
+        <tbody>${rows.map((row) => row.html).join("")}</tbody>
       </table>
     </div>
   </td></tr>`;
