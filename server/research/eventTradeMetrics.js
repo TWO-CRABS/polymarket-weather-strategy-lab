@@ -87,9 +87,11 @@ function settlementTemp(event) {
   return null;
 }
 
-export async function getEventTradeMetrics({ slug, wallet, bracket } = {}) {
+export async function getEventTradeMetrics({ slug, wallet, bracket, nodeTs, mode } = {}) {
   const eventSlug = String(slug || "").trim();
   const user = String(wallet || "").trim().toLowerCase();
+  const node = Number(nodeTs);
+  const isPre = String(mode || "") === "pre";
   if (!eventSlug || !user) throw new Error("slug and wallet are required");
   const event = await eventBySlug(eventSlug);
   const market = targetMarket(event, bracket);
@@ -133,6 +135,21 @@ export async function getEventTradeMetrics({ slug, wallet, bracket } = {}) {
   const winning = outcomeYes(market);
   const payout = winning === null ? null : winning ? 1 : 0;
   const profit = payout === null ? null : cash + shares * payout;
+  let relevant = userTrades;
+  if (Number.isFinite(node) && node > 0) {
+    if (isPre) {
+      relevant = userTrades.filter((trade) => Number(trade.timestamp) <= node);
+    } else {
+      relevant = userTrades.filter((trade) => {
+        const ts = Number(trade.timestamp);
+        if (!(ts >= node - 300 && ts <= node + 300)) return false;
+        const side = String(trade.side || "").toUpperCase();
+        const yes = String(trade.outcome || "").toLowerCase().startsWith("y");
+        return (side === "BUY" && yes) || (side === "SELL" && !yes);
+      });
+    }
+  }
+  const primary = relevant.slice().sort((a, b) => Number(b.timestamp) - Number(a.timestamp))[0] || null;
   return {
     tradeAmount: Number(tradeAmount.toFixed(2)),
     profit: profit === null ? null : Number(profit.toFixed(2)),
@@ -140,5 +157,10 @@ export async function getEventTradeMetrics({ slug, wallet, bracket } = {}) {
     winning,
     shares: Number(shares.toFixed(4)),
     settlementTemp: settlementTemp(event),
+    tradeTime: primary ? Number(primary.timestamp) : null,
+    side: primary ? String(primary.side || "").toUpperCase() : null,
+    outcome: primary ? String(primary.outcome || "").toUpperCase() : null,
+    tradeSize: primary ? Number(primary.size) : null,
+    tradePrice: primary ? Number(primary.price) : null,
   };
 }

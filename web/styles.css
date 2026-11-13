@@ -1809,3 +1809,4 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .lb-detail-table { min-width: 980px; }
 .lb-profit-up { color: var(--up-text) !important; font-weight: 600; }
 .lb-profit-down { color: var(--down-text) !important; font-weight: 600; }
+.lb-detail-table { min-width: 1280px; }

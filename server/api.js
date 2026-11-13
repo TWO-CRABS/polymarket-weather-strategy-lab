@@ -131,6 +131,8 @@ export function createApiHandler(deps) {
         slug: url.searchParams.get("slug") || "",
         wallet: url.searchParams.get("wallet") || "",
         bracket: url.searchParams.get("bracket") || "",
+        nodeTs: url.searchParams.get("nodeTs") || "",
+        mode: url.searchParams.get("mode") || "",
       });
       sendJson(res, 200, metrics);
       return true;

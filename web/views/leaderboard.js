@@ -27,6 +27,25 @@ function fmtNodeTime(ts) {
   }
 }
 
+function fmtTradeTime(ts) {
+  const value = Number(ts);
+  if (!Number.isFinite(value)) return "—";
+  try {
+    return new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date(value * 1000)).replace(/\//g, "-");
+  } catch {
+    return new Date(value * 1000).toISOString();
+  }
+}
+
 function pct(value, digits = 1) {
   const n = Number(value);
   return Number.isFinite(n) ? `${(n * 100).toFixed(digits)}%` : "—";
@@ -76,8 +95,10 @@ function eventRows(user) {
     const profileLink = profile
       ? `<a class="mkt-link" href="${ui.escapeHtml(profile)}" target="_blank" rel="noopener noreferrer" data-profile-link data-market-text="${ui.escapeHtml(question)}" title="打开该用户主页并复制此市场">打开用户主页 ↗</a>`
       : "—";
-    return `<tr class="lb-metric-row" data-metric-slug="${ui.escapeHtml(event.eventSlug || "")}" data-metric-wallet="${ui.escapeHtml(user.wallet || "")}" data-metric-bracket="${ui.escapeHtml(event.bracket || "")}">
+    return `<tr class="lb-metric-row" data-metric-slug="${ui.escapeHtml(event.eventSlug || "")}" data-metric-wallet="${ui.escapeHtml(user.wallet || "")}" data-metric-bracket="${ui.escapeHtml(event.bracket || "")}" data-metric-node="${ui.escapeHtml(String(event.nodeTs ?? ""))}" data-metric-mode="${event.prePositioned ? "pre" : "trade"}">
       <td>${ui.escapeHtml(event.eventDate || "—")}</td>
+      <td class="lb-trade-side">…</td>
+      <td class="mono lb-trade-time">…</td>
       <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
       <td class="lb-settlement-temp">…</td>
       <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
@@ -95,7 +116,7 @@ function eventRows(user) {
       <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间）</div>
       <table class="lb-detail-table">
         <thead><tr>
-          <th>日期</th><th>温度括号</th><th>结算温度</th><th>发布节点时间</th><th class="num-col">Baseline</th>
+          <th>日期</th><th>方向</th><th>成交时间</th><th>温度括号</th><th>结算温度</th><th>发布节点时间</th><th class="num-col">Baseline</th>
           <th class="num-col">重定价</th><th>类型</th><th>市场核验</th><th>用户主页</th>
           <th class="num-col">交易金额</th><th class="num-col">盈利金额</th>
         </tr></thead>
@@ -329,7 +350,13 @@ export async function mount(root, ctx = {}) {
       let metrics = state.metricsCache.get(key);
       if (!metrics) {
         try {
-          const params = new URLSearchParams({ slug, wallet, bracket });
+          const params = new URLSearchParams({
+            slug,
+            wallet,
+            bracket,
+            nodeTs: row.dataset.metricNode || "",
+            mode: row.dataset.metricMode || "",
+          });
           const res = await fetch(`/api/trader-event-metrics?${params.toString()}`, { cache: "no-store" });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           metrics = await res.json();
@@ -342,8 +369,12 @@ export async function mount(root, ctx = {}) {
       const tradeCell = row.querySelector(".lb-metric-trade");
       const profitCell = row.querySelector(".lb-metric-profit");
       const settlementCell = row.querySelector(".lb-settlement-temp");
+      const sideCell = row.querySelector(".lb-trade-side");
+      const timeCell = row.querySelector(".lb-trade-time");
       if (tradeCell) tradeCell.textContent = money(metrics.tradeAmount);
       if (settlementCell) settlementCell.textContent = metrics.settlementTemp || "—";
+      if (sideCell) sideCell.textContent = metrics.side ? `${metrics.side} ${metrics.outcome || ""}`.trim() : "—";
+      if (timeCell) timeCell.textContent = fmtTradeTime(metrics.tradeTime);
       if (profitCell) {
         const value = Number(metrics.profit);
         profitCell.textContent = money(value, true);
