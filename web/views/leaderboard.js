@@ -44,23 +44,35 @@ function userLabel(user) {
 function eventRows(user) {
   const events = Array.isArray(user.events) ? user.events : [];
   if (!events.length) {
-    return '<tr class="lb-detail-row"><td colspan="8" class="muted">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
+    return '<tr class="lb-detail-row"><td colspan="8" class="muted lb-detail-empty">暂无 ahead 事件明细（该用户仅作为 involved 出现）</td></tr>';
   }
-  return events.map((event) => {
+  const body = events.map((event) => {
     const url = eventUrl(event);
     const link = url
       ? `<a class="mkt-link" href="${ui.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开事件 ↗</a>`
       : "—";
-    return `<tr class="lb-detail-row">
+    return `<tr>
       <td>${ui.escapeHtml(event.eventDate || "—")}</td>
-      <td>${ui.escapeHtml(event.bracket || "—")}</td>
-      <td>${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
-      <td>${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
-      <td>${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
+      <td><b>${ui.escapeHtml(event.bracket || "—")}</b></td>
+      <td class="mono">${ui.escapeHtml(fmtNodeTime(event.nodeTs))}</td>
+      <td class="num-col">${ui.escapeHtml(String(event.baselinePrice ?? "—"))}</td>
+      <td class="num-col">${ui.escapeHtml(String(event.repricePrice ?? "—"))}</td>
       <td>${event.prePositioned ? "节点前已持仓" : "窗口内成交"}</td>
       <td>${link}</td>
     </tr>`;
   }).join("");
+  return `<tr class="lb-detail-row"><td colspan="8">
+    <div class="lb-detail">
+      <div class="lb-detail-title">${ui.escapeHtml(userLabel(user))} · 节点明细（北京时间）</div>
+      <table class="lb-detail-table">
+        <thead><tr>
+          <th>日期</th><th>温度括号</th><th>发布节点时间</th><th class="num-col">Baseline</th>
+          <th class="num-col">重定价</th><th>类型</th><th>市场核验</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  </td></tr>`;
 }
 
 export async function mount(root, ctx = {}) {
