@@ -22,10 +22,12 @@ export async function queryCityLeaderboard({
   fromDate = "",
   toDate = "",
   limit = 100,
+  eventType = "all",
   eventsDir = DEFAULT_EVENTS_DIR,
 } = {}) {
   const wantedCity = String(city || "").trim();
   if (!wantedCity) throw new Error("city is required");
+  const type = ["all", "trade", "pre"].includes(String(eventType || "all")) ? String(eventType || "all") : "all";
   let files = [];
   try {
     files = (await fs.readdir(eventsDir)).filter((name) => name.endsWith(".json"));
@@ -71,8 +73,19 @@ export async function queryCityLeaderboard({
   const ahead = new Map();
   const eventsByWallet = new Map();
   for (const node of nodes) {
-    for (const wallet of node.involvedWallets || []) involved.set(wallet, (involved.get(wallet) || 0) + 1);
-    for (const wallet of node.aheadWallets || []) {
+    const preSet = new Set(node.prePositionedWallets || []);
+    const matchingAhead = (node.aheadWallets || []).filter((wallet) => {
+      const pre = preSet.has(wallet);
+      if (type === "pre") return pre;
+      if (type === "trade") return !pre;
+      return true;
+    });
+    if (type === "all") {
+      for (const wallet of node.involvedWallets || []) involved.set(wallet, (involved.get(wallet) || 0) + 1);
+    } else {
+      for (const wallet of matchingAhead) involved.set(wallet, (involved.get(wallet) || 0) + 1);
+    }
+    for (const wallet of matchingAhead) {
       ahead.set(wallet, (ahead.get(wallet) || 0) + 1);
       const list = eventsByWallet.get(wallet) || [];
       list.push({
@@ -83,7 +96,7 @@ export async function queryCityLeaderboard({
         bracket: node.bracket,
         marketId: node.marketId,
         ahead: true,
-        prePositioned: (node.prePositionedWallets || []).includes(wallet),
+        prePositioned: preSet.has(wallet),
         baselinePrice: node.baselinePrice,
         repriceTs: node.repriceTs,
         repricePrice: node.repricePrice,
@@ -124,6 +137,7 @@ export async function queryCityLeaderboard({
     qualifiedWarmingNodes,
     eligibleMin: CITY_ELIGIBLE_MIN_QUALIFIED,
     eventCount: facts.length,
+    eventType: type,
     userCount: users.length,
     eligibleCount: users.filter((user) => user.eligible).length,
     users: users.slice(0, Math.max(1, Math.min(500, Number(limit) || 100))),

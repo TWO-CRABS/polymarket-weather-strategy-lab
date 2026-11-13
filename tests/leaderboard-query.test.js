@@ -16,7 +16,7 @@ function fact({ slug, date, nodes }) {
   };
 }
 
-function node({ id, ts, ahead = true }) {
+function node({ id, ts, ahead = true, pre = false }) {
   return {
     nodeId: id,
     nodeTs: ts,
@@ -26,7 +26,7 @@ function node({ id, ts, ahead = true }) {
     repriceTs: ts + 60,
     repricePrice: 0.5,
     aheadWallets: ahead ? ["0xabc"] : [],
-    prePositionedWallets: [],
+    prePositionedWallets: pre ? ["0xabc"] : [],
     involvedWallets: ["0xabc"],
   };
 }
@@ -58,6 +58,11 @@ test("per-city date filter recomputes denominator and user rates", async () => {
     assert.equal(day.qualifiedWarmingNodes, 1);
     assert.equal(day.users.find((u) => u.wallet === "0xabc").ahead, 0);
     assert.equal(day.users.find((u) => u.wallet === "0xabc").reactionRate, 0);
+
+    const trade = await queryCityLeaderboard({ city: "TestCity", eventType: "trade", eventsDir: dir });
+    assert.equal(trade.users.find((u) => u.wallet === "0xabc").ahead, 1);
+    const pre = await queryCityLeaderboard({ city: "TestCity", eventType: "pre", eventsDir: dir });
+    assert.equal(pre.userCount, 0);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }

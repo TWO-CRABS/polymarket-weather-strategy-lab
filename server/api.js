@@ -132,6 +132,7 @@ export function createApiHandler(deps) {
         city,
         fromDate: url.searchParams.get("from") || "",
         toDate: url.searchParams.get("to") || "",
+        eventType: url.searchParams.get("type") || "all",
         limit: parseLimit(url, 100, 500),
         eventsDir: path.join(config.dataDir, "trader-reactions", "events"),
       });

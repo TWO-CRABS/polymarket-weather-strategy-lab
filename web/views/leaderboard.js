@@ -84,6 +84,7 @@ export async function mount(root, ctx = {}) {
     toDate: "",
     search: "",
     eligibleOnly: false,
+    eventType: "all",
     expanded: new Set(),
     loading: true,
     error: null,
@@ -163,6 +164,11 @@ export async function mount(root, ctx = {}) {
         <input class="input" id="lbFrom" type="date" min="${ui.escapeHtml(data.fromDate || "")}" max="${ui.escapeHtml(data.toDate || "")}" value="${ui.escapeHtml(state.fromDate || data.fromDate || "")}">
         <label class="field-label" for="lbTo">到</label>
         <input class="input" id="lbTo" type="date" min="${ui.escapeHtml(data.fromDate || "")}" max="${ui.escapeHtml(data.toDate || "")}" value="${ui.escapeHtml(state.toDate || data.toDate || "")}">
+        <div class="segmented segmented-sm" role="group" aria-label="Ahead 类型">
+          <button class="seg ${state.eventType === "all" ? "is-active" : ""}" type="button" data-lb-type="all">全部类型</button>
+          <button class="seg ${state.eventType === "trade" ? "is-active" : ""}" type="button" data-lb-type="trade">窗口内成交</button>
+          <button class="seg ${state.eventType === "pre" ? "is-active" : ""}" type="button" data-lb-type="pre">节点前已持仓</button>
+        </div>
         <input class="input" id="lbSearch" type="search" placeholder="搜索伪名 / 钱包" value="${ui.escapeHtml(state.search)}">
         <div class="segmented segmented-sm" role="group" aria-label="榜单筛选">
           <button class="seg ${state.eligibleOnly ? "" : "is-active"}" type="button" data-lb-filter="all">全部</button>
@@ -245,6 +251,13 @@ export async function mount(root, ctx = {}) {
         render();
       });
     });
+    body.querySelectorAll("[data-lb-type]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        state.eventType = button.dataset.lbType || "all";
+        state.expanded.clear();
+        await loadCity();
+      });
+    });
   }
 
   async function loadCity() {
@@ -253,7 +266,7 @@ export async function mount(root, ctx = {}) {
     state.error = null;
     render();
     try {
-      const params = new URLSearchParams({ city: state.city, from: state.fromDate, to: state.toDate, limit: "100" });
+      const params = new URLSearchParams({ city: state.city, from: state.fromDate, to: state.toDate, limit: "100", type: state.eventType });
       const res = await fetch(`/api/trader-leaderboards?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       state.cityData = await res.json();
