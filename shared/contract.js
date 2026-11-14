@@ -107,8 +107,8 @@ export const REJECT_REASONS = Object.freeze([
 /** Hard limits used by both server validation and frontend sliders. */
 export const LIMITS = Object.freeze({
   universe: {
-    minPrice: [0.001, 0.5],
-    maxPrice: [0.5, 0.999],
+    minPrice: [0.0001, 0.5],
+    maxPrice: [0.5, 0.9999],
     minLiquidityUsd: [0, 1_000_000],
     maxSpread: [0.001, 0.2],
     minTimeToResolutionSec: [300, 604_800],

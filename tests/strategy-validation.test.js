@@ -149,7 +149,7 @@ test("out-of-range signal limits produce errors (docs/03 §1.1)", () => {
 });
 
 test("out-of-range universe limits produce errors", () => {
-  expectInvalid(patchUniverse({ minPrice: 0.0001 }), "universe.minPrice");
+  expectInvalid(patchUniverse({ minPrice: 0.00001 }), "universe.minPrice");
   expectInvalid(patchUniverse({ minPrice: 0.6 }), "universe.minPrice");
   expectInvalid(patchUniverse({ maxPrice: 0.4 }), "universe.maxPrice");
   expectInvalid(patchUniverse({ maxPrice: 1.0 }), "universe.maxPrice");
