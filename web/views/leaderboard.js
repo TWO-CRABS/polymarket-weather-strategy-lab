@@ -8,7 +8,33 @@
 import * as ui from "/web/components/ui.js";
 
 const DATA_URL = "/shared/traderReactionLeaderboards.json";
+const FILTER_STATE_KEY = "polytemp.leaderboardFilters.v1";
 const tradeSnapshots = new Map();
+
+function readFilterState() {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(FILTER_STATE_KEY) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistFilterState(state) {
+  try {
+    sessionStorage.setItem(FILTER_STATE_KEY, JSON.stringify({
+      city: state.city || "",
+      fromDate: state.fromDate || "",
+      toDate: state.toDate || "",
+      search: state.search || "",
+      eligibleOnly: Boolean(state.eligibleOnly),
+      eventType: state.eventType || "all",
+      takerOnly: Boolean(state.takerOnly),
+    }));
+  } catch {
+    /* ignore private mode / quota */
+  }
+}
 
 function usd(value, signed = false) {
   const n = Number(value);
@@ -209,16 +235,17 @@ function eventRows(user) {
 }
 
 export async function mount(root, ctx = {}) {
+  const saved = readFilterState();
   const state = {
     data: null,
     cityData: null,
-    city: String((ctx.params && ctx.params.city) || localStorage.getItem("polytemp.leaderboardCity") || ""),
-    fromDate: "",
-    toDate: "",
-    search: "",
-    eligibleOnly: false,
-    eventType: "all",
-    takerOnly: false,
+    city: String((ctx.params && ctx.params.city) || saved.city || localStorage.getItem("polytemp.leaderboardCity") || ""),
+    fromDate: String(saved.fromDate || ""),
+    toDate: String(saved.toDate || ""),
+    search: String(saved.search || ""),
+    eligibleOnly: Boolean(saved.eligibleOnly),
+    eventType: ["all", "trade", "pre"].includes(saved.eventType) ? saved.eventType : "all",
+    takerOnly: Boolean(saved.takerOnly),
     metricsCache: new Map(),
     profileCache: new Map(),
     pnlCache: new Map(),
@@ -366,6 +393,7 @@ export async function mount(root, ctx = {}) {
     body.querySelector("#lbSearch")?.addEventListener("input", (event) => {
       state.search = event.target.value;
       state.expanded.clear();
+      persistFilterState(state);
       render();
     });
     body.querySelector("#lbFrom")?.addEventListener("change", async (event) => {
@@ -417,6 +445,7 @@ export async function mount(root, ctx = {}) {
       button.addEventListener("click", () => {
         state.eligibleOnly = button.dataset.lbFilter === "eligible";
         state.expanded.clear();
+        persistFilterState(state);
         render();
       });
     });
@@ -700,6 +729,7 @@ export async function mount(root, ctx = {}) {
 
   async function loadCity() {
     if (!state.city) return;
+    persistFilterState(state);
     const seq = ++state.loadSeq;
     state.loading = true;
     state.error = null;
