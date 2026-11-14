@@ -230,9 +230,6 @@ export class RunManager {
     const config = check.normalized;
     config.sim.mode = requestedMode;
     strategyName = strategyName ?? config.name;
-    if (requestedMode === "live" && config.signal.entryMode === "node_temp_no") {
-      startMetarNodeTemperaturePoller({ log: this.log });
-    }
 
     const universeDate = requestedMode === "live" ? utcDateKey() : null;
     const markets = this.selectMarkets(config, requestedMode, { dateKey: universeDate });
@@ -308,6 +305,7 @@ export class RunManager {
     } else {
       run.startReplay().catch((err) => run.fail(err));
     }
+    this._syncNodeTemperaturePoller();
     return run.view();
   }
 
