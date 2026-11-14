@@ -98,7 +98,7 @@ async function main() {
     } else {
       const presets = meta.json.presets ?? [];
       const feeRate = meta.json.feeModel?.takerFeeRate;
-      if (presets.length !== 1) fail("GET /api/meta", `expected 1 preset, got ${presets.length}`);
+      if (presets.length !== 2) fail("GET /api/meta", `expected 2 presets, got ${presets.length}`);
       else if (feeRate !== 0.05) fail("GET /api/meta", `expected fee 0.05, got ${feeRate}`);
       else {
         pass(

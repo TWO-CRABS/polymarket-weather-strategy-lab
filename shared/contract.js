@@ -130,7 +130,7 @@ export const LIMITS = Object.freeze({
   execution: {
     sizingValue: [1, 100_000],
     maxPositionUsd: [1, 100_000],
-    maxPositions: [1, 100],
+    maxPositions: [1, 10_000],
     maxPositionsPerMarket: [1, 10],
     slippageBufferBps: [0, 1000],
     fallbackMinTopGapPct: [0, 100],
@@ -432,8 +432,8 @@ export function validateStrategy(input = {}) {
   if (!["release", "mirror"].includes(s.copyTraderMode)) {
     err(`signal.copyTraderMode 必须是 release 或 mirror，当前为 ${s.copyTraderMode}`);
   }
-  if (!["momentum", "price_band"].includes(s.entryMode)) {
-    err(`signal.entryMode 必须是 momentum 或 price_band，当前为 ${s.entryMode}`);
+  if (!["momentum", "price_band", "node_temp_no"].includes(s.entryMode)) {
+    err(`signal.entryMode 必须是 momentum、price_band 或 node_temp_no，当前为 ${s.entryMode}`);
   }
   for (const outcome of ["YES", "NO"]) {
     const band = s.entryPriceByOutcome?.[outcome];
@@ -543,6 +543,59 @@ export const STRATEGY_PRESETS = Object.freeze([
         maxHoldSec: 86_400,
         holdToResolution: false,
         targetPriceByOutcome: { YES: null, NO: 0.99 },
+      },
+      risk: {
+        ...clone(DEFAULT_STRATEGY.risk),
+        bankrollUsd: 1000,
+        maxDrawdownPct: 100,
+        dailyLossLimitUsd: 0,
+        killSwitch: false,
+      },
+      sim: { ...clone(DEFAULT_STRATEGY.sim), tickIntervalMs: 1000 },
+    },
+  },
+  {
+    id: "node-temp-no",
+    label: "节点最新温度买NO · 98¢买 / 99.5¢卖",
+    description: "在 METAR 发布节点后 7 分钟内轮询最新温度；按四舍五入后的温度，从高到低买入所有低于该温度的 NO 市场，最高 98¢，99.5¢ 卖出；不设持仓数量上限。",
+    config: {
+      ...clone(DEFAULT_STRATEGY),
+      name: "节点最新温度买NO",
+      universe: {
+        ...clone(DEFAULT_STRATEGY.universe),
+        minPrice: 0.01,
+        maxPrice: 0.99,
+        minLiquidityUsd: 0,
+        maxSpread: 0.2,
+      },
+      signal: {
+        ...clone(DEFAULT_STRATEGY.signal),
+        direction: "down",
+        entryMode: "node_temp_no",
+        entryPriceByOutcome: {
+          YES: { min: null, max: null },
+          NO: { min: null, max: 0.98 },
+        },
+        maxSignalsPerMarket: 100,
+        metarReleaseEnabled: false,
+        copyTraderEnabled: false,
+      },
+      execution: {
+        ...clone(DEFAULT_STRATEGY.execution),
+        sizingMode: "fixed_stake",
+        sizingValue: 25,
+        maxPositionUsd: 50,
+        maxPositions: 10_000,
+        maxPositionsPerMarket: 1,
+        fallbackBuyEachWindow: false,
+      },
+      exit: {
+        ...clone(DEFAULT_STRATEGY.exit),
+        takeProfitPct: 100,
+        stopLossPct: 100,
+        maxHoldSec: 86_400,
+        holdToResolution: false,
+        targetPriceByOutcome: { YES: null, NO: 0.995 },
       },
       risk: {
         ...clone(DEFAULT_STRATEGY.risk),
@@ -749,6 +802,7 @@ export const EXIT_REASON_LABELS = Object.freeze({
   copy_trade: "跟单交易",
   mirror_trade: "镜像跟单",
   price_band: "价格带入场",
+  node_temp_no: "节点温度买NO",
   rejected: "订单被拒",
 });
 

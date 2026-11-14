@@ -17,6 +17,7 @@ import { Run } from "./run.js";
 import { ReplaySource, loadFixtureMarkets } from "../data/replay.js";
 import { compareMarketsForSelection, effectiveTradingEndMs } from "../data/gamma.js";
 import { createSettler, marketsFromTrades, rehydratePortfolio, settlePendingPositions } from "./settlementRecovery.js";
+import { startMetarNodeTemperaturePoller, stopMetarNodeTemperaturePoller } from "../data/metarNodeTemperaturePoller.js";
 
 const RUNS_LIST_LIMIT = 50;
 
@@ -229,6 +230,9 @@ export class RunManager {
     const config = check.normalized;
     config.sim.mode = requestedMode;
     strategyName = strategyName ?? config.name;
+    if (requestedMode === "live" && config.signal.entryMode === "node_temp_no") {
+      startMetarNodeTemperaturePoller({ log: this.log });
+    }
 
     const universeDate = requestedMode === "live" ? utcDateKey() : null;
     const markets = this.selectMarkets(config, requestedMode, { dateKey: universeDate });
@@ -297,6 +301,7 @@ export class RunManager {
     this.active.set(id, run);
     await this.store.upsertRunRecord(record);
     this.applyFeedTracking();
+    this._syncNodeTemperaturePoller();
 
     if (requestedMode === "live") {
       await run.start().catch((err) => run.fail(err));
@@ -659,6 +664,7 @@ export class RunManager {
       const view = await run.stop("manual");
       this.active.delete(id);
       this.applyFeedTracking();
+      this._syncNodeTemperaturePoller();
       this._trackRunSettlement(run);
       return view;
     }
@@ -678,7 +684,16 @@ export class RunManager {
     }
     await this.store.deleteRunRecord(id);
     this.applyFeedTracking();
+    this._syncNodeTemperaturePoller();
     return true;
+  }
+
+  _syncNodeTemperaturePoller() {
+    const needs = [...this.active.values()].some(
+      (run) => run.mode === "live" && run.status === "running" && run.config.signal.entryMode === "node_temp_no",
+    );
+    if (needs) startMetarNodeTemperaturePoller({ log: this.log });
+    else stopMetarNodeTemperaturePoller();
   }
 
   /**

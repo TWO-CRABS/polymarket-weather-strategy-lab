@@ -165,7 +165,7 @@ test("out-of-range execution / exit / risk / fees / sim limits produce errors", 
   expectInvalid(patchExecution({ sizingValue: 100_001 }), "execution.sizingValue");
   expectInvalid(patchExecution({ maxPositionUsd: 0 }), "execution.maxPositionUsd");
   expectInvalid(patchExecution({ maxPositions: 0 }), "execution.maxPositions");
-  expectInvalid(patchExecution({ maxPositions: 101 }), "execution.maxPositions");
+  expectInvalid(patchExecution({ maxPositions: 10_001 }), "execution.maxPositions");
   expectInvalid(patchExecution({ maxPositionsPerMarket: 0 }), "execution.maxPositionsPerMarket");
   expectInvalid(patchExecution({ maxPositionsPerMarket: 11 }), "execution.maxPositionsPerMarket");
   expectInvalid(patchExecution({ slippageBufferBps: -1 }), "execution.slippageBufferBps");
@@ -389,6 +389,12 @@ test("STRATEGY_PRESETS are all valid and match docs/03 §9 parameter table", () 
   assert.equal(noBand.universe.maxPrice, 0.99);
   assert.equal(noBand.execution.sizingValue, 25);
   assert.equal(noBand.execution.maxPositions, 100);
+
+  const nodeTempNo = byId["node-temp-no"].config;
+  assert.equal(nodeTempNo.signal.entryMode, "node_temp_no");
+  assert.equal(nodeTempNo.signal.entryPriceByOutcome.NO.max, 0.98);
+  assert.equal(nodeTempNo.execution.maxPositions, 10_000);
+  assert.equal(nodeTempNo.exit.targetPriceByOutcome.NO, 0.995);
 });
 
 test("every LIMITS entry is a sane [min, max] pair", () => {

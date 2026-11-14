@@ -95,7 +95,7 @@ test("GET /api/meta returns presets/limits/fee model (docs/07 §4.1)", async () 
   assert.equal(body.contractVersion, CONTRACT_VERSION);
   assert.equal(typeof body.serverTime, "number");
   assert.ok(Array.isArray(body.cities));
-  assert.equal(body.presets.length, 1);
+  assert.equal(body.presets.length, 2);
   for (const preset of body.presets) {
     assert.equal(typeof preset.id, "string");
     assert.equal(typeof preset.label, "string");

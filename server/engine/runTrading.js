@@ -12,6 +12,7 @@ import { evaluateSignal, createSignalState } from "./signal.js";
 import { effectiveTradingEndMs, sideDepthUsd } from "../data/gamma.js";
 import { isFallbackBlockedAtMetarRelease } from "./metarReleaseWindow.js";
 import { parseBracketTitle } from "../research/traderReaction.js";
+import { getLatestNodeTemperature } from "../data/metarNodeTemperaturePoller.js";
 import { newId, roundTo } from "../util.js";
 
 export const RESOLUTION_POLL_MS = 20_000;
@@ -126,6 +127,10 @@ export function recordObservationSignal(run, market, candidate, now) {
 }
 
 export async function processMarkets(run, now) {
+  if (run.config.signal.entryMode === "node_temp_no") {
+    await processNodeTempNo(run, now);
+    return;
+  }
   if (run.config.signal.entryMode === "price_band") {
     await processPriceBandMarkets(run, now);
     return;
@@ -174,6 +179,66 @@ export async function processMarkets(run, now) {
   // 全局兜底：每个观察窗口周期检查一次，空仓则建两笔兜底仓（第 1 高 YES + 第 3 高 NO）
   if (run.config.signal.entryMode !== "price_band") {
     await maybePeriodicFallback(run, now);
+  }
+}
+
+/** Node-temperature mode: newest METAR temp, buy every lower bracket's NO. */
+async function processNodeTempNo(run, now) {
+  if (!run._nodeTempDone) run._nodeTempDone = new Set();
+  const byCity = new Map();
+  for (const market of run.markets.values()) {
+    if (!market || market.closed || !market.city) continue;
+    if (!byCity.has(market.city)) byCity.set(market.city, []);
+    byCity.get(market.city).push(market);
+  }
+  for (const [city, markets] of byCity) {
+    const node = getLatestNodeTemperature(city);
+    if (!node || now > node.windowEnd) continue;
+    const candidates = [];
+    for (const market of markets) {
+      const bracket = parseBracketTitle(market.bracket || market.title || "");
+      if (!bracket || !Number.isFinite(bracket.hi)) continue;
+      const threshold = Math.round(bracket.unit === "F" ? node.tempC * 9 / 5 + 32 : node.tempC);
+      // The whole bracket must be below the rounded node temperature.
+      if (bracket.hi > threshold) continue;
+      const quote = market.quotes?.NO;
+      const ask = Number(quote?.ask);
+      if (!(ask > 0) || ask > 0.98) continue;
+      const key = `${city}|${node.nodeTs}|${market.id}`;
+      if (run._nodeTempDone.has(key)) continue;
+      candidates.push({ market, bracket, ask, key });
+    }
+    candidates.sort((a, b) => (b.bracket.lo - a.bracket.lo) || (b.bracket.hi - a.bracket.hi));
+    for (const candidate of candidates) {
+      if (run.portfolio.positionsForMarket(candidate.market.id).length > 0) continue;
+      const signal = {
+        id: newId("sig"),
+        ts: now,
+        runId: run.id,
+        marketId: candidate.market.id,
+        city: candidate.market.city,
+        bracket: candidate.market.bracket,
+        direction: "down",
+        outcome: "NO",
+        tokenId: candidate.market.tokens.noTokenId,
+        fromPrice: candidate.ask,
+        toPrice: candidate.ask,
+        changePct: 0,
+        absChange: 0,
+        windowSec: 0,
+        priceField: "ask",
+        kind: "entry",
+        tradable: true,
+        reason: "node_temp_no",
+        nodeTemperatureC: node.tempC,
+        nodeObservationTime: node.obsTime,
+      };
+      run.signals.push(signal);
+      run.store.appendRecord(run.id, "signal", signal);
+      run.sse.broadcast("signal", { signal }, run.id);
+      run._nodeTempDone.add(candidate.key);
+      await tryEntry(run, signal, candidate.market, now, { reason: "node_temp_no" });
+    }
   }
 }
 

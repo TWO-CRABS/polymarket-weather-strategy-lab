@@ -78,11 +78,11 @@ test("offline server boots with health/meta and no live markets (acceptance chai
   const meta = await server.http.get("/api/meta");
   assert.equal(meta.status, 200);
   assert.equal(meta.json.contractVersion, "1.0.0");
-  assert.equal(meta.json.presets.length, 1);
+  assert.equal(meta.json.presets.length, 2);
   assert.equal(meta.json.feeModel.takerFeeRate, 0.05);
   assert.deepEqual(
     meta.json.presets.map((preset) => preset.id),
-    ["no-price-band"],
+    ["no-price-band", "node-temp-no"],
   );
 
   const markets = await server.http.get("/api/markets");

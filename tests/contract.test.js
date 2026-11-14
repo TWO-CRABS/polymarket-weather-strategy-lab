@@ -226,10 +226,10 @@ test("default strategy + presets are structurally complete and frozen", () => {
   for (const group of ["universe", "signal", "execution", "exit", "risk", "fees", "sim"]) {
     assert.ok(DEFAULT_STRATEGY[group] && typeof DEFAULT_STRATEGY[group] === "object", `missing ${group}`);
   }
-  assert.equal(STRATEGY_PRESETS.length, 1);
+  assert.equal(STRATEGY_PRESETS.length, 2);
   assert.deepEqual(
     STRATEGY_PRESETS.map((p) => p.id),
-    ["no-price-band"],
+    ["no-price-band", "node-temp-no"],
   );
   for (const preset of STRATEGY_PRESETS) {
     assert.ok(preset.label && preset.description, `preset ${preset.id} needs label/description`);
@@ -240,4 +240,7 @@ test("default strategy + presets are structurally complete and frozen", () => {
   assert.equal(STRATEGY_PRESETS[0].config.signal.direction, "down");
   assert.deepEqual(STRATEGY_PRESETS[0].config.signal.entryPriceByOutcome.NO, { min: 0.89, max: 0.98 });
   assert.equal(STRATEGY_PRESETS[0].config.exit.targetPriceByOutcome.NO, 0.99);
+  assert.equal(STRATEGY_PRESETS[1].config.signal.entryMode, "node_temp_no");
+  assert.equal(STRATEGY_PRESETS[1].config.execution.maxPositions, 10_000);
+  assert.equal(STRATEGY_PRESETS[1].config.exit.targetPriceByOutcome.NO, 0.995);
 });
