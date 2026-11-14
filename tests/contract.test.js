@@ -241,6 +241,6 @@ test("default strategy + presets are structurally complete and frozen", () => {
   assert.deepEqual(STRATEGY_PRESETS[0].config.signal.entryPriceByOutcome.NO, { min: 0.89, max: 0.98 });
   assert.equal(STRATEGY_PRESETS[0].config.exit.targetPriceByOutcome.NO, 0.99);
   assert.equal(STRATEGY_PRESETS[1].config.signal.entryMode, "node_temp_no");
-  assert.equal(STRATEGY_PRESETS[1].config.execution.maxPositions, 10_000);
+  assert.equal(STRATEGY_PRESETS[1].config.execution.maxPositions, 500);
   assert.equal(STRATEGY_PRESETS[1].config.exit.targetPriceByOutcome.NO, 0.995);
 });

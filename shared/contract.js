@@ -585,7 +585,7 @@ export const STRATEGY_PRESETS = Object.freeze([
         sizingMode: "fixed_stake",
         sizingValue: 25,
         maxPositionUsd: 50,
-        maxPositions: 10_000,
+        maxPositions: 500,
         maxPositionsPerMarket: 1,
         fallbackBuyEachWindow: false,
       },
