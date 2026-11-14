@@ -127,6 +127,10 @@ export function recordObservationSignal(run, market, candidate, now) {
 export async function processMarkets(run, now) {
   for (const market of run.markets.values()) {
     if (!market || market.closed) continue;
+    if (run.config.signal.entryMode === "price_band") {
+      await processPriceBandMarket(run, market, now);
+      continue;
+    }
     // Release signal owns this event group until its node window ends; do not
     // let momentum/fallback buy back positions that were just rotated.
     if (run._metarReleaseLockedGroups?.has(fallbackEventKey(market))) continue;
@@ -167,7 +171,55 @@ export async function processMarkets(run, now) {
     if (signal) await tryEntry(run, signal, market, now);
   }
   // 全局兜底：每个观察窗口周期检查一次，空仓则建两笔兜底仓（第 1 高 YES + 第 3 高 NO）
-  await maybePeriodicFallback(run, now);
+  if (run.config.signal.entryMode !== "price_band") {
+    await maybePeriodicFallback(run, now);
+  }
+}
+
+/** Price-band entry: buy the configured outcome when executable ask is in range. */
+async function processPriceBandMarket(run, market, now) {
+  const positions = run.portfolio.positionsForMarket(market.id);
+  await evaluateExits(run, market, now, null);
+  if (positions.length > 0) return;
+  const direction = run.config.signal.direction === "down" ? "down" : "up";
+  const outcome = direction === "up" ? "YES" : "NO";
+  const quote = outcome === "YES" ? market.quotes?.YES : market.quotes?.NO;
+  const ask = Number(quote?.ask);
+  if (!(ask > 0)) return;
+  const band = run.config.signal.entryPriceByOutcome?.[outcome] || {};
+  const min = band.min !== null && band.min !== undefined && Number.isFinite(Number(band.min)) ? Number(band.min) : run.config.universe.minPrice;
+  const max = band.max !== null && band.max !== undefined && Number.isFinite(Number(band.max)) ? Number(band.max) : run.config.universe.maxPrice;
+  if (ask < min || ask > max) return;
+  const cooldownMs = Math.max(1, Number(run.config.signal.cooldownSec) || 0) * 1000;
+  const key = `${market.id}|${outcome}|price_band`;
+  if (now - (run._priceBandLastSignal?.get(key) || 0) < cooldownMs) return;
+  if (!run._priceBandLastSignal) run._priceBandLastSignal = new Map();
+  run._priceBandLastSignal.set(key, now);
+  const tokenId = outcome === "YES" ? market.tokens.yesTokenId : market.tokens.noTokenId;
+  const signal = {
+    id: newId("sig"),
+    ts: now,
+    runId: run.id,
+    marketId: market.id,
+    city: market.city,
+    bracket: market.bracket,
+    direction,
+    outcome,
+    tokenId,
+    fromPrice: ask,
+    toPrice: ask,
+    changePct: 0,
+    absChange: 0,
+    windowSec: 0,
+    priceField: "ask",
+    kind: "entry",
+    tradable: true,
+    reason: "price_band",
+  };
+  run.signals.push(signal);
+  run.store.appendRecord(run.id, "signal", signal);
+  run.sse.broadcast("signal", { signal }, run.id);
+  await tryEntry(run, signal, market, now, { reason: "price_band" });
 }
 
 /** Exit plan: settlement handled earlier; then SL > TP > maxHold > opposite. */
@@ -184,9 +236,11 @@ export async function evaluateExits(run, market, now, signal) {
     const netProceeds = shares * bid - exitFee;
     const retLiqPct = position.costBasis > 0 ? (netProceeds / position.costBasis - 1) * 100 : 0;
     const holdSec = (now - position.entryTs) / 1000;
+    const targetPrice = Number(run.config.exit.targetPriceByOutcome?.[position.outcome]);
 
     let reason = null;
-    if (retLiqPct <= -run.config.exit.stopLossPct) reason = "stop_loss";
+    if (Number.isFinite(targetPrice) && targetPrice > 0 && bid >= targetPrice) reason = "take_profit";
+    else if (retLiqPct <= -run.config.exit.stopLossPct) reason = "stop_loss";
     else if (retLiqPct >= run.config.exit.takeProfitPct) reason = "take_profit";
     else if (holdSec >= run.config.exit.maxHoldSec) reason = "max_hold";
     else if (signal && run.config.exit.exitOnOppositeSignal && signal.outcome !== position.outcome) {
@@ -384,10 +438,17 @@ export function preRiskChecks(run, market, signal, now, opts = {}) {
   const quote = signal.outcome === "YES" ? market.quotes?.YES : market.quotes?.NO;
   const bestAsk = quote?.ask ?? 0;
   if (!(bestAsk > 0)) return fail("no_liquidity", `${signal.outcome || "目标"} 盘口没有有效卖价`);
-  if (bestAsk < run.config.universe.minPrice || bestAsk > run.config.universe.maxPrice) {
+  const outcomeBand = run.config.signal?.entryPriceByOutcome?.[signal.outcome] || {};
+  const entryMin = outcomeBand.min !== null && outcomeBand.min !== undefined && Number.isFinite(Number(outcomeBand.min))
+    ? Number(outcomeBand.min)
+    : run.config.universe.minPrice;
+  const entryMax = outcomeBand.max !== null && outcomeBand.max !== undefined && Number.isFinite(Number(outcomeBand.max))
+    ? Number(outcomeBand.max)
+    : run.config.universe.maxPrice;
+  if (bestAsk < entryMin || bestAsk > entryMax) {
     return fail(
       "risk_blocked",
-      `目标 ${signal.outcome} 卖价 ${rejectDetailCents(bestAsk)} 超出价格带 ${rejectDetailCents(run.config.universe.minPrice)}–${rejectDetailCents(run.config.universe.maxPrice)}`,
+      `目标 ${signal.outcome} 卖价 ${rejectDetailCents(bestAsk)} 超出 ${signal.outcome} 入场价格带 ${rejectDetailCents(entryMin)}–${rejectDetailCents(entryMax)}`,
     );
   }
   if (run.portfolio.positions.size >= run.config.execution.maxPositions) {

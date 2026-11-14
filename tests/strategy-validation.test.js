@@ -379,52 +379,15 @@ test("STRATEGY_PRESETS are all valid and match docs/03 §9 parameter table", () 
     assert.equal(preset.config.exit.holdToResolution, false, "presets must let TP/SL work");
   }
 
-  const conservative = byId.conservative.config;
-  assert.equal(conservative.signal.windowSec, 120);
-  assert.equal(conservative.signal.moveThresholdPct, 25);
-  assert.equal(conservative.signal.minAbsMove, 0.02);
-  assert.equal(conservative.signal.confirmationTicks, 2);
-  assert.equal(conservative.signal.cooldownSec, 600);
-  assert.equal(conservative.signal.maxSignalsPerMarket, 3);
-  assert.equal(conservative.universe.minPrice, 0.05);
-  assert.equal(conservative.universe.maxPrice, 0.95);
-  assert.equal(conservative.universe.maxSpread, 0.02);
-  assert.equal(conservative.universe.minLiquidityUsd, 1_000);
-  assert.equal(conservative.execution.sizingValue, 20);
-  assert.equal(conservative.execution.maxPositionUsd, 40);
-  assert.equal(conservative.execution.maxPositions, 3);
-  assert.equal(conservative.exit.takeProfitPct, 40);
-  assert.equal(conservative.exit.stopLossPct, 25);
-  assert.equal(conservative.exit.maxHoldSec, 1_800);
-  assert.equal(conservative.risk.maxDrawdownPct, 15);
-
-  const balanced = byId.balanced.config;
-  assert.equal(balanced.signal.windowSec, 60);
-  assert.equal(balanced.signal.moveThresholdPct, 20);
-  assert.equal(balanced.signal.minAbsMove, 0.01);
-  assert.equal(balanced.signal.confirmationTicks, 1);
-  assert.equal(balanced.signal.cooldownSec, 300);
-  assert.equal(balanced.universe.minPrice, 0.02);
-  assert.equal(balanced.universe.maxPrice, 0.98);
-  assert.equal(balanced.universe.maxSpread, 0.03);
-  assert.equal(balanced.execution.sizingValue, 25);
-  assert.equal(balanced.execution.maxPositionUsd, 50);
-  assert.equal(balanced.execution.maxPositions, 5);
-  assert.equal(balanced.exit.takeProfitPct, 50);
-  assert.equal(balanced.exit.stopLossPct, 30);
-  assert.equal(balanced.risk.bankrollUsd, 1_000);
-  assert.equal(balanced.risk.maxDrawdownPct, 20);
-
-  const aggressive = byId.aggressive.config;
-  assert.equal(aggressive.signal.windowSec, 30);
-  assert.equal(aggressive.signal.moveThresholdPct, 12);
-  assert.equal(aggressive.signal.minAbsMove, 0.005);
-  assert.equal(aggressive.execution.sizingValue, 50);
-  assert.equal(aggressive.execution.maxPositions, 8);
-  assert.equal(aggressive.exit.takeProfitPct, 80);
-  assert.equal(aggressive.risk.bankrollUsd, 2_000);
-  assert.equal(aggressive.risk.maxDrawdownPct, 35);
-  assert.equal(aggressive.sim.tickIntervalMs, 500);
+  const noBand = byId["no-price-band"].config;
+  assert.equal(noBand.signal.entryMode, "price_band");
+  assert.equal(noBand.signal.direction, "down");
+  assert.deepEqual(noBand.signal.entryPriceByOutcome.NO, { min: 0.89, max: 0.98 });
+  assert.equal(noBand.exit.targetPriceByOutcome.NO, 0.99);
+  assert.equal(noBand.universe.minPrice, 0.01);
+  assert.equal(noBand.universe.maxPrice, 0.99);
+  assert.equal(noBand.execution.sizingValue, 25);
+  assert.equal(noBand.execution.maxPositions, 10);
 });
 
 test("every LIMITS entry is a sane [min, max] pair", () => {

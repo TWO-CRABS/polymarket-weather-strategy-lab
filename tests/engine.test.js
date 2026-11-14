@@ -70,7 +70,7 @@ function approx(actual, expected, tolerance = 1e-6, message = "") {
 
 /** Balanced preset config, optionally patched, normalized through the contract. */
 function configWith(overrides = {}) {
-  const base = clone(STRATEGY_PRESETS.find((preset) => preset.id === "balanced").config);
+  const base = clone(DEFAULT_STRATEGY);
   return validateStrategy(deepMerge(base, overrides)).normalized;
 }
 

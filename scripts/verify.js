@@ -98,7 +98,7 @@ async function main() {
     } else {
       const presets = meta.json.presets ?? [];
       const feeRate = meta.json.feeModel?.takerFeeRate;
-      if (presets.length !== 3) fail("GET /api/meta", `expected 3 presets, got ${presets.length}`);
+      if (presets.length !== 1) fail("GET /api/meta", `expected 1 preset, got ${presets.length}`);
       else if (feeRate !== 0.05) fail("GET /api/meta", `expected fee 0.05, got ${feeRate}`);
       else {
         pass(
@@ -208,11 +208,11 @@ async function main() {
     }
 
     /* ---------------------------- 4. validate preset ---------------------- */
-    const balanced = meta.json?.presets?.find((preset) => preset.id === "balanced");
-    if (!balanced) {
-      fail("validate balanced preset", "preset `balanced` missing from /api/meta");
+    const noBandPreset = meta.json?.presets?.find((preset) => preset.id === "no-price-band");
+    if (!noBandPreset) {
+      fail("validate no-price-band preset", "preset `no-price-band` missing from /api/meta");
     } else {
-      const validate = await server.http.post("/api/strategies/validate", balanced.config);
+      const validate = await server.http.post("/api/strategies/validate", noBandPreset.config);
       if (validate.status !== 200 || validate.json?.valid !== true) {
         fail(
           "POST /api/strategies/validate",
@@ -221,14 +221,16 @@ async function main() {
       } else {
         pass(
           "POST /api/strategies/validate",
-          `balanced valid=true warnings=${validate.json.warnings.length}`,
+          `no-price-band valid=true warnings=${validate.json.warnings.length}`,
         );
       }
     }
 
     /* ----------------------------- 5. replay run --------------------------- */
     if (temperatureMarkets.length > 0) {
-      const runConfig = JSON.parse(JSON.stringify(balanced.config));
+      const runConfig = JSON.parse(JSON.stringify(noBandPreset.config));
+      runConfig.signal.entryMode = "momentum";
+      runConfig.signal.direction = "both";
       // The smoke run intentionally uses a *sensitive* variant so that real
       // replay data actually produces at least one fill and exercises the fee
       // formula. The balanced preset itself was validated above (step 4).

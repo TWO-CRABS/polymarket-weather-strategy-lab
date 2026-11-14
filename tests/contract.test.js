@@ -226,13 +226,17 @@ test("default strategy + presets are structurally complete and frozen", () => {
   for (const group of ["universe", "signal", "execution", "exit", "risk", "fees", "sim"]) {
     assert.ok(DEFAULT_STRATEGY[group] && typeof DEFAULT_STRATEGY[group] === "object", `missing ${group}`);
   }
-  assert.equal(STRATEGY_PRESETS.length, 3);
+  assert.equal(STRATEGY_PRESETS.length, 1);
   assert.deepEqual(
     STRATEGY_PRESETS.map((p) => p.id),
-    ["conservative", "balanced", "aggressive"],
+    ["no-price-band"],
   );
   for (const preset of STRATEGY_PRESETS) {
     assert.ok(preset.label && preset.description, `preset ${preset.id} needs label/description`);
     assert.equal(preset.config.fees.takerFeeRate, FEES.takerFeeRate);
   }
+  assert.equal(STRATEGY_PRESETS[0].config.signal.entryMode, "price_band");
+  assert.equal(STRATEGY_PRESETS[0].config.signal.direction, "down");
+  assert.deepEqual(STRATEGY_PRESETS[0].config.signal.entryPriceByOutcome.NO, { min: 0.89, max: 0.98 });
+  assert.equal(STRATEGY_PRESETS[0].config.exit.targetPriceByOutcome.NO, 0.99);
 });

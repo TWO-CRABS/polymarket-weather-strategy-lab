@@ -176,6 +176,11 @@ export const DEFAULT_STRATEGY = Object.freeze({
     moveThresholdPct: 20,
     minAbsMove: 0.01,
     direction: "both",
+    entryMode: "momentum",
+    entryPriceByOutcome: {
+      YES: { min: null, max: null },
+      NO: { min: null, max: null },
+    },
     confirmationTicks: 1,
     cooldownSec: 300,
     maxSignalsPerMarket: 5,
@@ -214,6 +219,7 @@ export const DEFAULT_STRATEGY = Object.freeze({
   },
   exit: {
     takeProfitPct: 50,
+    targetPriceByOutcome: { YES: null, NO: null },
     stopLossPct: 30,
     maxHoldSec: 3600,
     holdToResolution: false,
@@ -327,8 +333,30 @@ export function normalizeStrategy(input = {}) {
   merged.signal.metarReleaseRequireRising = coerceBool(merged.signal.metarReleaseRequireRising, true);
   merged.signal.copyTraderEnabled = coerceBool(merged.signal.copyTraderEnabled, false);
   merged.signal.copyTraderMode = String(merged.signal.copyTraderMode || "release").trim().toLowerCase();
+  merged.signal.entryMode = String(merged.signal.entryMode || "momentum").trim().toLowerCase();
   merged.signal.mirrorTakerOnly = coerceBool(merged.signal.mirrorTakerOnly, true);
   merged.signal.copyTraderUser = String(merged.signal.copyTraderUser || "").trim().toLowerCase();
+  const normalizeOutcomeBands = (value) => {
+    const source = value && typeof value === "object" ? value : {};
+    return {
+      YES: {
+        min: num(source.YES?.min, null),
+        max: num(source.YES?.max, null),
+      },
+      NO: {
+        min: num(source.NO?.min, null),
+        max: num(source.NO?.max, null),
+      },
+    };
+  };
+  merged.signal.entryPriceByOutcome = normalizeOutcomeBands(merged.signal.entryPriceByOutcome);
+  const targetSource = merged.exit.targetPriceByOutcome && typeof merged.exit.targetPriceByOutcome === "object"
+    ? merged.exit.targetPriceByOutcome
+    : {};
+  merged.exit.targetPriceByOutcome = {
+    YES: num(targetSource.YES, null),
+    NO: num(targetSource.NO, null),
+  };
   if (merged.signal.copyTraderUser && !/^0x[a-f0-9]{40}$/.test(merged.signal.copyTraderUser)) {
     merged.signal.copyTraderUser = "";
   }
@@ -401,6 +429,25 @@ export function validateStrategy(input = {}) {
   if (!["release", "mirror"].includes(s.copyTraderMode)) {
     err(`signal.copyTraderMode 必须是 release 或 mirror，当前为 ${s.copyTraderMode}`);
   }
+  if (!["momentum", "price_band"].includes(s.entryMode)) {
+    err(`signal.entryMode 必须是 momentum 或 price_band，当前为 ${s.entryMode}`);
+  }
+  for (const outcome of ["YES", "NO"]) {
+    const band = s.entryPriceByOutcome?.[outcome];
+    if (band?.min !== null && band?.min !== undefined) {
+      if (!(Number(band.min) >= 0 && Number(band.min) <= 1)) err(`signal.entryPriceByOutcome.${outcome}.min 必须在 0–1 之间`);
+    }
+    if (band?.max !== null && band?.max !== undefined) {
+      if (!(Number(band.max) >= 0 && Number(band.max) <= 1)) err(`signal.entryPriceByOutcome.${outcome}.max 必须在 0–1 之间`);
+    }
+    if (band?.min !== null && band?.max !== null && Number(band.min) > Number(band.max)) {
+      err(`signal.entryPriceByOutcome.${outcome}.min 不能大于 max`);
+    }
+    const target = x.targetPriceByOutcome?.[outcome];
+    if (target !== null && target !== undefined && !(Number(target) > 0 && Number(target) <= 1)) {
+      err(`exit.targetPriceByOutcome.${outcome} 必须在 0–1 之间`);
+    }
+  }
 
   inRange(e.sizingValue, LIMITS.execution.sizingValue, "execution.sizingValue");
   inRange(e.maxPositionUsd, LIMITS.execution.maxPositionUsd, "execution.maxPositionUsd");
@@ -446,48 +493,61 @@ export function validateStrategy(input = {}) {
  */
 export const STRATEGY_PRESETS = Object.freeze([
   {
-    id: "conservative",
-    label: "保守 · 高概率区间",
-    description: "只看 5¢-95¢ 的高流动性区间，2 次确认 + 长冷却，弱化噪声信号。",
+    id: "no-price-band",
+    label: "NO 89–98 入场 · 99 止盈",
+    description: "只监听 NO。目标 NO 卖价在 89–98¢ 时入场，NO 买一价达到 99¢ 时止盈；不启用动量、METAR、兜底或跟单。",
     config: {
       ...clone(DEFAULT_STRATEGY),
-      name: "保守 · 高概率区间",
-      universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.05, maxPrice: 0.95, minLiquidityUsd: 1000, maxSpread: 0.02 },
-      signal: { ...clone(DEFAULT_STRATEGY.signal), windowSec: 120, moveThresholdPct: 25, minAbsMove: 0.02, confirmationTicks: 2, cooldownSec: 600, maxSignalsPerMarket: 3 },
-      execution: { ...clone(DEFAULT_STRATEGY.execution), sizingMode: "fixed_stake", sizingValue: 20, maxPositionUsd: 40, maxPositions: 3 },
-      exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 40, stopLossPct: 25, maxHoldSec: 1800, holdToResolution: false },
-      risk: { ...clone(DEFAULT_STRATEGY.risk), bankrollUsd: 1000, maxDrawdownPct: 15 },
+      name: "NO 89–98 入场 · 99 止盈",
+      universe: {
+        ...clone(DEFAULT_STRATEGY.universe),
+        minPrice: 0.01,
+        maxPrice: 0.99,
+        minLiquidityUsd: 0,
+        maxSpread: 0.2,
+      },
+      signal: {
+        ...clone(DEFAULT_STRATEGY.signal),
+        direction: "down",
+        entryMode: "price_band",
+        entryPriceByOutcome: {
+          YES: { min: null, max: null },
+          NO: { min: 0.89, max: 0.98 },
+        },
+        windowSec: 60,
+        moveThresholdPct: 20,
+        minAbsMove: 0.01,
+        confirmationTicks: 1,
+        cooldownSec: 300,
+        maxSignalsPerMarket: 100,
+        metarReleaseEnabled: false,
+        copyTraderEnabled: false,
+      },
+      execution: {
+        ...clone(DEFAULT_STRATEGY.execution),
+        sizingMode: "fixed_stake",
+        sizingValue: 25,
+        maxPositionUsd: 50,
+        maxPositions: 10,
+        maxPositionsPerMarket: 1,
+        fallbackBuyEachWindow: false,
+      },
+      exit: {
+        ...clone(DEFAULT_STRATEGY.exit),
+        takeProfitPct: 100,
+        stopLossPct: 100,
+        maxHoldSec: 86_400,
+        holdToResolution: false,
+        targetPriceByOutcome: { YES: null, NO: 0.99 },
+      },
+      risk: {
+        ...clone(DEFAULT_STRATEGY.risk),
+        bankrollUsd: 1000,
+        maxDrawdownPct: 100,
+        dailyLossLimitUsd: 0,
+        killSwitch: false,
+      },
       sim: { ...clone(DEFAULT_STRATEGY.sim), tickIntervalMs: 1000 },
-    },
-  },
-  {
-    id: "balanced",
-    label: "均衡 · ±20%/1min 动量",
-    description: "需求原文策略的稳健实现：1 分钟 ±20% 且最小绝对变动 1¢，单笔 $25、最多 5 个仓位。",
-    config: {
-      ...clone(DEFAULT_STRATEGY),
-      name: "均衡 · ±20%/1min 动量",
-      universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.02, maxPrice: 0.98, minLiquidityUsd: 500, maxSpread: 0.03 },
-      signal: { ...clone(DEFAULT_STRATEGY.signal), windowSec: 60, moveThresholdPct: 20, minAbsMove: 0.01, confirmationTicks: 1, cooldownSec: 300 },
-      execution: { ...clone(DEFAULT_STRATEGY.execution), sizingValue: 25, maxPositionUsd: 50, maxPositions: 5 },
-      exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 50, stopLossPct: 30, maxHoldSec: 3600, holdToResolution: false },
-      risk: { ...clone(DEFAULT_STRATEGY.risk), bankrollUsd: 1000, maxDrawdownPct: 20 },
-      sim: { ...clone(DEFAULT_STRATEGY.sim), tickIntervalMs: 1000 },
-    },
-  },
-  {
-    id: "aggressive",
-    label: "激进 · 30s 高频动量",
-    description: "30 秒窗口、12% 阈值、快速冷却，追求交易频次；费用拖累和回撤显著放大。",
-    config: {
-      ...clone(DEFAULT_STRATEGY),
-      name: "激进 · 30s 高频动量",
-      universe: { ...clone(DEFAULT_STRATEGY.universe), minPrice: 0.01, maxPrice: 0.99, minLiquidityUsd: 200, maxSpread: 0.05 },
-      signal: { ...clone(DEFAULT_STRATEGY.signal), windowSec: 30, moveThresholdPct: 12, minAbsMove: 0.005, confirmationTicks: 1, cooldownSec: 120, maxSignalsPerMarket: 8 },
-      execution: { ...clone(DEFAULT_STRATEGY.execution), sizingMode: "fixed_stake", sizingValue: 50, maxPositionUsd: 100, maxPositions: 8 },
-      exit: { ...clone(DEFAULT_STRATEGY.exit), takeProfitPct: 80, stopLossPct: 50, maxHoldSec: 900, holdToResolution: false },
-      risk: { ...clone(DEFAULT_STRATEGY.risk), bankrollUsd: 2000, maxDrawdownPct: 35, dailyLossLimitUsd: 200 },
-      sim: { ...clone(DEFAULT_STRATEGY.sim), tickIntervalMs: 500 },
     },
   },
 ]);
@@ -684,6 +744,7 @@ export const EXIT_REASON_LABELS = Object.freeze({
   metar_release_rotate: "温度发布轮换卖出",
   copy_trade: "跟单交易",
   mirror_trade: "镜像跟单",
+  price_band: "价格带入场",
   rejected: "订单被拒",
 });
 

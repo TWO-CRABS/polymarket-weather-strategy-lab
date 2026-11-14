@@ -397,11 +397,10 @@ export async function mount(root, ctx) {
         state.presetId = preset.id;
       }
     } else if (ctx.store.meta && Array.isArray(ctx.store.meta.presets)) {
-      // 默认载入“均衡”预设，便于新用户直接启动需求中的 ±20%/1min 策略
-      const balanced = presets.find((item) => item.id === "balanced");
-      if (balanced) {
-        state.cfg = normalizeStrategy(balanced.config);
-        state.presetId = balanced.id;
+      const firstPreset = presets[0];
+      if (firstPreset) {
+        state.cfg = normalizeStrategy(firstPreset.config);
+        state.presetId = firstPreset.id;
       }
     }
   } catch (error) {
