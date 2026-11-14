@@ -130,7 +130,8 @@ export async function mount(root, ctx = {}) {
       config.risk.killSwitch = false;
       config.sim.mode = "live";
       config.sim.tickIntervalMs = 1000;
-      const run = await api.postJSON("/api/runs", { strategy: config, mode: "live" }, { timeoutMs: 25_000 });
+      const created = await api.postJSON("/api/runs", { strategy: config, mode: "live" }, { timeoutMs: 25_000 });
+      const run = created?.run || created;
       if (!run?.id) throw new Error("服务端未返回运行 ID");
       location.hash = `#/dashboard?run=${encodeURIComponent(run.id)}`;
     } catch (error) {
