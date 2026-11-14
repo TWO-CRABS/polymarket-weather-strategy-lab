@@ -11,6 +11,7 @@ import { bookMid, simulateBuy, simulateSell } from "./execution.js";
 import { evaluateSignal, createSignalState } from "./signal.js";
 import { effectiveTradingEndMs, sideDepthUsd } from "../data/gamma.js";
 import { isFallbackBlockedAtMetarRelease } from "./metarReleaseWindow.js";
+import { parseBracketTitle } from "../research/traderReaction.js";
 import { newId, roundTo } from "../util.js";
 
 export const RESOLUTION_POLL_MS = 20_000;
@@ -125,12 +126,12 @@ export function recordObservationSignal(run, market, candidate, now) {
 }
 
 export async function processMarkets(run, now) {
+  if (run.config.signal.entryMode === "price_band") {
+    await processPriceBandMarkets(run, now);
+    return;
+  }
   for (const market of run.markets.values()) {
     if (!market || market.closed) continue;
-    if (run.config.signal.entryMode === "price_band") {
-      await processPriceBandMarket(run, market, now);
-      continue;
-    }
     // Release signal owns this event group until its node window ends; do not
     // let momentum/fallback buy back positions that were just rotated.
     if (run._metarReleaseLockedGroups?.has(fallbackEventKey(market))) continue;
@@ -177,49 +178,80 @@ export async function processMarkets(run, now) {
 }
 
 /** Price-band entry: buy the configured outcome when executable ask is in range. */
-async function processPriceBandMarket(run, market, now) {
-  const positions = run.portfolio.positionsForMarket(market.id);
-  await evaluateExits(run, market, now, null);
-  if (positions.length > 0) return;
-  const direction = run.config.signal.direction === "down" ? "down" : "up";
-  const outcome = direction === "up" ? "YES" : "NO";
-  const quote = outcome === "YES" ? market.quotes?.YES : market.quotes?.NO;
-  const ask = Number(quote?.ask);
-  if (!(ask > 0)) return;
-  const band = run.config.signal.entryPriceByOutcome?.[outcome] || {};
-  const min = band.min !== null && band.min !== undefined && Number.isFinite(Number(band.min)) ? Number(band.min) : run.config.universe.minPrice;
-  const max = band.max !== null && band.max !== undefined && Number.isFinite(Number(band.max)) ? Number(band.max) : run.config.universe.maxPrice;
-  if (ask < min || ask > max) return;
-  const cooldownMs = Math.max(1, Number(run.config.signal.cooldownSec) || 0) * 1000;
-  const key = `${market.id}|${outcome}|price_band`;
-  if (now - (run._priceBandLastSignal?.get(key) || 0) < cooldownMs) return;
+async function processPriceBandMarkets(run, now) {
+  const candidates = [];
+  for (const market of run.markets.values()) {
+    if (!market || market.closed) continue;
+    await evaluateExits(run, market, now, null);
+    const hasPosition = run.portfolio.positionsForMarket(market.id).length > 0;
+    const direction = run.config.signal.direction === "down" ? "down" : "up";
+    const outcome = direction === "up" ? "YES" : "NO";
+    const quote = outcome === "YES" ? market.quotes?.YES : market.quotes?.NO;
+    const ask = Number(quote?.ask);
+    if (!(ask > 0)) continue;
+    const band = run.config.signal.entryPriceByOutcome?.[outcome] || {};
+    const min = band.min !== null && band.min !== undefined && Number.isFinite(Number(band.min)) ? Number(band.min) : run.config.universe.minPrice;
+    const max = band.max !== null && band.max !== undefined && Number.isFinite(Number(band.max)) ? Number(band.max) : run.config.universe.maxPrice;
+    if (ask < min || ask > max) continue;
+    const cooldownMs = Math.max(1, Number(run.config.signal.cooldownSec) || 0) * 1000;
+    const key = `${market.id}|${outcome}|price_band`;
+    const coolingDown = now - (run._priceBandLastSignal?.get(key) || 0) < cooldownMs;
+    const bracket = parseBracketTitle(market.bracket || market.title || "");
+    candidates.push({
+      market,
+      direction,
+      outcome,
+      ask,
+      key,
+      hasPosition,
+      coolingDown,
+      eventKey: market.eventId || market.eventSlug || `${market.city}|${market.endDate || ""}`,
+      temperature: bracket && Number.isFinite(bracket.lo) ? bracket.lo : Infinity,
+    });
+  }
+
+  let selected = candidates;
+  if (run.config.signal.onlyLeftmostInEvent) {
+    const byEvent = new Map();
+    for (const candidate of candidates) {
+      const previous = byEvent.get(candidate.eventKey);
+      if (!previous || candidate.temperature < previous.temperature) {
+        byEvent.set(candidate.eventKey, candidate);
+      }
+    }
+    selected = [...byEvent.values()];
+  }
+
   if (!run._priceBandLastSignal) run._priceBandLastSignal = new Map();
-  run._priceBandLastSignal.set(key, now);
-  const tokenId = outcome === "YES" ? market.tokens.yesTokenId : market.tokens.noTokenId;
-  const signal = {
-    id: newId("sig"),
-    ts: now,
-    runId: run.id,
-    marketId: market.id,
-    city: market.city,
-    bracket: market.bracket,
-    direction,
-    outcome,
-    tokenId,
-    fromPrice: ask,
-    toPrice: ask,
-    changePct: 0,
-    absChange: 0,
-    windowSec: 0,
-    priceField: "ask",
-    kind: "entry",
-    tradable: true,
-    reason: "price_band",
-  };
-  run.signals.push(signal);
-  run.store.appendRecord(run.id, "signal", signal);
-  run.sse.broadcast("signal", { signal }, run.id);
-  await tryEntry(run, signal, market, now, { reason: "price_band" });
+  for (const candidate of selected) {
+    if (candidate.hasPosition || candidate.coolingDown) continue;
+    run._priceBandLastSignal.set(candidate.key, now);
+    const tokenId = candidate.outcome === "YES" ? candidate.market.tokens.yesTokenId : candidate.market.tokens.noTokenId;
+    const signal = {
+      id: newId("sig"),
+      ts: now,
+      runId: run.id,
+      marketId: candidate.market.id,
+      city: candidate.market.city,
+      bracket: candidate.market.bracket,
+      direction: candidate.direction,
+      outcome: candidate.outcome,
+      tokenId,
+      fromPrice: candidate.ask,
+      toPrice: candidate.ask,
+      changePct: 0,
+      absChange: 0,
+      windowSec: 0,
+      priceField: "ask",
+      kind: "entry",
+      tradable: true,
+      reason: "price_band",
+    };
+    run.signals.push(signal);
+    run.store.appendRecord(run.id, "signal", signal);
+    run.sse.broadcast("signal", { signal }, run.id);
+    await tryEntry(run, signal, candidate.market, now, { reason: "price_band" });
+  }
 }
 
 /** Exit plan: settlement handled earlier; then SL > TP > maxHold > opposite. */
