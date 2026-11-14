@@ -250,19 +250,56 @@ function clamp(value, min, max) {
 
 function metaCities(store) {
   const raw = (store && store.meta && Array.isArray(store.meta.cities)) ? store.meta.cities : [];
+  const releaseCities = store?.meta?.metarReleaseTimes?.cities || {};
   return raw
     .map((item) => {
-      if (typeof item === "string") return { name: item, station: "" };
+      if (typeof item === "string") {
+        const release = releaseCities[item] || null;
+        return { name: item, station: release?.station || "", nodeOffsets: release?.minuteOffsetsUtc || [] };
+      }
       if (!item || typeof item !== "object") return null;
       const name = item.name || item.city || item.label || "";
       if (!name) return null;
+      const release = releaseCities[name] || null;
       return {
         name,
-        station: item.station || item.icao || item.code || "",
+        station: item.station || item.icao || item.code || release?.station || "",
         eventSlug: item.eventSlug || item.slug || "",
+        nodeOffsets: release?.minuteOffsetsUtc || [],
       };
     })
     .filter(Boolean);
+}
+
+/** Nearest METAR release node offset (seconds) for a set of UTC minute offsets. */
+function nearestNodeOffset(nodeOffsets, now = Date.now()) {
+  if (!Array.isArray(nodeOffsets) || nodeOffsets.length === 0) return null;
+  const current = new Date(now);
+  const midnight = Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate());
+  let best = null;
+  for (let day = -1; day <= 1; day += 1) {
+    for (let hour = 0; hour < 24; hour += 1) {
+      for (const minute of nodeOffsets) {
+        const ts = midnight + day * 86_400_000 + hour * 3_600_000 + Number(minute) * 60_000;
+        const offset = Math.round((now - ts) / 1000);
+        if (!best || Math.abs(offset) < Math.abs(best.offset)) best = { ts, offset };
+      }
+    }
+  }
+  return best;
+}
+
+function nodeBadgeText(city, timeZone, now = Date.now()) {
+  const nearest = nearestNodeOffset(city.nodeOffsets, now);
+  if (!nearest) return "";
+  const near = Math.abs(nearest.offset) <= 300;
+  if (!near) return { text: "节点 ±5m", near: false, nearest };
+  return {
+    text: `节点 ${nearest.offset >= 0 ? "+" : ""}${nearest.offset}s`,
+    near: true,
+    nearest,
+    local: timeZone ? localDateTimeForTimeZone(timeZone, new Date(nearest.ts)) : "",
+  };
 }
 
 function briefCityCode(city) {
@@ -422,6 +459,7 @@ export async function mount(root, ctx) {
   renderForm();
   loadSavedStrategyOptions();
   timers.time = window.setInterval(refreshCityTimezoneTimes, 30_000);
+  timers.node = window.setInterval(updateCityNodeBadges, 1000);
 
   /* -------------------- 渲染 -------------------- */
 
@@ -690,6 +728,8 @@ export async function mount(root, ctx) {
                 ${group.cities.map((city) => {
                   const eventUrl = cityEventUrl(city.name, cityLocalDateKey(city.name));
                   const title = `在 Polymarket 查看 ${city.name} 官方市场`;
+                  const nodeBadge = city.station && city.nodeOffsets?.length ? nodeBadgeText(city, group.timeZone) : null;
+                  const awUrl = city.station ? `https://aviationweather.gov/data/obs/data.php?ids=${encodeURIComponent(city.station)}` : "";
                   return `<div class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
                   <label class="city-option-label">
                     <input type="checkbox" value="${escapeAttr(city.name)}" data-city="${escapeAttr(city.name)}" ${selectedSet.has(city.name) ? "checked" : ""}>
@@ -697,6 +737,7 @@ export async function mount(root, ctx) {
                     <span class="city-name">${ui.escapeHtml(city.name)}</span>
                     ${city.station ? `<span class="city-meta">${ui.escapeHtml(city.station)}</span>` : ""}
                   </label>
+                  ${nodeBadge && awUrl ? `<a class="city-node-link ${nodeBadge.near ? "is-near" : ""}" href="${ui.escapeHtml(awUrl)}" target="_blank" rel="noopener noreferrer" data-city-node data-node-offsets="${escapeAttr(city.nodeOffsets.join(","))}" data-node-station="${escapeAttr(city.station)}" data-node-zone="${escapeAttr(group.timeZone || "")}" title="打开 aviationweather ${ui.escapeHtml(city.station)} · 最近节点 ${ui.escapeHtml(nodeBadge.local || "")}">${ui.escapeHtml(nodeBadge.text)} ↗</a>` : ""}
                   ${eventUrl ? `<a class="city-market-link" href="${ui.escapeHtml(eventUrl)}" target="_blank" rel="noopener noreferrer" title="${ui.escapeHtml(title)}" aria-label="${ui.escapeHtml(title)}">↗</a>` : ""}
                 </div>`;
                 }).join("")}
@@ -717,6 +758,23 @@ export async function mount(root, ctx) {
         value="${escapeAttr(selected.join(", "))}" placeholder="留空 = 全部城市；多个城市用英文逗号分隔">
       <span class="field-help" id="citiesHelp">城市元数据暂不可用；可手动输入城市名，例如 New York, London。</span>
     </div>`;
+  }
+
+  function updateCityNodeBadges() {
+    if (!root) return;
+    for (const link of root.querySelectorAll("[data-city-node]")) {
+      const offsets = String(link.dataset.nodeOffsets || "").split(",").map(Number).filter(Number.isFinite);
+      const nearest = nearestNodeOffset(offsets);
+      if (!nearest) continue;
+      const near = Math.abs(nearest.offset) <= 300;
+      const zone = link.dataset.nodeZone || "";
+      const local = zone ? localDateTimeForTimeZone(zone, new Date(nearest.ts)) : "";
+      link.textContent = near
+        ? `节点 ${nearest.offset >= 0 ? "+" : ""}${nearest.offset}s ↗`
+        : "节点 ±5m ↗";
+      link.classList.toggle("is-near", near);
+      link.title = `打开 aviationweather ${link.dataset.nodeStation || ""} · 最近节点 ${local}`;
+    }
   }
 
   function syncCityTimezoneUI() {
@@ -1374,6 +1432,8 @@ export async function mount(root, ctx) {
       timers.validate = 0;
       if (timers.time) clearInterval(timers.time);
       timers.time = 0;
+      if (timers.node) clearInterval(timers.node);
+      timers.node = 0;
       if (validateController) {
         try {
           validateController.abort();

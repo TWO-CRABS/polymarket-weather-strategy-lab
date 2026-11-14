@@ -1864,3 +1864,7 @@ canvas.mini-chart { display: block; width: 100%; height: 46px; margin: var(--sp-
 .city-heatmap th { color: var(--text-3); font-weight: 500; padding: 2px 4px; white-space: nowrap; text-align: center; }
 .city-heatmap tbody th { text-align: left; color: var(--text-2); font-size: var(--fs-11); }
 .city-heatmap td { width: 26px; height: 24px; text-align: center; color: var(--text-1); border-radius: 3px; font-family: var(--font-mono); }
+
+.city-node-link { font-size: 9px; font-family: var(--font-mono); color: var(--text-3); text-decoration: none; padding: 1px 4px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; }
+.city-node-link:hover { color: var(--cyan-text); border-color: rgba(34,211,238,.45); }
+.city-node-link.is-near { color: #031018; background: var(--cyan); border-color: var(--cyan); font-weight: 700; box-shadow: 0 0 0 2px rgba(34,211,238,.16); }

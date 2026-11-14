@@ -226,7 +226,7 @@ export function groupCitiesByTimezone(cities, at = new Date()) {
         cities: [],
       });
     }
-    groups.get(key).cities.push({ name: city.name, station: city.station || "" });
+    groups.get(key).cities.push({ ...city, name: city.name, station: city.station || "" });
   }
   const list = [...groups.values()];
   list.sort((a, b) => {

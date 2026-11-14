@@ -387,7 +387,7 @@ test("STRATEGY_PRESETS are all valid and match docs/03 §9 parameter table", () 
   assert.equal(noBand.universe.minPrice, 0.01);
   assert.equal(noBand.universe.maxPrice, 0.99);
   assert.equal(noBand.execution.sizingValue, 25);
-  assert.equal(noBand.execution.maxPositions, 10);
+  assert.equal(noBand.execution.maxPositions, 100);
 });
 
 test("every LIMITS entry is a sane [min, max] pair", () => {

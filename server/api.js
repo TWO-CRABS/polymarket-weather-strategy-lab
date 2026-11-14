@@ -21,6 +21,7 @@ import { queryCityLeaderboard } from "./research/leaderboardQuery.js";
 import { getEventTradeMetrics } from "./research/eventTradeMetrics.js";
 import { getPublicProfile } from "./research/profileResolver.js";
 import { getMonthlyPnl } from "./research/userPnl.js";
+import metarReleaseTimes from "./data/metarReleaseTimesStore.js";
 
 const MAX_LIMIT = 500;
 
@@ -94,6 +95,7 @@ export function createApiHandler(deps) {
     limits: LIMITS,
     priceFields: PRICE_FIELDS,
     directions: DIRECTIONS,
+    metarReleaseTimes: metarReleaseTimes.data,
   });
 
   /* --------------------------------- routes -------------------------------- */
