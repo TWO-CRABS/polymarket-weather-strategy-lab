@@ -26,6 +26,7 @@ const STATUS = Object.freeze({
 
 /** CLOB /books hard limit is 500 token ids per request. */
 const POLL_BOOK_CHUNK = 500;
+const POLL_BOOK_CONCURRENCY = 4;
 
 function quoteFromBook(book, previous, marker) {
   const bid = book && book.bestBid > 0 ? book.bestBid : previous ? previous.bid : 0;
@@ -284,31 +285,46 @@ export class Feed {
     this._pollStartedAt = started;
     try {
       const tokenIds = [...this.tokens.keys()];
-      let received = 0;
+      const batches = [];
       for (let i = 0; i < tokenIds.length; i += POLL_BOOK_CHUNK) {
-        const batch = tokenIds.slice(i, i + POLL_BOOK_CHUNK);
-        let books;
-        try {
-          // hot path: one batch request, no per-token fallback (never stall),
-          // short timeout so a slow upstream cannot freeze the feed loop
-          books = await this.clob.getBooks(batch, {
-            chunkSize: POLL_BOOK_CHUNK,
-            fallback: false,
-            timeoutMs: 6000,
-          });
-        } catch (err) {
-          this._consecutiveErrors += 1;
-          this.lastError = err.message;
-          continue;
-        }
-        for (const tokenId of batch) {
-          const book = books.get(tokenId);
-          if (book) {
-            received += 1;
-            this._applyBook(tokenId, book);
+        batches.push(tokenIds.slice(i, i + POLL_BOOK_CHUNK));
+      }
+      let received = 0;
+      let nextBatch = 0;
+      const worker = async () => {
+        while (true) {
+          const index = nextBatch++;
+          if (index >= batches.length) return;
+          const batch = batches[index];
+          let books;
+          try {
+            // hot path: one batch request, no per-token fallback (never stall),
+            // short timeout so a slow upstream cannot freeze the feed loop
+            books = await this.clob.getBooks(batch, {
+              chunkSize: POLL_BOOK_CHUNK,
+              fallback: false,
+              timeoutMs: 6000,
+            });
+          } catch (err) {
+            this._consecutiveErrors += 1;
+            this.lastError = err.message;
+            continue;
+          }
+          for (const tokenId of batch) {
+            const book = books.get(tokenId);
+            if (book) {
+              received += 1;
+              this._applyBook(tokenId, book);
+            }
           }
         }
-      }
+      };
+      await Promise.all(
+        Array.from(
+          { length: Math.min(POLL_BOOK_CONCURRENCY, batches.length) },
+          () => worker(),
+        ),
+      );
       this.latencyMs = Math.round(nowMs() - started);
       if (received > 0) {
         this._consecutiveErrors = 0;
