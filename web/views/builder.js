@@ -289,6 +289,12 @@ function nearestNodeOffset(nodeOffsets, now = Date.now()) {
   return best;
 }
 
+function aviationWeatherUrl(station, timestamp = Date.now()) {
+  const date = new Date(timestamp);
+  date.setUTCMinutes(0, 0, 0);
+  return `https://aviationweather.gov/api/data/metar?ids=${encodeURIComponent(station)}&format=raw&date=${date.toISOString().replace(".000Z", "Z")}&hours=30`;
+}
+
 function nodeBadgeText(city, timeZone, now = Date.now()) {
   const nearest = nearestNodeOffset(city.nodeOffsets, now);
   if (!nearest) return "";
@@ -729,7 +735,7 @@ export async function mount(root, ctx) {
                   const eventUrl = cityEventUrl(city.name, cityLocalDateKey(city.name));
                   const title = `在 Polymarket 查看 ${city.name} 官方市场`;
                   const nodeBadge = city.station && city.nodeOffsets?.length ? nodeBadgeText(city, group.timeZone) : null;
-                  const awUrl = city.station ? `https://aviationweather.gov/data/obs/data.php?ids=${encodeURIComponent(city.station)}` : "";
+                  const awUrl = city.station ? aviationWeatherUrl(city.station, nodeBadge?.nearest?.ts) : "";
                   return `<div class="city-option ${selectedSet.has(city.name) ? "is-on" : ""}">
                   <label class="city-option-label">
                     <input type="checkbox" value="${escapeAttr(city.name)}" data-city="${escapeAttr(city.name)}" ${selectedSet.has(city.name) ? "checked" : ""}>
@@ -769,6 +775,7 @@ export async function mount(root, ctx) {
       const near = Math.abs(nearest.offset) <= 300;
       const zone = link.dataset.nodeZone || "";
       const local = zone ? localDateTimeForTimeZone(zone, new Date(nearest.ts)) : "";
+      link.href = aviationWeatherUrl(link.dataset.nodeStation || "", nearest.ts);
       link.textContent = near
         ? `节点 ${nearest.offset >= 0 ? "+" : ""}${nearest.offset}s ↗`
         : "节点 ±5m ↗";
