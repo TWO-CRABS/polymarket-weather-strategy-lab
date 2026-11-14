@@ -177,8 +177,8 @@ export const DEFAULT_STRATEGY = Object.freeze({
     minAbsMove: 0.01,
     direction: "both",
     entryMode: "momentum",
-    /** price_band 模式：同一城市/日期事件只买最左侧（最低温度）的合格括号。 */
-    onlyLeftmostInEvent: false,
+    /** price_band 模式：以同一事件最高概率括号为界，只买其左侧（更低温度）的合格括号。 */
+    onlyLeftSideOfMaxProbability: false,
     entryPriceByOutcome: {
       YES: { min: null, max: null },
       NO: { min: null, max: null },
@@ -336,7 +336,7 @@ export function normalizeStrategy(input = {}) {
   merged.signal.copyTraderEnabled = coerceBool(merged.signal.copyTraderEnabled, false);
   merged.signal.copyTraderMode = String(merged.signal.copyTraderMode || "release").trim().toLowerCase();
   merged.signal.entryMode = String(merged.signal.entryMode || "momentum").trim().toLowerCase();
-  merged.signal.onlyLeftmostInEvent = coerceBool(merged.signal.onlyLeftmostInEvent, false);
+  merged.signal.onlyLeftSideOfMaxProbability = coerceBool(merged.signal.onlyLeftSideOfMaxProbability, false);
   merged.signal.mirrorTakerOnly = coerceBool(merged.signal.mirrorTakerOnly, true);
   merged.signal.copyTraderUser = String(merged.signal.copyTraderUser || "").trim().toLowerCase();
   const normalizeOutcomeBands = (value) => {
@@ -498,7 +498,7 @@ export const STRATEGY_PRESETS = Object.freeze([
   {
     id: "no-price-band",
     label: "NO 89–98 入场 · 99 止盈",
-    description: "只监听 NO。目标 NO 卖价在 89–98¢ 时入场，同一事件只买最低温度（最左侧）的合格括号，NO 买一价达到 99¢ 时止盈；不启用动量、METAR、兜底或跟单。",
+    description: "只监听 NO。目标 NO 卖价在 89–98¢ 时入场，只买同一事件最高概率温度左侧（更低温度）的合格括号，右侧不买；NO 买一价达到 99¢ 时止盈。",
     config: {
       ...clone(DEFAULT_STRATEGY),
       name: "NO 89–98 入场 · 99 止盈",
@@ -513,7 +513,7 @@ export const STRATEGY_PRESETS = Object.freeze([
         ...clone(DEFAULT_STRATEGY.signal),
         direction: "down",
         entryMode: "price_band",
-        onlyLeftmostInEvent: true,
+        onlyLeftSideOfMaxProbability: true,
         entryPriceByOutcome: {
           YES: { min: null, max: null },
           NO: { min: 0.89, max: 0.98 },

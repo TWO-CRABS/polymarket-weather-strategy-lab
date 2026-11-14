@@ -236,7 +236,7 @@ test("default strategy + presets are structurally complete and frozen", () => {
     assert.equal(preset.config.fees.takerFeeRate, FEES.takerFeeRate);
   }
   assert.equal(STRATEGY_PRESETS[0].config.signal.entryMode, "price_band");
-  assert.equal(STRATEGY_PRESETS[0].config.signal.onlyLeftmostInEvent, true);
+  assert.equal(STRATEGY_PRESETS[0].config.signal.onlyLeftSideOfMaxProbability, true);
   assert.equal(STRATEGY_PRESETS[0].config.signal.direction, "down");
   assert.deepEqual(STRATEGY_PRESETS[0].config.signal.entryPriceByOutcome.NO, { min: 0.89, max: 0.98 });
   assert.equal(STRATEGY_PRESETS[0].config.exit.targetPriceByOutcome.NO, 0.99);

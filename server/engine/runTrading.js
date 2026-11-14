@@ -179,6 +179,20 @@ export async function processMarkets(run, now) {
 
 /** Price-band entry: buy the configured outcome when executable ask is in range. */
 async function processPriceBandMarkets(run, now) {
+  const eventPeaks = new Map();
+  for (const market of run.markets.values()) {
+    if (!market || market.closed) continue;
+    const bracket = parseBracketTitle(market.bracket || market.title || "");
+    if (!bracket || !Number.isFinite(bracket.lo)) continue;
+    const probability = Number(market.impliedProbability);
+    if (!Number.isFinite(probability)) continue;
+    const eventKey = market.eventId || market.eventSlug || `${market.city}|${market.endDate || ""}`;
+    const previous = eventPeaks.get(eventKey);
+    if (!previous || probability > previous.probability) {
+      eventPeaks.set(eventKey, { probability, temperature: bracket.lo });
+    }
+  }
+
   const candidates = [];
   for (const market of run.markets.values()) {
     if (!market || market.closed) continue;
@@ -211,15 +225,11 @@ async function processPriceBandMarkets(run, now) {
   }
 
   let selected = candidates;
-  if (run.config.signal.onlyLeftmostInEvent) {
-    const byEvent = new Map();
-    for (const candidate of candidates) {
-      const previous = byEvent.get(candidate.eventKey);
-      if (!previous || candidate.temperature < previous.temperature) {
-        byEvent.set(candidate.eventKey, candidate);
-      }
-    }
-    selected = [...byEvent.values()];
+  if (run.config.signal.onlyLeftSideOfMaxProbability) {
+    selected = candidates.filter((candidate) => {
+      const peak = eventPeaks.get(candidate.eventKey);
+      return peak && Number.isFinite(candidate.temperature) && candidate.temperature < peak.temperature;
+    });
   }
 
   if (!run._priceBandLastSignal) run._priceBandLastSignal = new Map();

@@ -69,7 +69,7 @@ const GROUP_DEFS = [
       { path: "signal.moveThresholdPct", label: "触发阈值", unit: "%（±）", min: LIM.signal.moveThresholdPct[0], max: LIM.signal.moveThresholdPct[1], step: 1, slider: true, out: (v) => `±${v}%`, help: "需求示例：20（±20%）" },
       { path: "signal.minAbsMove", label: "最小绝对变动", unit: "USDC", min: LIM.signal.minAbsMove[0], max: LIM.signal.minAbsMove[1], step: 0.001, help: "过滤低价噪声；0.01 = 1¢，强烈建议 ≥ 0.01" },
       { path: "signal.direction", kind: "select", label: "信号方向", options: DIRECTIONS.map((v) => ({ value: v, label: DIRECTION_LABELS[v] || v })) },
-    { path: "signal.onlyLeftmostInEvent", kind: "toggle", label: "价格带模式只买最左侧温度", help: "同一城市/日期事件中，只买最低温度（最左侧）的合格括号；例如 26°C NO 89¢ 和 32°C NO 90¢ 同时合格时只买 26°C" },
+    { path: "signal.onlyLeftSideOfMaxProbability", kind: "toggle", label: "只买最高概率温度的左侧", help: "以同一事件当前概率最高的括号为中线，只买其左侧更低温度的合格 NO；右侧更高温度不买。例如最高概率是 30°C 时，26°C 可买，32°C 不买" },
       { path: "signal.confirmationTicks", label: "确认 Tick 数", unit: "次", min: LIM.signal.confirmationTicks[0], max: LIM.signal.confirmationTicks[1], step: 1 },
       { path: "signal.cooldownSec", label: "同市场冷却", unit: "秒", min: LIM.signal.cooldownSec[0], max: LIM.signal.cooldownSec[1], step: 10 },
       { path: "signal.maxSignalsPerMarket", label: "单市场最大信号数", unit: "次", min: LIM.signal.maxSignalsPerMarket[0], max: LIM.signal.maxSignalsPerMarket[1], step: 1 },

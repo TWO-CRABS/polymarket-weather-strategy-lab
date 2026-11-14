@@ -381,7 +381,7 @@ test("STRATEGY_PRESETS are all valid and match docs/03 §9 parameter table", () 
 
   const noBand = byId["no-price-band"].config;
   assert.equal(noBand.signal.entryMode, "price_band");
-  assert.equal(noBand.signal.onlyLeftmostInEvent, true);
+  assert.equal(noBand.signal.onlyLeftSideOfMaxProbability, true);
   assert.equal(noBand.signal.direction, "down");
   assert.deepEqual(noBand.signal.entryPriceByOutcome.NO, { min: 0.89, max: 0.98 });
   assert.equal(noBand.exit.targetPriceByOutcome.NO, 0.99);
