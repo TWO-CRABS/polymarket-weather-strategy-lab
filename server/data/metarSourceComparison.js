@@ -104,6 +104,14 @@ const adapters = {
     return parseMetarText(raw, now);
   },
 
+  async pagasa(entry, now) {
+    const response = await get("https://www.pagasa.dost.gov.ph/aviation/metar");
+    if (!response.ok) throw new Error(`PAGASA HTTP ${response.status}`);
+    const text = await response.text();
+    const raw = new RegExp(`(${entry.station}\\s+\\d{6}Z[^<\\n]*)`, "i").exec(text)?.[1] || "";
+    return parseMetarText(raw, now);
+  },
+
   async tgftp(entry, now) {
     const url = `https://tgftp.nws.noaa.gov/data/observations/metar/stations/${entry.station}.TXT`;
     const response = await get(url);

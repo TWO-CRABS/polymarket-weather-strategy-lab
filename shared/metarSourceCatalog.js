@@ -37,6 +37,12 @@ export const METAR_SOURCE_CITIES = Object.freeze([
     adapter: "saws",
   },
   {
+    city: "Manila",
+    station: "RPLL",
+    category: "national",
+    adapter: "pagasa",
+  },
+  {
     city: "Toronto",
     station: "CYYZ",
     category: "other",
