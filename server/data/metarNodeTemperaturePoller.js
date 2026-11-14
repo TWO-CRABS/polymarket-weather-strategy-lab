@@ -82,7 +82,7 @@ async function pollOnce() {
     const url = `${API}?ids=${stations.join(",")}&format=json&hours=0`;
     const response = await fetch(url, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(20_000),
     });
     if (response.status === 429) {
       backoffUntil = Date.now() + 30_000;

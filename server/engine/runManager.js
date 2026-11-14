@@ -18,6 +18,7 @@ import { ReplaySource, loadFixtureMarkets } from "../data/replay.js";
 import { compareMarketsForSelection, effectiveTradingEndMs } from "../data/gamma.js";
 import { createSettler, marketsFromTrades, rehydratePortfolio, settlePendingPositions } from "./settlementRecovery.js";
 import { startMetarNodeTemperaturePoller, stopMetarNodeTemperaturePoller } from "../data/metarNodeTemperaturePoller.js";
+import { startMetarSourceComparison, stopMetarSourceComparison } from "../data/metarSourceComparison.js";
 
 const RUNS_LIST_LIMIT = 50;
 
@@ -692,6 +693,8 @@ export class RunManager {
     );
     if (needs) startMetarNodeTemperaturePoller({ log: this.log });
     else stopMetarNodeTemperaturePoller();
+    if (needs) startMetarSourceComparison({ log: this.log });
+    else stopMetarSourceComparison();
   }
 
   /**
