@@ -54,8 +54,28 @@ function marketTable(rows) {
   </table>`;
 }
 
+function settlementPanel(data) {
+  if (!data) return "";
+  const before = data.byPeriod?.before || { total: 0, below: 0, belowRatio: 0 };
+  const after = data.byPeriod?.after || { total: 0, below: 0, belowRatio: 0 };
+  return `<div class="panel"><div class="panel-head"><div class="panel-title"><h2>天气 NO 买入 vs 结算温度</h2><p>只统计天气市场 BUY NO，并与该事件最终获胜温度比较</p></div></div><div class="panel-body">
+    <div class="lb-summary-row">
+      <div class="lb-stat"><span>NO 买入笔数</span><b>${data.totalWeatherNoBuyTrades}</b></div>
+      <div class="lb-stat"><span>可比较（已结算）</span><b>${data.resolvedComparable}</b></div>
+      <div class="lb-stat"><span>买在市场温度 &lt; 结算温度</span><b>${data.below} / ${data.resolvedComparable}（${pct(data.belowRatio)}）</b></div>
+      <div class="lb-stat"><span>等于结算温度</span><b>${data.equal}</b></div>
+      <div class="lb-stat"><span>高于结算温度</span><b>${data.above}</b></div>
+    </div>
+    <table class="table lb-trade-table" style="margin-top:12px"><thead><tr><th>时间段</th><th class="num-col">可比较</th><th class="num-col">温度低于结算</th><th class="num-col">比例</th></tr></thead><tbody>
+      <tr><td>5月22日之前</td><td class="num-col">${before.total}</td><td class="num-col">${before.below}</td><td class="num-col">${pct(before.belowRatio)}</td></tr>
+      <tr><td>5月22日至今</td><td class="num-col">${after.total}</td><td class="num-col">${after.below}</td><td class="num-col">${pct(after.belowRatio)}</td></tr>
+    </tbody></table>
+    <p class="muted">温度区间市场用区间中点近似；未结算事件和无法解析的温度括号被排除。跳过未结算 ${data.skippedUnresolvedEvents} 笔，解析失败 ${data.skippedParse} 笔。</p>
+  </div></div>`;
+}
+
 export async function mount(root) {
-  const state = { data: null, error: "", destroyed: false };
+  const state = { data: null, settlement: null, error: "", destroyed: false };
   root.innerHTML = `
     <section class="view is-active">
       <div class="view-head">
@@ -95,6 +115,7 @@ export async function mount(root) {
           <li>天气市场占比从 ${pct(before.weatherRatio)} 变为 ${pct(after.weatherRatio)}；之后平均成交价从 ${before.avgPrice} 上升到 ${after.avgPrice}。</li>
         </ul>
       </div></div>
+      ${settlementPanel(state.settlement)}
       <div class="panel lb-summary">
         <div class="panel-body lb-summary-row">
           <div class="lb-stat"><span>钱包</span><b class="mono">${ui.escapeHtml(d.wallet)}</b></div>
@@ -126,9 +147,13 @@ export async function mount(root) {
 
   async function load() {
     try {
-      const res = await fetch(DATA_URL, { cache: "no-store" });
+      const [res, settlementRes] = await Promise.all([
+        fetch(DATA_URL, { cache: "no-store" }),
+        fetch("/shared/traderNoSettlement.json", { cache: "no-store" }).catch(() => null),
+      ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       state.data = await res.json();
+      state.settlement = settlementRes && settlementRes.ok ? await settlementRes.json() : null;
       state.error = "";
     } catch (error) {
       state.error = `分析数据加载失败：${error.message}`;

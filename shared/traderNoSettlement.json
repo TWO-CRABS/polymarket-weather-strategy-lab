@@ -1,0 +1,118 @@
+{
+  "wallet": "0x6011655c4afb76f36dd1b08a137a1ba73466b31e",
+  "generatedAt": "2026-11-14T04:58:45.021Z",
+  "totalWeatherNoBuyTrades": 3411,
+  "uniqueEvents": 2427,
+  "resolvedComparable": 3406,
+  "below": 3388,
+  "above": 6,
+  "equal": 12,
+  "belowRatio": 0.9947152084556665,
+  "belowRatioAll": 0.9932571093520962,
+  "belowNotional": 1059272.1,
+  "comparableNotional": 1070702.02,
+  "skippedUnresolvedEvents": 5,
+  "skippedParse": 0,
+  "byPeriod": {
+    "after": {
+      "total": 3402,
+      "below": 3386,
+      "above": 6,
+      "equal": 10,
+      "belowRatio": 0.9952968841857731
+    },
+    "before": {
+      "total": 4,
+      "below": 2,
+      "above": 0,
+      "equal": 2,
+      "belowRatio": 0.5
+    }
+  },
+  "examples": [
+    {
+      "title": "Will the highest temperature in Moscow be 4°C on November 13?",
+      "market": "4°C",
+      "settlement": "5°C",
+      "ts": 1794598216,
+      "notional": 240.65
+    },
+    {
+      "title": "Will the highest temperature in Cape Town be 21°C on November 13?",
+      "market": "21°C",
+      "settlement": "22°C",
+      "ts": 1794567519,
+      "notional": 127.66
+    },
+    {
+      "title": "Will the highest temperature in Kuala Lumpur be 29°C on November 13?",
+      "market": "29°C",
+      "settlement": "30°C",
+      "ts": 1794557010,
+      "notional": 27.87
+    },
+    {
+      "title": "Will the highest temperature in Singapore be 31°C on November 13?",
+      "market": "31°C",
+      "settlement": "32°C",
+      "ts": 1794535254,
+      "notional": 623.44
+    },
+    {
+      "title": "Will the highest temperature in Moscow be 1°C on November 12?",
+      "market": "1°C",
+      "settlement": "2°C",
+      "ts": 1794483030,
+      "notional": 347.86
+    },
+    {
+      "title": "Will the highest temperature in Cape Town be 22°C on November 12?",
+      "market": "22°C",
+      "settlement": "23°C",
+      "ts": 1794477640,
+      "notional": 147.43
+    },
+    {
+      "title": "Will the highest temperature in Istanbul be 20°C on November 12?",
+      "market": "20°C",
+      "settlement": "22°C",
+      "ts": 1794477072,
+      "notional": 64.11
+    },
+    {
+      "title": "Will the highest temperature in Singapore be 31°C on November 12?",
+      "market": "31°C",
+      "settlement": "32°C",
+      "ts": 1794456061,
+      "notional": 138.33
+    },
+    {
+      "title": "Will the highest temperature in Paris be 10°C on November 12?",
+      "market": "10°C",
+      "settlement": "12°C",
+      "ts": 1794452470,
+      "notional": 538.09
+    },
+    {
+      "title": "Will the highest temperature in Singapore be 30°C on November 12?",
+      "market": "30°C",
+      "settlement": "32°C",
+      "ts": 1794452455,
+      "notional": 179.74
+    },
+    {
+      "title": "Will the highest temperature in Mexico City be 23°C on November 11?",
+      "market": "23°C",
+      "settlement": "24°C",
+      "ts": 1794426286,
+      "notional": 74.26
+    },
+    {
+      "title": "Will the highest temperature in Cape Town be 22°C on November 11?",
+      "market": "22°C",
+      "settlement": "23°C",
+      "ts": 1794394617,
+      "notional": 135.85
+    }
+  ]
+}
