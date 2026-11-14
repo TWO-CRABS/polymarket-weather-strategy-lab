@@ -74,8 +74,44 @@ function settlementPanel(data) {
   </div></div>`;
 }
 
+function cityDistributionPanel(data) {
+  if (!data?.cities?.length) return "";
+  const max = Math.max(...data.cities.map((city) => city.count), 1);
+  return `<div class="panel"><div class="panel-head"><div class="panel-title"><h2>城市分布</h2><p>天气市场成交笔数 · 共 ${data.weatherTrades} 笔 / ${data.cityCount} 个城市</p></div></div><div class="panel-body">
+    <div class="city-bars">
+      ${data.cities.slice(0, 20).map((city) => `<div class="city-bar-row">
+        <span class="city-bar-name">${ui.escapeHtml(city.city)}</span>
+        <div class="city-bar-track"><div class="city-bar-fill" style="width:${Math.max(2, (city.count / max) * 100).toFixed(1)}%"></div></div>
+        <span class="city-bar-value">${city.count} 笔 · ${money(city.notional)}</span>
+      </div>`).join("")}
+    </div>
+    <p class="muted">展示成交笔数前 20 的城市；香港等无时区映射的城市只计入城市分布，不进入时间热力图。</p>
+  </div></div>`;
+}
+
+function cityHourHeatmapPanel(data) {
+  if (!data?.cities?.length) return "";
+  const cities = data.cities.slice(0, 12);
+  const max = Math.max(1, ...cities.flatMap((city) => city.hours || []));
+  return `<div class="panel"><div class="panel-head"><div class="panel-title"><h2>各城市本地交易时间分布</h2><p>纵轴城市，横轴该城市当地小时（0–23），颜色越深成交越多</p></div></div><div class="panel-body">
+    <div class="city-heatmap-wrap">
+      <table class="city-heatmap">
+        <thead><tr><th>城市</th>${Array.from({ length: 24 }, (_, hour) => `<th>${hour}</th>`).join("")}</tr></thead>
+        <tbody>${cities.map((city) => `<tr>
+          <th>${ui.escapeHtml(city.city)}</th>
+          ${(city.hours || Array(24).fill(0)).map((count, hour) => {
+            const alpha = count ? Math.min(0.92, 0.12 + (count / max) * 0.8) : 0.02;
+            return `<td style="background:rgba(34,211,238,${alpha.toFixed(2)})" title="${ui.escapeHtml(city.city)} ${hour}:00 当地时间 · ${count} 笔">${count || ""}</td>`;
+          }).join("")}
+        </tr>`).join("")}</tbody>
+      </table>
+    </div>
+    <p class="muted">展示成交笔数前 12 的城市；按各城市当地时区换算，含夏令时。</p>
+  </div></div>`;
+}
+
 export async function mount(root) {
-  const state = { data: null, settlement: null, error: "", destroyed: false };
+  const state = { data: null, settlement: null, cities: null, error: "", destroyed: false };
   root.innerHTML = `
     <section class="view is-active">
       <div class="view-head">
@@ -116,6 +152,8 @@ export async function mount(root) {
         </ul>
       </div></div>
       ${settlementPanel(state.settlement)}
+      ${cityDistributionPanel(state.cities)}
+      ${cityHourHeatmapPanel(state.cities)}
       <div class="panel lb-summary">
         <div class="panel-body lb-summary-row">
           <div class="lb-stat"><span>钱包</span><b class="mono">${ui.escapeHtml(d.wallet)}</b></div>
@@ -147,13 +185,15 @@ export async function mount(root) {
 
   async function load() {
     try {
-      const [res, settlementRes] = await Promise.all([
+      const [res, settlementRes, citiesRes] = await Promise.all([
         fetch(DATA_URL, { cache: "no-store" }),
         fetch("/shared/traderNoSettlement.json", { cache: "no-store" }).catch(() => null),
+        fetch("/shared/traderCityAnalysis.json", { cache: "no-store" }).catch(() => null),
       ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       state.data = await res.json();
       state.settlement = settlementRes && settlementRes.ok ? await settlementRes.json() : null;
+      state.cities = citiesRes && citiesRes.ok ? await citiesRes.json() : null;
       state.error = "";
     } catch (error) {
       state.error = `分析数据加载失败：${error.message}`;
