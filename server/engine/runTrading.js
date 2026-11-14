@@ -203,7 +203,7 @@ async function processNodeTempNo(run, now) {
       if (bracket.hi > threshold) continue;
       const quote = market.quotes?.NO;
       const ask = Number(quote?.ask);
-      if (!(ask > 0) || ask > 0.98) continue;
+      if (!(ask > 0) || ask >= 1 || (Number.isFinite(Number(run.config.signal.entryPriceByOutcome?.NO?.max)) && ask > Number(run.config.signal.entryPriceByOutcome.NO.max))) continue;
       const key = `${city}|${node.nodeTs}|${market.id}`;
       if (run._nodeTempDone.has(key)) continue;
       candidates.push({ market, bracket, ask, key });

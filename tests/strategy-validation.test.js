@@ -392,9 +392,9 @@ test("STRATEGY_PRESETS are all valid and match docs/03 §9 parameter table", () 
 
   const nodeTempNo = byId["node-temp-no"].config;
   assert.equal(nodeTempNo.signal.entryMode, "node_temp_no");
-  assert.equal(nodeTempNo.signal.entryPriceByOutcome.NO.max, 0.98);
+  assert.equal(nodeTempNo.signal.entryPriceByOutcome.NO.max, 0.999);
   assert.equal(nodeTempNo.execution.maxPositions, 500);
-  assert.equal(nodeTempNo.exit.targetPriceByOutcome.NO, 0.995);
+  assert.equal(nodeTempNo.exit.targetPriceByOutcome.NO, 1);
 });
 
 test("every LIMITS entry is a sane [min, max] pair", () => {

@@ -556,15 +556,15 @@ export const STRATEGY_PRESETS = Object.freeze([
   },
   {
     id: "node-temp-no",
-    label: "节点最新温度买NO · 98¢买 / 99.5¢卖",
-    description: "在 METAR 发布节点后 7 分钟内轮询最新温度；按四舍五入后的温度，从高到低买入所有低于该温度的 NO 市场，最高 98¢，99.5¢ 卖出；不设持仓数量上限。",
+    label: "节点最新温度买NO · 100¢以下买 / 100¢卖或结算",
+    description: "在 METAR 发布节点后 7 分钟内轮询最新温度；按四舍五入后的温度，从高到低买入所有低于该温度的 NO 市场，只要卖价低于 100¢ 就买；到 100¢ 卖出，否则持有到结算。",
     config: {
       ...clone(DEFAULT_STRATEGY),
       name: "节点最新温度买NO",
       universe: {
         ...clone(DEFAULT_STRATEGY.universe),
-        minPrice: 0.01,
-        maxPrice: 0.99,
+        minPrice: 0.001,
+        maxPrice: 0.999,
         minLiquidityUsd: 0,
         maxSpread: 0.2,
       },
@@ -574,7 +574,7 @@ export const STRATEGY_PRESETS = Object.freeze([
         entryMode: "node_temp_no",
         entryPriceByOutcome: {
           YES: { min: null, max: null },
-          NO: { min: null, max: 0.98 },
+          NO: { min: null, max: 0.999 },
         },
         maxSignalsPerMarket: 100,
         metarReleaseEnabled: false,
@@ -591,11 +591,11 @@ export const STRATEGY_PRESETS = Object.freeze([
       },
       exit: {
         ...clone(DEFAULT_STRATEGY.exit),
-        takeProfitPct: 100,
+        takeProfitPct: 1000,
         stopLossPct: 100,
-        maxHoldSec: 86_400,
+        maxHoldSec: 604_800,
         holdToResolution: false,
-        targetPriceByOutcome: { YES: null, NO: 0.995 },
+        targetPriceByOutcome: { YES: null, NO: 1 },
       },
       risk: {
         ...clone(DEFAULT_STRATEGY.risk),
