@@ -1,0 +1,323 @@
+{
+  "wallet": "0x6011655c4afb76f36dd1b08a137a1ba73466b31e",
+  "generatedAt": "2026-11-14T04:40:17.567Z",
+  "boundary": 1779379200000,
+  "boundaryLabel": "2026-05-22 00:00 Asia/Shanghai",
+  "totalTrades": 12438,
+  "firstTradeTs": 1772681087,
+  "lastTradeTs": 1794625208,
+  "before": {
+    "label": "5月22日之前",
+    "from": 0,
+    "to": 1779379200000,
+    "tradeCount": 32,
+    "buyCount": 17,
+    "sellCount": 15,
+    "buyRatio": 0.53125,
+    "yesCount": 6,
+    "noCount": 26,
+    "notional": 94.05,
+    "avgNotional": 2.94,
+    "avgPrice": 0.383,
+    "avgSize": 114.96,
+    "marketCount": 12,
+    "eventCount": 9,
+    "activeDays": 5,
+    "tradesPerActiveDay": 6.4,
+    "weatherTradeCount": 21,
+    "weatherRatio": 0.65625,
+    "firstTs": 1772681087,
+    "lastTs": 1779247786,
+    "hourly": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      4,
+      0,
+      0,
+      1,
+      0,
+      3,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      3,
+      11,
+      0,
+      8,
+      0,
+      0
+    ],
+    "topMarkets": [
+      {
+        "conditionId": "0x9996ba14a699d29370c9ac866d61e1dd3ff860b5a051bc8de6190a80c8efb7d3",
+        "slug": "highest-temperature-in-lucknow-on-april-4-2026-35c",
+        "title": "Will the highest temperature in Lucknow be 35°C on April 4?",
+        "eventSlug": "highest-temperature-in-lucknow-on-april-4-2026",
+        "count": 9,
+        "notional": 29.25
+      },
+      {
+        "conditionId": "0xf43d12757f63a81e73959eb390c5b5c9b83ea4a218f334fa96c77f7ea5955b11",
+        "slug": "highest-temperature-in-lucknow-on-april-4-2026-36c",
+        "title": "Will the highest temperature in Lucknow be 36°C on April 4?",
+        "eventSlug": "highest-temperature-in-lucknow-on-april-4-2026",
+        "count": 5,
+        "notional": 12.48
+      },
+      {
+        "conditionId": "0xaa3a08c9d618bd946bfa62f4df6e30e8504976fd3f4b39b4640e53bee6f89173",
+        "slug": "btc-updown-5m-1772803200",
+        "title": "Bitcoin Up or Down - March 6, 8:20AM-8:25AM ET",
+        "eventSlug": "btc-updown-5m-1772803200",
+        "count": 3,
+        "notional": 2.96
+      },
+      {
+        "conditionId": "0xad599d62ca44c7203d9c2838ff0eba6898b9bcf4c400b163b15f903bcb4ba63a",
+        "slug": "highest-temperature-in-tokyo-on-may-20-2026-26c",
+        "title": "Will the highest temperature in Tokyo be 26°C on May 20?",
+        "eventSlug": "highest-temperature-in-tokyo-on-may-20-2026",
+        "count": 2,
+        "notional": 1.95
+      },
+      {
+        "conditionId": "0x4fcd814c967ad00a80f4d0d706eedd7467c409006ed6361c447dc1c66bdb5292",
+        "slug": "highest-temperature-in-lucknow-on-april-3-2026-35c",
+        "title": "Will the highest temperature in Lucknow be 35°C on April 3?",
+        "eventSlug": "highest-temperature-in-lucknow-on-april-3-2026",
+        "count": 2,
+        "notional": 10.33
+      },
+      {
+        "conditionId": "0x6faa656fe8b32761a793200718b37f986244ee1bab611d836b584d01fd4828fa",
+        "slug": "highest-temperature-in-lucknow-on-april-3-2026-36c",
+        "title": "Will the highest temperature in Lucknow be 36°C on April 3?",
+        "eventSlug": "highest-temperature-in-lucknow-on-april-3-2026",
+        "count": 2,
+        "notional": 11.74
+      },
+      {
+        "conditionId": "0x634bce2a0be1773970e6ff1f663f38302db156446921239cf571559c51135cd6",
+        "slug": "btc-updown-5m-1772803800",
+        "title": "Bitcoin Up or Down - March 6, 8:30AM-8:35AM ET",
+        "eventSlug": "btc-updown-5m-1772803800",
+        "count": 2,
+        "notional": 4.92
+      },
+      {
+        "conditionId": "0xfedd2983b4742a85faa2f43c6e8373217544bc6051e8fec1b2051a45100a3e66",
+        "slug": "btc-updown-5m-1772802000",
+        "title": "Bitcoin Up or Down - March 6, 8:00AM-8:05AM ET",
+        "eventSlug": "btc-updown-5m-1772802000",
+        "count": 2,
+        "notional": 1.95
+      }
+    ],
+    "topEvents": [
+      {
+        "eventSlug": "highest-temperature-in-lucknow-on-april-4-2026",
+        "count": 15,
+        "notional": 53.69
+      },
+      {
+        "eventSlug": "highest-temperature-in-lucknow-on-april-3-2026",
+        "count": 4,
+        "notional": 22.07
+      },
+      {
+        "eventSlug": "btc-updown-5m-1772803200",
+        "count": 3,
+        "notional": 2.96
+      },
+      {
+        "eventSlug": "highest-temperature-in-tokyo-on-may-20-2026",
+        "count": 2,
+        "notional": 1.95
+      },
+      {
+        "eventSlug": "btc-updown-5m-1772803800",
+        "count": 2,
+        "notional": 4.92
+      },
+      {
+        "eventSlug": "btc-updown-5m-1772802000",
+        "count": 2,
+        "notional": 1.95
+      },
+      {
+        "eventSlug": "bitcoin-up-or-down-on-march-5",
+        "count": 2,
+        "notional": 2
+      },
+      {
+        "eventSlug": "btc-updown-5m-1772804100",
+        "count": 1,
+        "notional": 3.52
+      }
+    ]
+  },
+  "after": {
+    "label": "5月22日至今",
+    "from": 1779379200000,
+    "to": 9007199254740991,
+    "tradeCount": 12406,
+    "buyCount": 5208,
+    "sellCount": 7198,
+    "buyRatio": 0.41979687248105757,
+    "yesCount": 719,
+    "noCount": 11687,
+    "notional": 2552227.79,
+    "avgNotional": 205.73,
+    "avgPrice": 0.9651,
+    "avgSize": 217.12,
+    "marketCount": 4980,
+    "eventCount": 3666,
+    "activeDays": 177,
+    "tradesPerActiveDay": 70.09,
+    "weatherTradeCount": 8955,
+    "weatherRatio": 0.721828147670482,
+    "firstTs": 1779411637,
+    "lastTs": 1794625208,
+    "hourly": [
+      555,
+      521,
+      640,
+      629,
+      682,
+      493,
+      533,
+      410,
+      361,
+      359,
+      614,
+      652,
+      682,
+      617,
+      487,
+      652,
+      670,
+      549,
+      492,
+      394,
+      367,
+      315,
+      343,
+      389
+    ],
+    "topMarkets": [
+      {
+        "conditionId": "0xa2130b3ddb191eec221ec4b0c2646a1f3fe94e6808c3a67ef8c79238e93e38df",
+        "slug": "highest-temperature-in-tel-aviv-on-september-21-2026-27corbelow",
+        "title": "Will the highest temperature in Tel Aviv be 27°C or below on September 21?",
+        "eventSlug": "highest-temperature-in-tel-aviv-on-september-21-2026",
+        "count": 35,
+        "notional": 4460.1
+      },
+      {
+        "conditionId": "0x0069c83b5e194c609aedc5ec139a7a0f9bcd14a601b7e6d92936233b7acef424",
+        "slug": "highest-temperature-in-taipei-on-june-2-2026-35c",
+        "title": "Will the highest temperature in Taipei be 35°C on June 2?",
+        "eventSlug": "highest-temperature-in-taipei-on-june-2-2026",
+        "count": 34,
+        "notional": 1647.3
+      },
+      {
+        "conditionId": "0x2f16d5b6000c5a8fba261c5473a8f2a5d99d8c6ec551c1aa59b10ca300b3fe7a",
+        "slug": "highest-temperature-in-tokyo-on-may-27-2026-26c",
+        "title": "Will the highest temperature in Tokyo be 26°C on May 27?",
+        "eventSlug": "highest-temperature-in-tokyo-on-may-27-2026",
+        "count": 32,
+        "notional": 1151.71
+      },
+      {
+        "conditionId": "0x300f58fcd0955ac9f7309deef26d37cd0f5b16d3fcd7240b85920fe3dea10ab8",
+        "slug": "highest-temperature-in-mexico-city-on-october-21-2026-20c",
+        "title": "Will the highest temperature in Mexico City be 20°C on October 21?",
+        "eventSlug": "highest-temperature-in-mexico-city-on-october-21-2026",
+        "count": 31,
+        "notional": 1679.3
+      },
+      {
+        "conditionId": "0x84d5b7b2dc74ed0da5742083adf18051affdb768c3cc3187bac42b224a8109a0",
+        "slug": "highest-temperature-in-sao-paulo-on-may-30-2026-21c",
+        "title": "Will the highest temperature in Sao Paulo be 21°C on May 30?",
+        "eventSlug": "highest-temperature-in-sao-paulo-on-may-30-2026",
+        "count": 29,
+        "notional": 800.45
+      },
+      {
+        "conditionId": "0x3e904f00a01634eed5d9d5e094921604a04b6d335fb4045cc56dd024c634b610",
+        "slug": "highest-temperature-in-jeddah-on-july-26-2026-40c",
+        "title": "Will the highest temperature in Jeddah be 40°C on July 26?",
+        "eventSlug": "highest-temperature-in-jeddah-on-july-26-2026",
+        "count": 28,
+        "notional": 217.19
+      },
+      {
+        "conditionId": "0x17bc4af0839bf70b968f0f9c53c46b0ab744bc990db41615c0bdda7519303c2a",
+        "slug": "highest-temperature-in-mexico-city-on-june-11-2026-25c",
+        "title": "Will the highest temperature in Mexico City be 25°C on June 11?",
+        "eventSlug": "highest-temperature-in-mexico-city-on-june-11-2026",
+        "count": 28,
+        "notional": 2227.02
+      },
+      {
+        "conditionId": "0x847abf04cce249d3cbd8287d1d7646798b810803978625b3be9815063a4954d7",
+        "slug": "highest-temperature-in-panama-city-on-may-30-2026-30c",
+        "title": "Will the highest temperature in Panama City be 30°C on May 30?",
+        "eventSlug": "highest-temperature-in-panama-city-on-may-30-2026",
+        "count": 28,
+        "notional": 899.17
+      }
+    ],
+    "topEvents": [
+      {
+        "eventSlug": "highest-temperature-in-taipei-on-june-2-2026",
+        "count": 63,
+        "notional": 5801.12
+      },
+      {
+        "eventSlug": "highest-temperature-in-cape-town-on-june-2-2026",
+        "count": 54,
+        "notional": 2843.49
+      },
+      {
+        "eventSlug": "highest-temperature-in-taipei-on-june-16-2026",
+        "count": 53,
+        "notional": 7204.79
+      },
+      {
+        "eventSlug": "highest-temperature-in-warsaw-on-june-11-2026",
+        "count": 52,
+        "notional": 7490.49
+      },
+      {
+        "eventSlug": "highest-temperature-in-paris-on-may-31-2026",
+        "count": 43,
+        "notional": 1844.59
+      },
+      {
+        "eventSlug": "highest-temperature-in-taipei-on-may-28-2026",
+        "count": 38,
+        "notional": 4341.82
+      },
+      {
+        "eventSlug": "highest-temperature-in-tel-aviv-on-september-21-2026",
+        "count": 37,
+        "notional": 8558.97
+      },
+      {
+        "eventSlug": "highest-temperature-in-taipei-on-july-22-2026",
+        "count": 36,
+        "notional": 10346.4
+      }
+    ]
+  }
+}
