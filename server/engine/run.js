@@ -339,13 +339,15 @@ export class Run {
       this._syncMarkets(snapshots);
       this._refreshMarks();
       await this._handleSettlements(now);
-      await this._processMarkets(now);
-      // Release signal runs after fallback/momentum so fallback always gets
-      // first chance; it may rotate positions created on this same tick.
-      await processMetarRelease(this, now);
       if (this.config.signal.copyTraderMode === "mirror") {
+        // Mirror runs are driven only by the target wallet's public fills.
+        // Do not also generate ordinary momentum, fallback or METAR signals.
         await processMirrorTrades(this, now);
       } else {
+        await this._processMarkets(now);
+        // Release signal runs after fallback/momentum so fallback always gets
+        // first chance; it may rotate positions created on this same tick.
+        await processMetarRelease(this, now);
         await processCopyTrades(this, now);
       }
       this._refreshMarks();
